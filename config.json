@@ -12,6 +12,7 @@
   ],
 
   "jitter_max_seconds": 0,
+  "zero_streak_limit": 6,
 
   "highlight_keywords": [
     "プラザシティ新所沢　けやき通り"
