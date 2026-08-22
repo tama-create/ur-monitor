@@ -86,6 +86,14 @@ jobs:
           path: ~/.npm
           key: npm-wrangler-${{ env.WRANGLER_VERSION }}
 
+      # プロジェクトが無ければ作る。ダッシュボードでの手作業を不要にするため。
+      # 既にあれば wrangler がエラーを返すが、それは正常な状態なので握りつぶす。
+      - name: Pages プロジェクトを用意
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          npx --yes wrangler@"${WRANGLER_VERSION}" pages project create "${PAGES_PROJECT}" \
+            --production-branch=main || true
+
       - name: Cloudflare Pages へデプロイ
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: |
