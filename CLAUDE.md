@@ -126,19 +126,20 @@ Cloudflare Pages へ配信するのは `results.html` と `deploy/_headers` に�
 ### デプロイは常に一式を送ること
 
 Cloudflare Pages の Direct Upload は、**デプロイした内容でサイト全体を置き換える**。
-一部のファイルだけを送ると、送らなかったファイルは消える。
+一部のファイルだけを送ると、送らなかったファイルは消える。`monitor.yml` の
+「公開用ディレクトリを用意」で `dist/` に入れたものが、そのまま公開物のすべてになる。
 
-デプロイする経路は2つあり、**どちらも `index.html` / `setup.html` / `_headers` の3点を揃えてから送っている**。
+### 公開先は2つあり、別物
 
-| ワークフロー | 起動 | 用途 |
+| 公開物 | 公開先 | 反映のタイミング |
 |---|---|---|
-| `monitor.yml` | 30分ごと | 監視の実行結果を反映 |
-| `deploy-docs.yml` | `docs/setup.html` の push | 手順書の更新を即時反映 |
+| `results.html`（実行結果） | Cloudflare Pages | 監視の実行ごと（30分） |
+| `docs/setup.html`（手順書） | GitHub Pages | `main` への push |
 
-**片方に公開物を足したら、もう片方にも足すこと。** 忘れると、そちらが動いた瞬間に消える。
-
-`deploy-docs.yml` が監視のコミットで誤発火しないのは、監視側のコミットメッセージに
-`[skip ci]` が付いていることと、`paths` に `results.html` を含めていないことの二重で防いでいる。
+**手順書を Cloudflare 側に混ぜないこと。** GitHub Pages が `main` の `/docs` を
+自動で配信するため、ワークフローもトークンも不要で、監視の実行サイクルにも縛られない。
+以前は Cloudflare 側に相乗りさせていたが、手順書を直すたびに監視の実行を待つ必要があり、
+無駄な結合だった。
 
 ## スタイル
 

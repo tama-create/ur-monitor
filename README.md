@@ -12,7 +12,7 @@ UR賃貸の空き部屋を定期監視し、条件に合う新着があれば Sl
 **プログラミングの知識がなくても使えます。** 画面の操作と設定値のコピー＆ペーストだけで、
 30〜60分ほどでセットアップできます。
 
-### 📖 [セットアップ手順書（図解つき）](https://ur-monitor-6pd.pages.dev/setup.html)
+### 📖 [セットアップ手順書（図解つき）](https://tama-create.github.io/ur-monitor/setup.html)
 
 GitHub アカウントの作り方から順に、図を交えて説明しています。はじめての方はこちらをどうぞ。
 
@@ -136,6 +136,25 @@ URサイトのHTML構造が変わって0件になった場合：
 2. 生成された `debug_page.html` をブラウザで開いて構造を確認
 3. `config.json` の `selectors` を更新
 
+## セットアップ手順書の公開（GitHub Pages）
+
+`docs/setup.html` は GitHub Pages で公開している。**ワークフローもトークンも不要**で、
+`main` に push すれば自動で反映される（反映まで最大10分程度）。
+
+フォークして自分の手順書を公開したい場合は、リポジトリの
+Settings → Pages → Build and deployment を次のように設定する。
+
+| 項目 | 値 |
+|---|---|
+| Source | Deploy from a branch |
+| Branch | `main` |
+| Folder | `/docs` |
+
+公開 URL は `https://<ユーザー名>.github.io/ur-monitor/setup.html` になる。
+
+**GitHub Free では公開リポジトリのみ**この機能を使える。private のままにしたい場合は
+手順書の公開を諦めるか、Cloudflare 側へ相乗りさせること。
+
 ## 設定（config.json）
 
 振る舞いはすべて `config.json` で決まる。監視対象も通知条件もセレクターも設定側にあるので、
@@ -228,10 +247,11 @@ Direct Upload のプロジェクトを作成する（Git 連携は使わない�
 `deploy/_headers` は Cloudflare Pages が読むヘッダー定義。配信ディレクトリ直下に
 `_headers` という名前で置く必要があるため、デプロイ時にコピーしている。
 
-デプロイする経路は2つある。監視結果を反映する `monitor.yml`（30分ごと）と、
-手順書の更新を即時反映する `deploy-docs.yml`（`docs/setup.html` の push で起動）。
-**Direct Upload はデプロイ内容でサイト全体を置き換えるため、どちらも公開物を一式揃えてから送っている。**
-公開物を増やすときは両方に足すこと。
+**Direct Upload はデプロイ内容でサイト全体を置き換える**ため、`dist/` に入れたものが
+そのまま公開物のすべてになる。公開物を増やすときは「公開用ディレクトリを用意」に足すこと。
+
+なお**セットアップ手順書はここではなく GitHub Pages で公開している**（下記）。
+静的なドキュメントを監視の実行サイクルに結びつける必要がないため。
 
 **公開範囲に注意。** Pages の URL は誰でもアクセスできる。中身は UR の公開情報だが、
 `highlight_keywords` で強調している物件名から「どの物件を狙っているか」は読み取れる。
