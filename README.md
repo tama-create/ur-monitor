@@ -152,6 +152,10 @@ Settings → Pages → Build and deployment を次のように設定する。
 
 公開 URL は `https://<ユーザー名>.github.io/ur-monitor/setup.html` になる。
 
+`docs/.nojekyll` は Jekyll による変換処理を止めるための空ファイル。HTML をそのまま配信させる。
+これが無いと、HTML 内の `{{ }}` や `{% %}` が Jekyll のテンプレート記法として解釈されて壊れたり、
+アンダースコアで始まるファイルが無視されたりする。**消さないこと。**
+
 **GitHub Free では公開リポジトリのみ**この機能を使える。private のままにしたい場合は
 手順書の公開を諦めるか、Cloudflare 側へ相乗りさせること。
 
