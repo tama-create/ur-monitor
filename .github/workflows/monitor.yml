@@ -78,9 +78,6 @@ jobs:
           cp results.html dist/index.html
           # Pages が読む _headers。ファイル名のまま配信ディレクトリ直下に置く必要がある。
           cp deploy/_headers dist/_headers
-          # セットアップ手順書。GitHub 上では HTML がレンダリングされないため、
-          # ここへ載せて README からリンクする。
-          cp docs/setup.html dist/setup.html
 
       - name: wrangler のキャッシュ
         if: env.CLOUDFLARE_API_TOKEN != ''
