@@ -734,6 +734,11 @@ function run_monitor(array $config, bool $dryRun = false): void
     // 検索URLごとの「0 件が続いた回数」。一時的な取得失敗と本当の空き無しを区別するために持つ。
     $zeroStreak = $state['zero_streak'] ?? [];
 
+    // 何回連続で 0 件なら「本当に空きが尽きた」と認めるか。
+    // これは回数であって時間ではないため、実行間隔を変えたらここも合わせること。
+    // 実行間隔 × この回数 が、UR 側の一時的な不調に耐えられる時間になる。
+    $zeroLimit = max(1, (int)($config['zero_streak_limit'] ?? 6));
+
     // Chrome を1回だけ起動してすべての URL を処理（高速化）
     $browser = create_browser($config, headless: true);
     try {
@@ -777,16 +782,16 @@ function run_monitor(array $config, bool $dryRun = false): void
             }
 
             // 取り直しても 0 件。一時障害なら前回状態を維持したいが、本当に空きが尽きた場合に
-            // 古い部屋を永久に表示し続けてしまうため、3 回連続（＝約1.5時間）で 0 なら実態として受け入れる。
+            // 古い部屋を永久に表示し続けてしまうため、一定回数続いたら実態として受け入れる。
             if (empty($rooms) && !empty($prevForUrl)) {
                 $streak = (int)($zeroStreak[$searchUrl] ?? 0) + 1;
-                if ($streak < 3) {
+                if ($streak < $zeroLimit) {
                     $zeroStreak[$searchUrl] = $streak;
-                    log_msg('ERROR', "0 件のため前回状態を維持（{$streak} 回目）: {$searchUrl}");
+                    log_msg('ERROR', "0 件のため前回状態を維持（{$streak}/{$zeroLimit} 回目）: {$searchUrl}");
                     $currentMap += $prevForUrl;
                     continue;
                 }
-                log_msg('WARNING', "3 回連続で 0 件のため、実際に空きが無くなったと判断: {$searchUrl}");
+                log_msg('WARNING', "{$zeroLimit} 回連続で 0 件のため、実際に空きが無くなったと判断: {$searchUrl}");
             }
             unset($zeroStreak[$searchUrl]);
             $scrapedOk = true;
