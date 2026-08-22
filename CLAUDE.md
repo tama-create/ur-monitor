@@ -16,7 +16,7 @@ php -l ur_monitor.php          # 構文チェック
 
 | コマンド | 用途 |
 |---|---|
-| `php ur_monitor.php --dry-run` | スクレイピングのみ。Slack 通知も `state.json` / `results.html` の更新もしない |
+| `php ur_monitor.php --dry-run` | スクレイピングのみ。Slack 通知も `state.json` / `docs/index.html` の更新もしない |
 | `php ur_monitor.php` | 本番と同じ動作。**ローカルでは基本実行しない**（下記「状態はリポジトリにある」参照） |
 | `php ur_monitor.php --setup` | ブラウザを表示し `debug_page.html` と `debug_*.png` を保存。セレクター調整用 |
 | `php ur_monitor.php --check-robots` | robots.txt の確認のみ |
@@ -43,7 +43,7 @@ config.json ──> run_monitor()
                   ↓
              前回 state との差分 ──> watch 条件に合致 ──> Slack
                   ↓
-             state.json / results.html を書き出し
+             state.json / docs/index.html を書き出し
 ```
 
 依存は `chrome-php/chrome`（Chrome DevTools Protocol）のみ。
@@ -52,7 +52,7 @@ config.json ──> run_monitor()
 
 ### 状態はリポジトリにある
 
-`state.json` と `results.html` は毎回の実行結果で、**Actions が実行のたびにコミットしている**
+`state.json` と `docs/index.html` は毎回の実行結果で、**Actions が実行のたびにコミットしている**
 （ランナーは毎回まっさらでファイルが残らないため）。`--dry-run` を付けずにローカル実行すると
 この2ファイルが書き換わり、Actions 側のコミットと衝突する。開発中は必ず `--dry-run` を使う。
 
@@ -105,41 +105,40 @@ Slack の Webhook URL は `SLACK_WEBHOOK_URL` 環境変数から渡す。`config
 画像読み込み無効（`--blink-settings=imagesEnabled=false`）にしている。監視URLを増やしたり
 間隔を詰めたりする変更は、この枠を超えないか確認してから行う。
 
-課金は**ジョブ単位で分単位に切り上げ**られる。監視ジョブは実測 64〜65 秒（＝2分課金）なので、
-数秒〜十数秒の追加はたいてい同じ課金分に収まる。Cloudflare Pages へのデプロイ手順を
-足しているのはこの余地があるため（wrangler の導入は実測でコールド9秒・ウォーム3秒）。
-逆に言えば、1分や2分の境界を跨ぐ追加は1回あたり+1分として効いてくる。
+課金は**ジョブ単位で分単位に切り上げ**られる。監視ジョブは実測 45〜65 秒なので、
+数秒の追加は同じ課金分に収まることが多いが、**1分の境界を跨ぐ追加は1回あたり+1分**として効く。
+公開を GitHub Pages に寄せて wrangler の実行（実測コールド9秒・ウォーム3秒）を
+やめたのは、この境界を跨ぎにくくする意味もある。
 
-`results.html` は生成時刻を埋め込むため、**部屋に変化が無くても毎回内容が変わる**。
+**なお公開リポジトリなら Actions は無制限に無料**で、この枠自体が外れる。上記は
+private に戻す場合に効いてくる話。
+
+`docs/index.html` は生成時刻を埋め込むため、**部屋に変化が無くても毎回内容が変わる**。
 「変わったときだけ処理する」といった分岐を書くときは、この点を踏まえること。
 
-### 公開されるのは dist/ の中身だけ
+### 公開は GitHub Pages 一本
 
-Cloudflare Pages へ配信するのは `results.html` と `deploy/_headers` に限っている。
-このリポジトリには `ur_monitor.php` や `config.json` など**公開してはいけないファイルがある**ため、
-リポジトリ直下を配信する構成にはできない。公開物を増やすときは `monitor.yml` の
-「公開用ディレクトリを用意」で明示的に `dist/` へコピーすること。
+一覧は `docs/index.html` に書き出し、実行のたびにコミットする。GitHub Pages が `main` の
+`/docs` を配信しているため、**push されれば自動で公開ページが最新になる**。
+外部サービスもトークンも使わない。
+
+| URL | 中身 |
+|---|---|
+| `https://<ユーザー名>.github.io/ur-monitor/` | 空き部屋一覧（`docs/index.html`） |
+| `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
+
+`docs/.nojekyll` は Jekyll の変換を止めるための空ファイル。**消さないこと。**
+これが無いと HTML 内の `{{ }}` や `{% %}` がテンプレート記法として解釈されて壊れる。
+
+**監視のコミットに `[skip ci]` を付けないこと。** このワークフローには `push` トリガーが
+無いので自己ループは起きず、逆に付けると Pages のビルドまで止めてしまう恐れがある。
 
 生成 HTML には `noindex, nofollow` を入れている。狙っている物件が
 `highlight_keywords` から読み取れるため、検索エンジンに載せない意図。外すときはその点を承知の上で。
 
-### デプロイは常に一式を送ること
-
-Cloudflare Pages の Direct Upload は、**デプロイした内容でサイト全体を置き換える**。
-一部のファイルだけを送ると、送らなかったファイルは消える。`monitor.yml` の
-「公開用ディレクトリを用意」で `dist/` に入れたものが、そのまま公開物のすべてになる。
-
-### 公開先は2つあり、別物
-
-| 公開物 | 公開先 | 反映のタイミング |
-|---|---|---|
-| `results.html`（実行結果） | Cloudflare Pages | 監視の実行ごと（30分） |
-| `docs/setup.html`（手順書） | GitHub Pages | `main` への push |
-
-**手順書を Cloudflare 側に混ぜないこと。** GitHub Pages が `main` の `/docs` を
-自動で配信するため、ワークフローもトークンも不要で、監視の実行サイクルにも縛られない。
-以前は Cloudflare 側に相乗りさせていたが、手順書を直すたびに監視の実行を待つ必要があり、
-無駄な結合だった。
+以前は Cloudflare Pages の Direct Upload を使っていたが、GitHub Pages で足りるため廃止した。
+API トークンと Account ID の Secrets、wrangler の実行手順、`deploy/_headers`、
+「デプロイは常に一式を送る」という制約が、まとめて不要になっている。
 
 ## スタイル
 

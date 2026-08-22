@@ -2,6 +2,21 @@
 
 UR賃貸の空き部屋を定期監視し、条件に合う新着があれば Slack へ通知する。
 
+## なぜ作ったのか
+
+**UR賃貸の空室情報は、基本的に Web にしか出ません。** メールで知らせてくれるわけでもないので、
+気になる物件のページを自分で何度も開いて確かめるしかありません。
+
+そして**空きが出たら、気づいた人から順に電話で押さえる早い者勝ち**です。
+数時間気づくのが遅れただけで、もう他の人に決まっていた、ということが普通に起こります。
+
+1件を見張るだけでも大変なのに、候補が複数あればなおさら現実的ではありません。
+仕事中も寝ている間も、人間が張り付き続けることはできません。
+
+**だから、入居したい物件を横断的に監視して、空きが出た瞬間に知らせる仕組みが要ります。**
+このツールはそのために作りました。30分ごとに自動で見に行き、条件に合う新着だけを通知します。
+見張る作業を機械に任せて、**人間は「電話をかける」という本当に大事な一手に集中できます。**
+
 - **本番実行は GitHub Actions（Linux）のみ**。PCの起動状態に関係なく動く。
 - **開発は Windows / macOS / Linux のどこでもできる**。OS固有の処理は持たず、
   Chrome の場所の違いだけ `detect_chrome_path()` で吸収している。
@@ -22,7 +37,7 @@ GitHub アカウントの作り方から順に、図を交えて説明してい�
 - GitHub アカウントの用意 → フォーク → 監視条件の設定
 - Slack の通知先の作り方（アプリ作成・チャンネル・Webhook 発行）
 - 動作確認のしかた
-- Cloudflare での Web 公開（任意）
+- 空き部屋一覧の Web 公開（任意）
 - うまくいかないときの対処と、使っている技術の説明
 
 以降のこの README は、**技術的な詳細を知りたい方向け**の内容です。
@@ -36,7 +51,7 @@ GitHub アカウントの作り方から順に、図を交えて説明してい�
 - **自己責任でお願いします。** 動作を保証するものではなく、利用によって生じた不利益について作者は責任を負いません（[MIT License](LICENSE)）
 - **`config.json` は作者の設定例です。** `search_urls` / `watch` / `highlight_keywords` は
   ご自身の条件に置き換えてください。そのまま動かしても作者が見ている物件を追うだけになります
-- **Slack Webhook や Cloudflare のトークンは含まれていません。** それぞれご自身で用意してください
+- **Slack Webhook は含まれていません。** ご自身で用意してください
 
 UR のサイトへアクセスするツールです。`robots.txt` を確認し、URL間に待機を入れ、30分間隔で
 動かしています。**取得間隔を極端に詰めるような改変はしないでください。** 相手のサーバーに
@@ -47,7 +62,7 @@ UR のサイトへアクセスするツールです。`robots.txt` を確認し�
 - 08:00〜21:00 JST・30分間隔で `.github/workflows/monitor.yml` が実行される
 - `config.json` の `search_urls` を巡回してスクレイピング
 - `watch` 条件に合致する新着があれば Slack へ通知
-- 実行結果（`state.json` / `results.html`）は毎回リポジトリへコミットして永続化する
+- 実行結果（`state.json` / `docs/index.html`）は毎回リポジトリへコミットして永続化する
   （Actions のランナーは毎回まっさらな環境で、ファイルが残らないため）
 
 ## 開発（Windows / Mac 共通）
@@ -57,7 +72,7 @@ composer install
 php ur_monitor.php --dry-run
 ```
 
-`--dry-run` はスクレイピングだけ行い、**Slack 通知も `state.json` / `results.html` の更新もしない**。
+`--dry-run` はスクレイピングだけ行い、**Slack 通知も `state.json` / `docs/index.html` の更新もしない**。
 本番の状態を壊さずに手元で動作確認できるので、開発中は基本これを使う。
 
 `--dry-run` を付けずに実行すると本番と同じ動作になり、`state.json` が書き換わる。
@@ -157,7 +172,7 @@ Settings → Pages → Build and deployment を次のように設定する。
 アンダースコアで始まるファイルが無視されたりする。**消さないこと。**
 
 **GitHub Free では公開リポジトリのみ**この機能を使える。private のままにしたい場合は
-手順書の公開を諦めるか、Cloudflare 側へ相乗りさせること。
+Web 公開を諦め、Slack 通知だけを使うこと。
 
 ## 設定（config.json）
 
@@ -169,7 +184,7 @@ Settings → Pages → Build and deployment を次のように設定する。
 | `search_urls` | ✓ | 巡回する UR の検索結果ページ。**ここに出てくる物件だけが監視対象**になる |
 | `watch` |  | 通知する条件。合致した新着だけが Slack に飛ぶ |
 | `notify_all_new` |  | `true` で `watch` に関係なく全新着を通知。既定 `false`（スパム防止） |
-| `highlight_keywords` |  | `results.html` で強調表示する文字列。**通知には影響しない**（見た目だけ） |
+| `highlight_keywords` |  | 公開ページで強調表示する文字列。**通知には影響しない**（見た目だけ） |
 | `jitter_max_seconds` |  | 実行開始前のランダム待機の上限秒。`0` で無効 |
 | `selectors` |  | UR ページの CSS セレクター。省略時はコード内の既定値が使われる |
 | `slack_webhook_url` |  | Slack の Webhook URL。**環境変数 `SLACK_WEBHOOK_URL` があればそちらが優先**。実値は書かない |
@@ -202,7 +217,7 @@ UR のサイトで条件を絞り込んだ**検索結果ページの URL** を�
 
 ### highlight_keywords
 
-`results.html` の中で色を付けて目立たせるだけの設定。通知の条件とは無関係なので、
+公開ページ（`docs/index.html`）の中で色を付けて目立たせるだけの設定。通知の条件とは無関係なので、
 `watch` と同じ文字列を書いておくと画面上でも見つけやすい、という使い方になる。
 
 ### selectors
@@ -223,45 +238,22 @@ Webhook URL は**リポジトリに置かない**。GitHub Secrets から環境�
 環境変数が未設定なら `config.json` の `slack_webhook_url` を見るが、
 **そこに実際の値を書いてコミットしないこと**（Git履歴に残ると消すのが面倒）。
 
-## results.html を Cloudflare Pages に公開する
+## 空き部屋一覧の Web 公開（GitHub Pages）
 
-`results.html` を Cloudflare Pages へ自動デプロイできる。監視の実行後、`monitor.yml` が
-`dist/index.html` として送り出す。**`CLOUDFLARE_API_TOKEN` が未設定のうちはスキップされる**ので、
-設定を終えるまでこのワークフローが失敗し続けることはない。
+監視が生成する一覧は `docs/index.html` に書き出され、実行のたびにコミットされる。
+GitHub Pages が `main` の `/docs` を配信しているので、**push されるたび自動で公開ページが最新になる**。
 
-**1. Pages プロジェクトを作る。** Cloudflare ダッシュボードの Workers & Pages で
-Direct Upload のプロジェクトを作成する（Git 連携は使わない）。名前は `monitor.yml` の
-`PAGES_PROJECT` と一致させる（既定は `ur-monitor`）。
+**外部サービスもトークンも要らない。** 手順書と同じ仕組みに相乗りしている。
 
-**2. API トークンを作る。** 権限は **アカウント → Cloudflare Pages → 編集**。
-
-**3. GitHub Secrets に登録する。** Settings → Secrets and variables → Actions で次の2つ。
-
-| Secret 名 | 中身 |
+| URL | 中身 |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | 上で作ったトークン |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare のアカウントID |
+| `https://<ユーザー名>.github.io/ur-monitor/` | 空き部屋一覧 |
+| `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
 
-公開されるのは `dist/` の中身、つまり `results.html`（`index.html` として配置）と
-`deploy/_headers` だけ。**リポジトリ直下をそのまま配信すると `ur_monitor.php` や
-`config.json` まで公開されてしまう**ため、公開したいファイルだけを `dist/` に移してから
-デプロイしている。同じ Cloudflare Pages でも、静的サイトそのものであれば
-リポジトリを直接つなぐ方が簡単だが、このリポジトリはその形にできない。
+有効化の手順は下記「セットアップ手順書の公開（GitHub Pages）」と共通。**設定は1回だけ**でよい。
 
-`deploy/_headers` は Cloudflare Pages が読むヘッダー定義。配信ディレクトリ直下に
-`_headers` という名前で置く必要があるため、デプロイ時にコピーしている。
-
-**Direct Upload はデプロイ内容でサイト全体を置き換える**ため、`dist/` に入れたものが
-そのまま公開物のすべてになる。公開物を増やすときは「公開用ディレクトリを用意」に足すこと。
-
-なお**セットアップ手順書はここではなく GitHub Pages で公開している**（下記）。
-静的なドキュメントを監視の実行サイクルに結びつける必要がないため。
-
-**公開範囲に注意。** Pages の URL は誰でもアクセスできる。中身は UR の公開情報だが、
-`highlight_keywords` で強調している物件名から「どの物件を狙っているか」は読み取れる。
-そのため生成される HTML に `<meta name="robots" content="noindex, nofollow">` を入れて
-検索エンジンに拾われないようにしている。URL を知っている人には見えるので、
-それも避けたい場合は Cloudflare Access（Zero Trust）で認証をかける。
+生成 HTML には `noindex, nofollow` を入れている。狙っている物件が `highlight_keywords` から
+読み取れるため、検索エンジンに載せない意図。**ただし URL を知っていれば誰でも見られる。**
 
 ## 取得失敗への対策
 

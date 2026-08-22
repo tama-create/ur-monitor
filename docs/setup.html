@@ -146,6 +146,12 @@
 <nav class="toc" aria-label="目次">
   <p class="toc-ttl">目次</p>
   <ol>
+    <li><a href="#s0">なぜこのツールを作ったのか</a>
+      <ol>
+        <li><a href="#s0-1">空室情報は Web にしか出ない</a></li>
+        <li><a href="#s0-2">気づくのが遅れると取られる</a></li>
+      </ol>
+    </li>
     <li><a href="#s1">このツールは何をするのか</a>
       <ol>
         <li><a href="#s1-1">全体の流れ</a></li>
@@ -200,28 +206,32 @@
         <li><a href="#s8-3">結果を確認する</a></li>
       </ol>
     </li>
-    <li><a href="#s9">Web ページとして公開する <span class="opt">（任意）</span></a>
+    <li><a href="#s9">通知を活かすコツ</a>
       <ol>
-        <li><a href="#s9-1">Cloudflare アカウントを作る</a></li>
-        <li><a href="#s9-2">API トークンを作る</a></li>
-        <li><a href="#s9-3">Account ID を調べる</a></li>
-        <li><a href="#s9-4">GitHub に2つ登録する</a></li>
-        <li><a href="#s9-5">もう一度実行する</a></li>
+        <li><a href="#s9-1">スマートウォッチで受け取る</a></li>
+        <li><a href="#s9-2">通知は強めに設定してよい</a></li>
+        <li><a href="#s9-3">気づいたらすぐ電話する</a></li>
       </ol>
     </li>
-    <li><a href="#s10">うまくいかないとき</a>
+    <li><a href="#s10">空き部屋一覧を Web で見る <span class="opt">（任意）</span></a>
       <ol>
-        <li><a href="#s10-1">Slack に通知が来ない</a></li>
-        <li><a href="#s10-2">「0 件のため前回状態を維持」と出る</a></li>
-        <li><a href="#s10-3">実行が赤いバツになる</a></li>
-        <li><a href="#s10-4">1件も部屋が取れない</a></li>
+        <li><a href="#s10-1">GitHub Pages を有効にする</a></li>
+        <li><a href="#s10-2">反映のタイミング</a></li>
       </ol>
     </li>
-    <li><a href="#s11">使っている技術</a>
+    <li><a href="#s11">うまくいかないとき</a>
       <ol>
-        <li><a href="#s11-1">技術の一覧</a></li>
-        <li><a href="#s11-2">状態の持ち方</a></li>
-        <li><a href="#s11-3">やっていないこと</a></li>
+        <li><a href="#s11-1">Slack に通知が来ない</a></li>
+        <li><a href="#s11-2">「0 件のため前回状態を維持」と出る</a></li>
+        <li><a href="#s11-3">実行が赤いバツになる</a></li>
+        <li><a href="#s11-4">1件も部屋が取れない</a></li>
+      </ol>
+    </li>
+    <li><a href="#s12">使っている技術</a>
+      <ol>
+        <li><a href="#s12-1">技術の一覧</a></li>
+        <li><a href="#s12-2">状態の持ち方</a></li>
+        <li><a href="#s12-3">やっていないこと</a></li>
       </ol>
     </li>
   </ol>
@@ -241,6 +251,34 @@ UR賃貸の空き部屋を自動で監視し、条件に合う新着が出たら
 <p><strong>所要時間の目安：30〜60分。</strong>
 アカウントを新しく作る場合は、その分が加算されます。<br>
 途中で分からなくなっても壊れることはないので、落ち着いて進めてください。</p>
+</div>
+
+<h2 id="s0">なぜこのツールを作ったのか</h2>
+
+<h3 id="s0-1">空室情報は Web にしか出ない</h3>
+
+<p>
+<strong>UR賃貸の空室情報は、基本的に Web にしか出ません。</strong>
+メールで知らせてくれるわけでもないので、気になる物件のページを<strong>自分で何度も開いて
+確かめるしかありません</strong>。
+</p>
+
+<h3 id="s0-2">気づくのが遅れると取られる</h3>
+
+<p>
+そして<strong>空きが出たら、気づいた人から順に電話で押さえる早い者勝ち</strong>です。
+数時間気づくのが遅れただけで、もう他の人に決まっていた、ということが普通に起こります。
+</p>
+
+<p>
+1件を見張るだけでも大変なのに、候補が複数あればなおさら現実的ではありません。
+仕事中も、寝ている間も、人間が張り付き続けることはできません。
+</p>
+
+<div class="ok">
+<p><strong>だから、入居したい物件を横断的に監視して、空きが出た瞬間に知らせる仕組みが要ります。</strong>
+このツールはそのために作りました。</p>
+<p>見張る作業は機械に任せて、<strong>人間は「電話をかける」という本当に大事な一手に集中できます。</strong></p>
 </div>
 
 <h2 id="s1">このツールは何をするのか</h2>
@@ -316,15 +354,14 @@ UR賃貸のサイトを<strong>30分ごとに自動で見に行き</strong>、�
 
 <table>
   <tr><th>必要なもの</th><th>費用</th><th>備考</th></tr>
-  <tr><td>GitHub アカウント</td><td>無料</td><td>必須。第 3 章で作ります</td></tr>
+  <tr><td>GitHub アカウント</td><td>無料</td><td>必須。第 4 章で作ります</td></tr>
   <tr><td>Slack ワークスペース</td><td>無料</td><td>必須。通知の受け取り先</td></tr>
-  <tr><td>Cloudflare アカウント</td><td>無料</td><td>任意。Web 公開したい場合だけ</td></tr>
 </table>
 
 <h3 id="s2-2">セットアップの全体像</h3>
 
 <figure class="fig">
-<svg viewBox="0 0 840 330" role="img" aria-label="第3章から第8章までが必須、第9章のCloudflareは任意という全体像">
+<svg viewBox="0 0 840 330" role="img" aria-label="第4章から第9章までが必須、第11章のWeb公開は任意という全体像">
   <defs>
     <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -334,23 +371,23 @@ UR賃貸のサイトを<strong>30分ごとに自動で見に行き</strong>、�
   <rect x="14" y="34" width="812" height="132" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
   <g>
     <rect x="30" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="89" y="82" class="tn">第 3 章</text>
+    <text x="89" y="82" class="tn">第 4 章</text>
     <text x="89" y="106" class="t1">GitHub</text>
     <text x="89" y="126" class="t2">アカウント</text>
     <rect x="188" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="247" y="82" class="tn">第 4 章</text>
+    <text x="247" y="82" class="tn">第 5 章</text>
     <text x="247" y="106" class="t1">フォーク</text>
     <text x="247" y="126" class="t2">自分にコピー</text>
     <rect x="346" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="405" y="82" class="tn">第 5 章</text>
+    <text x="405" y="82" class="tn">第 6 章</text>
     <text x="405" y="106" class="t1">条件を設定</text>
     <text x="405" y="126" class="t2">config.json</text>
     <rect x="504" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="563" y="82" class="tn">第 6〜7 章</text>
+    <text x="563" y="82" class="tn">第 7〜8 章</text>
     <text x="563" y="106" class="t1">Slack</text>
     <text x="563" y="126" class="t2">通知先を用意</text>
     <rect x="662" y="58" width="148" height="86" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
-    <text x="736" y="82" class="tn">第 8 章</text>
+    <text x="736" y="82" class="tn">第 9 章</text>
     <text x="736" y="106" class="t1">動かす</text>
     <text x="736" y="126" class="t2">ここで完成 ✓</text>
   </g>
@@ -361,10 +398,10 @@ UR賃貸のサイトを<strong>30分ごとに自動で見に行き</strong>、�
   <text x="20" y="212" class="t4">任意（やらなくても通知は動きます）</text>
   <rect x="14" y="222" width="812" height="94" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
   <rect x="662" y="240" width="148" height="60" rx="8" fill="#fff" stroke="#8c959f" stroke-width="2"/>
-  <text x="736" y="262" class="tn">第 9 章</text>
+  <text x="736" y="262" class="tn">第 11 章</text>
   <text x="736" y="284" class="t1">Web に公開</text>
   <path d="M736,166 V236" fill="none" stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
-  <text x="330" y="276" class="t2">Cloudflare を使って、空き部屋一覧をスマホからも見られるようにする</text>
+  <text x="330" y="276" class="t2">GitHub Pages で、空き部屋一覧をスマホからも見られるようにする</text>
 </svg>
 </figure>
 
@@ -373,7 +410,7 @@ UR賃貸のサイトを<strong>30分ごとに自動で見に行き</strong>、�
 <div class="ok">
 <p><strong>費用は一切かかりません。</strong>
 公開リポジトリ（誰でも見られる設定）なら、GitHub の自動実行は無制限に無料です。
-Slack も Cloudflare も無料枠の範囲で収まります。</p>
+Slack も無料枠の範囲で収まります。<strong>外部の有料サービスは一切使いません。</strong></p>
 </div>
 
 <h2 id="s3">GitHub アカウントを用意する <span class="step-time">（5分／お持ちなら飛ばす）</span></h2>
@@ -416,7 +453,7 @@ Slack も Cloudflare も無料枠の範囲で収まります。</p>
 
 <div class="warn">
 <p><strong>フォークした直後は、自動実行が止まっています。</strong>
-これは GitHub の安全のための仕様です。第 8 章で有効にします。</p>
+これは GitHub の安全のための仕様です。第 9 章で有効にします。</p>
 </div>
 
 <h2 id="s5">監視する条件を設定する <span class="step-time">（10分）</span></h2>
@@ -514,7 +551,7 @@ Slack も Cloudflare も無料枠の範囲で収まります。</p>
 
 <h3 id="s6-4">アプリをチャンネルに招待する</h3>
 
-<p>Slack に戻り、6.2 で作ったチャンネルで次を入力して送信します。</p>
+<p>Slack に戻り、7.2 で作ったチャンネルで次を入力して送信します。</p>
 
 <pre><code>/invite @UR空室監視</code></pre>
 
@@ -528,7 +565,7 @@ Slack も Cloudflare も無料枠の範囲で収まります。</p>
 <ol>
   <li>api.slack.com の <strong>Incoming Webhooks</strong> の画面に戻る</li>
   <li>下部の <strong>Add New Webhook to Workspace</strong> を押す</li>
-  <li>投稿先で 6.2 のチャンネルを選ぶ → <strong>許可する</strong></li>
+  <li>投稿先で 7.2 のチャンネルを選ぶ → <strong>許可する</strong></li>
   <li>表に追加された URL の <strong>Copy</strong> を押す</li>
 </ol>
 
@@ -584,7 +621,7 @@ Slack も Cloudflare も無料枠の範囲で収まります。</p>
 <table>
   <tr><th>欄</th><th>入力するもの</th></tr>
   <tr><td>Name</td><td><code>SLACK_WEBHOOK_URL</code></td></tr>
-  <tr><td>Secret</td><td>6.5 でコピーした URL</td></tr>
+  <tr><td>Secret</td><td>7.5 でコピーした URL</td></tr>
 </table>
 
 <div class="warn">
@@ -624,77 +661,110 @@ Slack も Cloudflare も無料枠の範囲で収まります。</p>
 以降は 8:00〜21:00 の間、30分ごとに自動で動き続けます。もう何もしなくて構いません。</p>
 </div>
 
-<h2 id="s9">Web ページとして公開する <span class="step-time">（任意・15分）</span></h2>
+<h2 id="s9">通知を活かすコツ</h2>
+
+<p>
+セットアップはここまでで終わりです。この章は<strong>通知を実際に役立てるための使い方</strong>の話で、
+設定作業ではありません。
+</p>
+
+<h3 id="s9-1">スマートウォッチで受け取る</h3>
+
+<p>
+スマートウォッチをお持ちなら、<strong>Slack の通知をウォッチに転送する設定を有効にしておく</strong>ことを
+おすすめします。
+</p>
+
+<p>
+空室は早い者勝ちなので、<strong>気づくまでの数分が結果を分けます。</strong>
+スマホを見ていない時間帯 — 通勤中、会議中、家事や運転の最中 — でも、
+手首の振動なら気づけます。ポケットからスマホを出して確認するより明らかに速いです。
+</p>
+
+<h3 id="s9-2">通知は強めに設定してよい</h3>
+
+<p>
+このツールは<strong>条件に合う新着が出たときだけ</strong>通知します。
+毎回の実行結果を送りつけたりはしませんし、<code>notify_all_new</code> も既定でオフです。
+</p>
+
+<div class="note">
+<p><strong>つまり、通知が鳴るのは「本当に見るべきとき」だけです。</strong>
+だから遠慮なく強めに設定して構いません。</p>
+<p>Slack のチャンネル設定で <strong>「すべての新しい投稿」</strong> を選び、
+モバイル通知もオンにしておくと取りこぼしません。専用のプライベートチャンネルを作ったのは、
+この設定を<strong>他の会話に影響させずに済ませる</strong>ためでもあります。</p>
+</div>
+
+<h3 id="s9-3">気づいたらすぐ電話する</h3>
+
+<p>
+通知には物件名・間取り・家賃・詳細ページへのリンクが入っています。
+リンクを開けば物件の詳細がすぐ確認できます。
+</p>
+
+<p>
+<strong>迷っている時間がそのまま不利になります。</strong>
+条件を満たしているなら、まず電話で押さえてから細かい検討をするほうが結果的に得です。
+このツールは「気づく」までを速くしますが、<strong>その先の一手はご自身の行動しだい</strong>です。
+</p>
+
+<h2 id="s10">空き部屋一覧を Web で見る <span class="step-time">（任意・3分）</span></h2>
 
 <p>
 空き部屋の一覧を、スマホからも見られる Web ページとして公開できます。
 <strong>この章はやらなくても Slack 通知は動きます。</strong>不要なら飛ばしてください。
 </p>
 
-<h3 id="s9-1">Cloudflare アカウントを作る</h3>
+<div class="ok">
+<p><strong>外部サービスもトークンも要りません。</strong>
+GitHub の設定を1つ切り替えるだけです。</p>
+</div>
 
-<p><a href="https://dash.cloudflare.com/sign-up">https://dash.cloudflare.com/sign-up</a> から無料で作れます。</p>
-
-<h3 id="s9-2">API トークンを作る</h3>
+<h3 id="s10-1">GitHub Pages を有効にする</h3>
 
 <ol>
-  <li><a href="https://dash.cloudflare.com/profile/api-tokens">https://dash.cloudflare.com/profile/api-tokens</a> を開く</li>
-  <li><strong>Create Token</strong> を押す</li>
-  <li>一番上の <strong>カスタム トークンを作成する</strong> の <strong>始める</strong> を押す</li>
-  <li>トークン名を入力（例：<code>ur-monitor-pages</code>）</li>
-  <li>権限の3つのドロップダウンを、左から <strong>Account</strong> / <strong>Cloudflare Pages</strong> / <strong>Edit</strong> にする</li>
-  <li>それ以外（アカウントリソース、IP、TTL）は<strong>触らない</strong></li>
-  <li><strong>概要に進む</strong> → <strong>トークンを作成する</strong></li>
-  <li>表示されたトークンを<strong>コピー</strong></li>
+  <li>自分のリポジトリで <strong>Settings</strong> タブを開く</li>
+  <li>左メニューの <strong>Pages</strong> をクリック</li>
+  <li><strong>Build and deployment</strong> を次のように設定して <strong>Save</strong></li>
 </ol>
 
-<div class="stop">
-<p><strong>トークンは一度しか表示されません。</strong>
-この画面を閉じる前に必ずコピーしてください。閉じてしまった場合は作り直しになります。</p>
-</div>
-
-<h3 id="s9-3">Account ID を調べる</h3>
-
-<p>Cloudflare の画面のアドレスバーを見ると、次のような形になっています。</p>
-
-<pre><code>dash.cloudflare.com/【32文字の英数字】/workers-and-pages</code></pre>
-
-<p>この【　】の部分が Account ID です。コピーしておいてください。</p>
-
-<h3 id="s9-4">GitHub に2つ登録する</h3>
-
-<p>7.2 と同じ手順（Settings → Secrets and variables → Actions → New repository secret）で、2つ登録します。</p>
-
 <table>
-  <tr><th>Name</th><th>Secret</th></tr>
-  <tr><td><code>CLOUDFLARE_API_TOKEN</code></td><td>9.2 のトークン</td></tr>
-  <tr><td><code>CLOUDFLARE_ACCOUNT_ID</code></td><td>9.3 の Account ID</td></tr>
+  <tr><th>項目</th><th>値</th></tr>
+  <tr><td>Source</td><td>Deploy from a branch</td></tr>
+  <tr><td>Branch</td><td><code>main</code></td></tr>
+  <tr><td>Folder</td><td><code>/docs</code></td></tr>
 </table>
 
+<p>公開 URL はこうなります。</p>
+
+<pre><code>https://&lt;あなたのユーザー名&gt;.github.io/ur-monitor/</code></pre>
+
 <div class="warn">
-<p><strong>公開するページ名を変えたい場合は、もう1か所直します。</strong></p>
-<p><code>.github/workflows/monitor.yml</code> を開き、<code>PAGES_PROJECT: ur-monitor</code> の
-<code>ur-monitor</code> を好きな名前に書き換えてください。ここがそのままページの名前になります。</p>
+<p><strong>GitHub Free ではこの機能は公開リポジトリでのみ使えます。</strong>
+フォークしたリポジトリを private にしている場合は使えません。</p>
 </div>
 
-<h3 id="s9-5">もう一度実行する</h3>
-
-<p>8.2 と同じ手順で手動実行してください。今度は Cloudflare への公開まで行われます。</p>
+<h3 id="s10-2">反映のタイミング</h3>
 
 <p>
-実行ログの最後に <code>Deployment complete!</code> と URL が出れば成功です。
-以降は監視が動くたびに、そのページが自動で最新になります。
+監視が動いて一覧が更新されると、その内容がリポジトリにコミットされ、
+<strong>自動で Web ページに反映されます</strong>。ビルドは30秒ほどで終わります。
 </p>
 
-<div class="warn">
-<p><strong>公開ページは URL を知っていれば誰でも見られます。</strong>
-検索エンジンには載らない設定（noindex）が入っていますが、完全に隠したい場合は
-Cloudflare Access という機能で認証をかけてください。</p>
+<p>
+つまり<strong>やることは最初の設定1回だけ</strong>で、あとは何もしなくても最新に保たれます。
+</p>
+
+<div class="note">
+<p>ページには <code>noindex</code> を入れてあるので検索エンジンには載りません。
+ただし<strong>URL を知っている人は誰でも見られます。</strong>
+狙っている物件を人に知られたくない場合は、この章を飛ばして Slack 通知だけを使ってください。</p>
 </div>
 
-<h2 id="s10">うまくいかないとき</h2>
+<h2 id="s11">うまくいかないとき</h2>
 
-<h3 id="s10-1">Slack に通知が来ない</h3>
+<h3 id="s11-1">Slack に通知が来ない</h3>
 
 <table>
   <tr><th>確認すること</th><th>対処</th></tr>
@@ -712,7 +782,7 @@ Cloudflare Access という機能で認証をかけてください。</p>
   </tr>
 </table>
 
-<h3 id="s10-2">「0 件のため前回状態を維持」と出る</h3>
+<h3 id="s11-2">「0 件のため前回状態を維持」と出る</h3>
 
 <div class="note">
 <p><strong>これは正常な動作です。故障ではありません。</strong></p>
@@ -722,7 +792,7 @@ Cloudflare Access という機能で認証をかけてください。</p>
 3回連続（約1時間半）で0件が続いた場合だけ、本当に空きが無くなったと判断します。</p>
 </div>
 
-<h3 id="s10-3">実行が赤いバツになる</h3>
+<h3 id="s11-3">実行が赤いバツになる</h3>
 
 <ol>
   <li>Actions タブから、失敗した実行をクリック</li>
@@ -732,7 +802,7 @@ Cloudflare Access という機能で認証をかけてください。</p>
 
 <p>よくある原因は、<code>config.json</code> の書き間違いです。カンマの付け忘れや、括弧の対応が合っていないと止まります。</p>
 
-<h3 id="s10-4">1件も部屋が取れない</h3>
+<h3 id="s11-4">1件も部屋が取れない</h3>
 
 <p>
 UR のサイトの作りが変わった可能性があります。その場合は <code>config.json</code> の
@@ -740,11 +810,11 @@ UR のサイトの作りが変わった可能性があります。その場合�
 リポジトリの Issues から相談してみてください。
 </p>
 
-<h2 id="s11">使っている技術</h2>
+<h2 id="s12">使っている技術</h2>
 
 <p>仕組みに興味がある方向けの説明です。<strong>読まなくてもセットアップには影響しません。</strong></p>
 
-<h3 id="s11-1">技術の一覧</h3>
+<h3 id="s12-1">技術の一覧</h3>
 
 <table>
   <tr><th>技術</th><th>役割</th></tr>
@@ -767,8 +837,9 @@ UR のサイトの作りが変わった可能性があります。その場合�
     <td>指定の URL にメッセージを送ると Slack に投稿される仕組み</td>
   </tr>
   <tr>
-    <td><strong>Cloudflare Pages</strong></td>
-    <td>HTML ファイルを置くだけで Web 公開できるサービス（任意機能）</td>
+    <td><strong>GitHub Pages</strong></td>
+    <td>リポジトリ内の HTML をそのまま Web 公開できる仕組み。<code>docs/</code> に置いたものが
+        push のたびに自動で配信される（任意機能）</td>
   </tr>
   <tr>
     <td><strong>GitHub Secrets</strong></td>
@@ -776,7 +847,7 @@ UR のサイトの作りが変わった可能性があります。その場合�
   </tr>
 </table>
 
-<h3 id="s11-2">状態の持ち方</h3>
+<h3 id="s12-2">状態の持ち方</h3>
 
 <p>
 「前回どの部屋があったか」は <code>state.json</code> というファイルに記録され、
@@ -784,7 +855,7 @@ UR のサイトの作りが変わった可能性があります。その場合�
 GitHub の実行環境は毎回まっさらにリセットされ、ファイルが残らないためです。
 </p>
 
-<h3 id="s11-3">やっていないこと</h3>
+<h3 id="s12-3">やっていないこと</h3>
 
 <p>
 UR のサイトへの負荷を抑えるため、<strong>30分間隔</strong>を守り、URL 間に待機を入れ、
