@@ -55,9 +55,35 @@ jobs:
         # docs/index.html を push すると GitHub Pages が自動で再ビルドし、公開ページが最新になる。
         # [skip ci] は付けない。このワークフローに push トリガーが無いので自己ループは起きず、
         # 逆に付けると Pages のビルドまで止めてしまう恐れがあるため。
+        #
+        # push が弾かれたら main を取り込んで再試行する。実行中に誰かが main へ push すると
+        # （PR のマージなど）その回が丸ごと失敗して結果が捨てられるため。実際に起きた:
+        # PR マージの5秒後に始まった回が ! [rejected] main -> main (fetch first) で落ちた。
+        #
+        # 衝突時は -X theirs でこちらの結果を採る。state.json と docs/index.html は毎回
+        # まるごと生成し直すものなので、新しく取得したこちらが常に正しい。
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state.json docs/index.html
-          git diff --cached --quiet || git commit -m "chore: 監視結果を更新"
-          git push
+          if git diff --cached --quiet; then
+            echo "変更なし。コミットしません"
+            exit 0
+          fi
+          git commit -m "chore: 監視結果を更新"
+
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "push 成功（試行 ${attempt} 回目）"
+              exit 0
+            fi
+            echo "push が弾かれました。main を取り込んで再試行します（試行 ${attempt} 回目）"
+            git fetch origin main
+            if ! git rebase -X theirs origin/main; then
+              git rebase --abort || true
+              echo "::error::main の取り込みに失敗しました"
+              exit 1
+            fi
+          done
+          echo "::error::3 回試しても push できませんでした"
+          exit 1
