@@ -27,6 +27,68 @@
     margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
   }
 
+  /* ===== 冒頭のヒーロー ===== */
+  /* .wrap の外に置いて画面幅いっぱいに敷く。中身だけ本文と同じ最大幅に揃える。 */
+  .hero {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      radial-gradient(120% 150% at 82% 15%, #1a6fd0 0%, rgba(26,111,208,0) 58%),
+      linear-gradient(135deg, #07203a 0%, #00417f 52%, #002b56 100%);
+  }
+  /* 細かいドットを重ねて、べた塗りにせず質感を出す */
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.16) 1px, transparent 1px);
+    background-size: 22px 22px; opacity: .5;
+  }
+  /* アイコンを巨大化して右へ逃がした装飾。文字に干渉しないよう薄く敷く */
+  .hero-art {
+    position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+    width: 400px; height: 400px; opacity: .13; pointer-events: none;
+  }
+  .hero-art svg { width: 100%; height: 100%; display: block; }
+  .hero-inner {
+    position: relative; z-index: 2;
+    max-width: 1200px; margin: 0 auto; padding: 58px 24px 50px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 14px 6px 6px; border-radius: 999px;
+    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.22);
+    font-size: .82rem; letter-spacing: .06em; font-weight: 700;
+  }
+  .hero-badge svg { width: 26px; height: 26px; display: block; border-radius: 7px; }
+  .hero h1 {
+    border: none; padding: 0; margin: 20px 0 0;
+    font-size: 2.4rem; line-height: 1.32; letter-spacing: .01em; color: #fff;
+  }
+  .hero h1 .name {
+    display: block; font-size: 1.05rem; letter-spacing: .22em;
+    color: #8fc2f5; font-weight: 700; margin-bottom: 8px;
+  }
+  .hero-tag { margin: 16px 0 0; font-size: 1.02rem; color: #cfe2f7; max-width: 42em; }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 0; }
+  .btn {
+    display: inline-block; padding: 12px 22px; border-radius: 8px;
+    font-size: .93rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+  }
+  .btn-main { background: #fff; color: #00417f; }
+  .btn-main:hover { background: #e8f0fb; }
+  .btn-sub {
+    background: rgba(255,255,255,.08); color: #fff;
+    border: 1px solid rgba(255,255,255,.38);
+  }
+  .btn-sub:hover { background: rgba(255,255,255,.18); }
+  .hero-chips {
+    list-style: none; display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 26px 0 0; padding: 0;
+  }
+  .hero-chips li {
+    font-size: .8rem; padding: 5px 12px; border-radius: 999px;
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
+    color: #dce9f8;
+  }
+
   /* ===== レイアウト ===== */
   .wrap {
     display: grid; grid-template-columns: 272px minmax(0, 1fr);
@@ -141,6 +203,13 @@
 
   /* ===== 狭い画面 ===== */
   @media (max-width: 900px) {
+    .hero-inner { padding: 40px 18px 36px; }
+    .hero h1 { font-size: 1.72rem; }
+    .hero h1 .name { font-size: .92rem; }
+    .hero-tag { font-size: .95rem; }
+    /* 装飾は本文の可読性より優先しない。狭い画面では小さくして端へ寄せる */
+    .hero-art { width: 260px; height: 260px; right: -90px; opacity: .1; }
+    .btn { padding: 11px 18px; font-size: .89rem; }
     .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
     .toc {
       position: static; max-height: none; overflow: visible;
@@ -153,6 +222,32 @@
 </style>
 </head>
 <body>
+
+<!-- 冒頭のヒーロー。タブアイコンと同じ絵柄を拡大して背景に敷き、
+     手順書とツール本体の見た目を繋げている。.wrap の外に出しているのは
+     画面幅いっぱいに敷くため（.wrap は目次と本文の2カラムで最大幅が決まる）。 -->
+<header class="hero">
+  <div class="hero-art"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><circle cx="41" cy="39" r="13" fill="none" stroke="#fff" stroke-width="6"/><path d="M50 48L59 57" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg></div>
+  <div class="hero-inner">
+    <span class="hero-badge"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg>ur-monitor</span>
+    <h1><span class="name">UR賃貸 空き部屋 監視ツール</span>セットアップ手順書</h1>
+    <p class="hero-tag">
+      狙っている部屋に空きが出た瞬間、Slack に通知が届きます。
+      パソコンは起動しっぱなしにしなくて構いません。
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-main" href="#s0">手順を読みはじめる</a>
+      <a class="btn btn-sub" href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">見本の一覧ページを見る →</a>
+    </div>
+    <ul class="hero-chips">
+      <li>費用 0円</li>
+      <li>所要 30〜60分</li>
+      <li>プログラミング不要</li>
+      <li>スマートウォッチ対応</li>
+    </ul>
+  </div>
+</header>
+
 <div class="wrap">
 
 <nav class="toc" aria-label="目次">
@@ -232,6 +327,7 @@
     </li>
     <li><a href="#s10">空き部屋一覧を Web で見る <span class="opt">（任意）</span></a>
       <ol>
+        <li><a href="#s10-0">実際にできるページ（見本）</a></li>
         <li><a href="#s10-1">GitHub Pages を有効にする</a></li>
         <li><a href="#s10-2">反映のタイミング</a></li>
       </ol>
@@ -255,8 +351,6 @@
 </nav>
 
 <main>
-
-<h1>ur-monitor セットアップ手順書</h1>
 
 <p class="lead">
 UR賃貸の空き部屋を自動で監視し、条件に合う新着が出たら Slack に通知するツールです。
@@ -929,6 +1023,29 @@ Slack も無料枠の範囲で収まります。<strong>外部の有料サービ
 空き部屋の一覧を、スマホからも見られる Web ページとして公開できます。
 <strong>この章はやらなくても Slack 通知は動きます。</strong>不要なら飛ばしてください。
 </p>
+
+<h3 id="s10-0">実際にできるページ（見本）</h3>
+
+<p>
+作者が実際に運用しているページです。<strong>開いてみると、この章で作るものが分かります。</strong>
+</p>
+
+<div class="ok">
+<p><a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener"><strong>https://tama-create.github.io/ur-monitor/</strong></a></p>
+<p>見どころは次のとおりです。</p>
+<ul>
+  <li><strong>取得日時</strong>が上に出ます。いつ時点の情報かがひと目で分かります</li>
+  <li>監視している<strong>検索URLごとに区切られて</strong>、それぞれ何件空いているかが出ます</li>
+  <li><strong>NEW</strong> の付いた行が、前回の確認から新しく出てきた部屋です</li>
+  <li><strong>赤く目立つ行</strong>が、狙っている物件（設定した <code>highlight_keywords</code> に一致した行）です</li>
+  <li>各行の「詳細を見る」から、UR の物件ページへ直接飛べます</li>
+</ul>
+</div>
+
+<div class="note">
+<p>このページは<strong>実際に動いているもの</strong>なので、開くタイミングによって件数も中身も変わります。
+「0 件」と表示されていても壊れているわけではありません。</p>
+</div>
 
 <div class="ok">
 <p><strong>外部サービスもトークンも要りません。</strong>
