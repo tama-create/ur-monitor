@@ -28,66 +28,50 @@
   }
 
   /* ===== 冒頭のヒーロー ===== */
-  /* .wrap の外に置いて画面幅いっぱいに敷く。中身だけ本文と同じ最大幅に揃える。 */
+  /* 本文の前に置く帯。読み手が用があるのは手順であって表紙ではないので、
+     縦を詰めて1画面に本文が入るようにしている。 */
   .hero {
     position: relative; overflow: hidden; color: #fff;
     background:
-      radial-gradient(120% 150% at 82% 15%, #1a6fd0 0%, rgba(26,111,208,0) 58%),
-      linear-gradient(135deg, #07203a 0%, #00417f 52%, #002b56 100%);
+      radial-gradient(120% 200% at 84% 30%, #1a6fd0 0%, rgba(26,111,208,0) 62%),
+      linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
   }
-  /* 細かいドットを重ねて、べた塗りにせず質感を出す */
   .hero::before {
     content: ""; position: absolute; inset: 0;
-    background-image: radial-gradient(rgba(255,255,255,.16) 1px, transparent 1px);
-    background-size: 22px 22px; opacity: .5;
+    background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+    background-size: 20px 20px; opacity: .45;
   }
-  /* アイコンを巨大化して右へ逃がした装飾。文字に干渉しないよう薄く敷く */
+  /* 帯が低いので装飾も小さく。文字に被らないよう右端へ寄せる */
   .hero-art {
-    position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
-    width: 400px; height: 400px; opacity: .13; pointer-events: none;
+    position: absolute; top: 50%; right: 26px; transform: translateY(-50%);
+    width: 150px; height: 150px; opacity: .14; pointer-events: none;
   }
   .hero-art svg { width: 100%; height: 100%; display: block; }
   .hero-inner {
     position: relative; z-index: 2;
-    max-width: 1200px; margin: 0 auto; padding: 58px 24px 50px;
+    max-width: 1200px; margin: 0 auto; padding: 20px 24px 18px;
   }
-  .hero-badge {
-    display: inline-flex; align-items: center; gap: 10px;
-    padding: 6px 14px 6px 6px; border-radius: 999px;
-    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.22);
-    font-size: .82rem; letter-spacing: .06em; font-weight: 700;
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
+  .hero-kicker {
+    margin: 0 0 3px; font-size: .8rem; font-weight: 700;
+    letter-spacing: .16em; color: #8fc2f5;
   }
-  .hero-badge svg { width: 26px; height: 26px; display: block; border-radius: 7px; }
   .hero h1 {
-    border: none; padding: 0; margin: 20px 0 0;
-    font-size: 2.4rem; line-height: 1.32; letter-spacing: .01em; color: #fff;
+    border: none; padding: 0; margin: 0;
+    font-size: 1.72rem; line-height: 1.3; letter-spacing: .01em; color: #fff;
   }
-  .hero h1 .name {
-    display: block; font-size: 1.05rem; letter-spacing: .22em;
-    color: #8fc2f5; font-weight: 700; margin-bottom: 8px;
+  /* 見出しの下に1行だけ添える情報。区切りは │ で詰めて置く */
+  .hero-meta {
+    margin: 14px 0 0; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,.16);
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
   }
-  .hero-tag { margin: 16px 0 0; font-size: 1.02rem; color: #cfe2f7; max-width: 42em; }
-  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 0; }
-  .btn {
-    display: inline-block; padding: 12px 22px; border-radius: 8px;
-    font-size: .93rem; font-weight: 700; text-decoration: none; white-space: nowrap;
-  }
-  .btn-main { background: #fff; color: #00417f; }
-  .btn-main:hover { background: #e8f0fb; }
-  .btn-sub {
-    background: rgba(255,255,255,.08); color: #fff;
-    border: 1px solid rgba(255,255,255,.38);
-  }
-  .btn-sub:hover { background: rgba(255,255,255,.18); }
-  .hero-chips {
-    list-style: none; display: flex; flex-wrap: wrap; gap: 8px;
-    margin: 26px 0 0; padding: 0;
-  }
-  .hero-chips li {
-    font-size: .8rem; padding: 5px 12px; border-radius: 999px;
-    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
-    color: #dce9f8;
-  }
+  .hero-meta .sep { color: rgba(255,255,255,.32); }
+  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .hero-meta a:hover { border-bottom-color: #fff; }
 
   /* ===== レイアウト ===== */
   .wrap {
@@ -203,13 +187,13 @@
 
   /* ===== 狭い画面 ===== */
   @media (max-width: 900px) {
-    .hero-inner { padding: 40px 18px 36px; }
-    .hero h1 { font-size: 1.72rem; }
-    .hero h1 .name { font-size: .92rem; }
-    .hero-tag { font-size: .95rem; }
-    /* 装飾は本文の可読性より優先しない。狭い画面では小さくして端へ寄せる */
-    .hero-art { width: 260px; height: 260px; right: -90px; opacity: .1; }
-    .btn { padding: 11px 18px; font-size: .89rem; }
+    .hero-inner { padding: 16px 18px 14px; }
+    .hero h1 { font-size: 1.3rem; }
+    .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
+    .hero-meta { font-size: .76rem; margin-top: 12px; padding-top: 10px; }
+    /* 装飾は本文の可読性より優先しない。狭い画面では消す */
+    .hero-art { display: none; }
     .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
     .toc {
       position: static; max-height: none; overflow: visible;
@@ -229,22 +213,20 @@
 <header class="hero">
   <div class="hero-art"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><circle cx="41" cy="39" r="13" fill="none" stroke="#fff" stroke-width="6"/><path d="M50 48L59 57" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg></div>
   <div class="hero-inner">
-    <span class="hero-badge"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg>ur-monitor</span>
-    <h1><span class="name">UR賃貸 空き部屋 監視ツール</span>セットアップ手順書</h1>
-    <p class="hero-tag">
-      狙っている部屋に空きが出た瞬間、Slack に通知が届きます。
-      パソコンは起動しっぱなしにしなくて構いません。
-    </p>
-    <div class="hero-cta">
-      <a class="btn btn-main" href="#s0">手順を読みはじめる</a>
-      <a class="btn btn-sub" href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">見本の一覧ページを見る →</a>
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>セットアップ手順書</h1>
+      </div>
     </div>
-    <ul class="hero-chips">
-      <li>費用 0円</li>
-      <li>所要 30〜60分</li>
-      <li>プログラミング不要</li>
-      <li>スマートウォッチ対応</li>
-    </ul>
+    <p class="hero-meta">
+      <span>費用 0円</span><span class="sep">│</span>
+      <span>所要 30〜60分</span><span class="sep">│</span>
+      <span>プログラミング不要</span><span class="sep">│</span>
+      <span>パソコンは起動しっぱなしにしない</span><span class="sep">│</span>
+      <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">見本の一覧ページを見る →</a>
+    </p>
   </div>
 </header>
 
