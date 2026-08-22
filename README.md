@@ -228,6 +228,11 @@ Direct Upload のプロジェクトを作成する（Git 連携は使わない�
 `deploy/_headers` は Cloudflare Pages が読むヘッダー定義。配信ディレクトリ直下に
 `_headers` という名前で置く必要があるため、デプロイ時にコピーしている。
 
+デプロイする経路は2つある。監視結果を反映する `monitor.yml`（30分ごと）と、
+手順書の更新を即時反映する `deploy-docs.yml`（`docs/setup.html` の push で起動）。
+**Direct Upload はデプロイ内容でサイト全体を置き換えるため、どちらも公開物を一式揃えてから送っている。**
+公開物を増やすときは両方に足すこと。
+
 **公開範囲に注意。** Pages の URL は誰でもアクセスできる。中身は UR の公開情報だが、
 `highlight_keywords` で強調している物件名から「どの物件を狙っているか」は読み取れる。
 そのため生成される HTML に `<meta name="robots" content="noindex, nofollow">` を入れて
