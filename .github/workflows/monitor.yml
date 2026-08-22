@@ -1,0 +1,94 @@
+name: UR賃貸監視
+
+on:
+  # 08:00〜21:00 JST・30分間隔（JST = UTC+9 のため UTC では前日23:00〜当日12:00）
+  # 間隔を30分にしているのは、プライベートリポジトリの Actions 無料枠（月2,000分）に収めるため。
+  schedule:
+    - cron: '0,30 23 * * *'    # 08:00・08:30 JST
+    - cron: '0,30 0-11 * * *'  # 09:00〜20:30 JST
+    - cron: '0 12 * * *'       # 21:00 JST
+  # 手動実行用（動作確認に使う）
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # state.json / results.html をコミットし直すため
+
+concurrency:
+  group: ur-monitor
+  cancel-in-progress: false  # 前回実行が state.json を書き込み中なら待つ
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # デプロイ手順の if: で参照するため、ジョブレベルで展開しておく
+      # （secrets コンテキストは step の if: から直接読めないため）。
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Pages プロジェクト名。Cloudflare 側で作成した名前と一致させる。
+      PAGES_PROJECT: ur-monitor
+      # メジャー固定。無人実行なので予期しない破壊的変更を避けたいが、
+      # デプロイは監視本体（スクレイプとコミット）の完了後に走るため、
+      # 仮にここで失敗しても監視結果そのものは失われない。
+      WRANGLER_VERSION: '4'
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: PHP をセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Composer 依存関係をインストール
+        run: composer install --no-dev --prefer-dist --no-progress
+
+      - name: Chrome の場所を確認
+        run: which google-chrome-stable || which google-chrome || which chromium-browser
+
+      - name: 監視スクリプトを実行
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: php ur_monitor.php
+
+      - name: state.json / results.html の変更をコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state.json results.html
+          git diff --cached --quiet || git commit -m "chore: 監視結果を更新 [skip ci]"
+          git push
+
+      # ここから下は results.html を Cloudflare Pages へ公開する処理。
+      # 監視の本体（スクレイプ〜コミット）が終わってから走らせているのは、
+      # デプロイに失敗しても監視結果を失わないようにするため。
+      #
+      # CLOUDFLARE_API_TOKEN が未設定なら丸ごとスキップする。Cloudflare 側の
+      # 準備が終わる前にこのワークフローが動いても、監視が失敗し続けないようにするため。
+      - name: 公開用ディレクトリを用意
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          # リポジトリ直下をそのまま配信すると ur_monitor.php や config.json まで
+          # 公開されてしまうため、公開するファイルだけを dist に移す。
+          # （静的サイトそのものである quiet-desk-notes と違い、このリポジトリは
+          #   公開してはいけないファイルを含むため直下配信はできない）
+          mkdir -p dist
+          cp results.html dist/index.html
+          # Pages が読む _headers。ファイル名のまま配信ディレクトリ直下に置く必要がある。
+          cp deploy/_headers dist/_headers
+
+      - name: wrangler のキャッシュ
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-wrangler-${{ env.WRANGLER_VERSION }}
+
+      - name: Cloudflare Pages へデプロイ
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          npx --yes wrangler@"${WRANGLER_VERSION}" pages deploy dist \
+            --project-name="${PAGES_PROJECT}" \
+            --branch=main

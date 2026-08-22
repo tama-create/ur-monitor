@@ -1,0 +1,16 @@
+# Composer（毎回 composer install するので追跡しない）
+vendor/
+composer.lock
+
+# デバッグ用（--setup 実行時のみ生成）
+debug_*.png
+debug_page.html
+
+# 実行ログ（GitHub Actions のログビューアで確認できるため追跡しない）
+monitor.log
+
+# PHP キャッシュ
+*.cache
+
+# Cloudflare Pages へ公開する一時ディレクトリ（Actions が実行時に作る）
+dist/

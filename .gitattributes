@@ -1,0 +1,11 @@
+# すべてのテキストファイルを UTF-8 / LF で統一
+* text=auto eol=lf
+
+# バイナリファイルは変換しない
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.zip  binary
+*.gz   binary

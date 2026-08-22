@@ -1,0 +1,50 @@
+name: クラウド用セットアップ検証
+
+# docs/cloud-setup.sh が Claude Code on the web のサンドボックスで通るかを、
+# 同じ Ubuntu 24.04 上で確認するための検証用ワークフロー。手動実行のみ。
+#
+# ランナーには Chrome がプリインストールされているため、それを使ってしまうと
+# 検証にならない。あらかじめ退避させ、スクリプトが入れた Chrome だけで動かす。
+# 最後の dry-run が通れば、detect_chrome_path() が symlink を見つけて
+# スクレイピングまで到達したことの証明になる（他に Chrome が無いため）。
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: プリインストールの Chrome を退避（サンドボックスの状態を再現）
+        run: |
+          for p in /usr/bin/google-chrome-stable /usr/bin/google-chrome \
+                   /usr/bin/chromium-browser /usr/bin/chromium \
+                   /usr/local/bin/google-chrome-stable; do
+            if [ -e "$p" ]; then sudo mv "$p" "$p.disabled"; echo "退避: $p"; fi
+          done
+          echo "--- 退避後に見つかる Chrome ---"
+          which google-chrome-stable google-chrome chromium chromium-browser || echo "なし（意図どおり）"
+
+      - name: セットアップスクリプトを実行
+        run: sudo -E env "PATH=$PATH" bash docs/cloud-setup.sh
+
+      - name: スクリプトの結果を確認
+        run: |
+          echo "--- symlink ---"
+          ls -l /usr/local/bin/google-chrome-stable
+          echo "--- 実体 ---"
+          readlink -f /usr/local/bin/google-chrome-stable
+          echo "--- バージョン ---"
+          /usr/local/bin/google-chrome-stable --version
+          echo "--- vendor ---"
+          test -d vendor && echo "composer install 済み"
+
+      - name: 入れた Chrome だけでスクレイピングできるか確認
+        run: php ur_monitor.php --dry-run
