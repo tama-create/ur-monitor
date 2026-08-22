@@ -5,6 +5,12 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ur-monitor セットアップ手順書</title>
+<!-- タブに出すアイコン。おうちを虫めがねで覗いている絵＝このツールがやっていること。
+     外部ファイルにせず SVG を data URI で埋め込んでいるのは、GitHub Pages に
+     余計なファイルを置かずに済ませるため（docs/ は公開ディレクトリそのもの）。
+     16px でも家とめがねが分かれて見えるよう、青い下地・白い家・黄色いめがねで
+     色を分けている。記号は全て percent encode すること（生の # や " は壊れる）。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 <style>
   :root {
     --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
