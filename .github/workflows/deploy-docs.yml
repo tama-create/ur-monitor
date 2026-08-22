@@ -1,0 +1,68 @@
+name: 手順書を公開
+
+# 手順書は滅多に変わらないが、変えたときは 30 分ごとの監視を待たずに公開したい。
+# そのため push で直接デプロイする。監視は行わないので数十秒で終わる。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/setup.html'
+      - 'deploy/_headers'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# monitor.yml と同じグループにして、Pages への同時デプロイを避ける。
+concurrency:
+  group: ur-monitor
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PAGES_PROJECT: ur-monitor
+      WRANGLER_VERSION: '4'
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      # Direct Upload はデプロイした内容でサイト全体を置き換える。
+      # 手順書だけを送ると物件一覧が消えるため、必ず一式を揃えてから送る。
+      # （同じ理由で monitor.yml 側も手順書を含めている）
+      - name: 公開用ディレクトリを用意
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          mkdir -p dist
+          cp docs/setup.html dist/setup.html
+          cp deploy/_headers dist/_headers
+          # results.html は監視の実行結果。初回の監視がまだなら存在しないので、
+          # その場合だけ案内ページを置く。次の監視実行で本物に置き換わる。
+          if [ -f results.html ]; then
+            cp results.html dist/index.html
+          else
+            printf '%s\n' \
+              '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">' \
+              '<meta name="robots" content="noindex, nofollow">' \
+              '<title>UR賃貸 空き部屋一覧</title></head><body>' \
+              '<p>準備中です。最初の監視が実行されると一覧に置き換わります。</p>' \
+              '</body></html>' > dist/index.html
+          fi
+
+      - name: wrangler のキャッシュ
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-wrangler-${{ env.WRANGLER_VERSION }}
+
+      - name: Cloudflare Pages へデプロイ
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          npx --yes wrangler@"${WRANGLER_VERSION}" pages deploy dist \
+            --project-name="${PAGES_PROJECT}" \
+            --branch=main
