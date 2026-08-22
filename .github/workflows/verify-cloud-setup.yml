@@ -1,6 +1,6 @@
 name: クラウド用セットアップ検証
 
-# docs/cloud-setup.sh が Claude Code on the web のサンドボックスで通るかを、
+# tools/cloud-setup.sh が Claude Code on the web のサンドボックスで通るかを、
 # 同じ Ubuntu 24.04 上で確認するための検証用ワークフロー。手動実行のみ。
 #
 # ランナーには Chrome がプリインストールされているため、それを使ってしまうと
@@ -33,7 +33,7 @@ jobs:
           which google-chrome-stable google-chrome chromium chromium-browser || echo "なし（意図どおり）"
 
       - name: セットアップスクリプトを実行
-        run: sudo -E env "PATH=$PATH" bash docs/cloud-setup.sh
+        run: sudo -E env "PATH=$PATH" bash tools/cloud-setup.sh
 
       - name: スクリプトの結果を確認
         run: |

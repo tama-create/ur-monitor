@@ -60,22 +60,60 @@ function load_config(): array
 function load_state(): array
 {
     if (!file_exists(STATE_FILE)) {
-        return ['rooms' => []];
+        return ['rooms' => []];  // 初回実行。全部屋が新着として扱われる
     }
-    return json_decode(file_get_contents(STATE_FILE), true) ?? ['rooms' => []];
+
+    $raw = file_get_contents(STATE_FILE);
+    if ($raw === false) {
+        log_msg('ERROR', 'state.json を読めませんでした。前回状態が分からないため中止します');
+        exit(1);
+    }
+
+    $decoded = json_decode($raw, true);
+    // 壊れた state を空とみなすと「全部屋が新着」になり、条件に合うものが
+    // まとめて Slack に飛ぶ。誤通知のほうが害が大きいので、黙って続けず止める。
+    if (!is_array($decoded)) {
+        log_msg('ERROR', 'state.json を解釈できませんでした（壊れている可能性があります）。'
+            . '全部屋を新着として通知してしまうため中止します。'
+            . '意図的にやり直す場合は state.json を {"rooms":{}} にしてください');
+        exit(1);
+    }
+
+    return $decoded;
 }
 
 function save_state(array $state): void
 {
-    file_put_contents(
+    $ok = file_put_contents(
         STATE_FILE,
         json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
     );
+    // 書けていないと次回の差分計算が狂うため、成功したことにして進まない
+    if ($ok === false) {
+        log_msg('ERROR', 'state.json の書き込みに失敗しました: ' . STATE_FILE);
+        exit(1);
+    }
 }
 
 // ──────────────────────────────────────────
 // robots.txt チェック
 // ──────────────────────────────────────────
+
+// robots.txt の Disallow / Allow を照合する。
+//
+// UR の robots.txt は `Disallow: /chintai/*/result/?skcs=` のようにワイルドカードと
+// クエリ文字列を使うため、パスの前方一致だけでは判定できない。`*`（任意文字列）と
+// 末尾 `$`（終端固定）を正規表現に変換し、クエリを含めた文字列に対して照合する。
+// Allow は「より長く一致した方が勝つ」という一般的な解釈に従う。
+function robots_rule_matches(string $rule, string $target): bool
+{
+    // メタ文字を殺してから、robots.txt での意味を持つ * と末尾 $ だけを戻す
+    $anchored = str_ends_with($rule, '$');
+    $body     = $anchored ? substr($rule, 0, -1) : $rule;
+    $regex    = str_replace('\\*', '.*', preg_quote($body, '#'));
+
+    return (bool)preg_match('#^' . $regex . ($anchored ? '$' : '') . '#', $target);
+}
 
 function check_robots_txt(string $url): bool
 {
@@ -96,24 +134,47 @@ function check_robots_txt(string $url): bool
     $content = $contentCache[$host];
 
     if ($content === false) {
+        // 取得できないだけで拒否と決めつけない（robots.txt が無いサイトは全許可が既定）
         log_msg('WARNING', "robots.txt 取得失敗（続行します）");
         return true;
     }
 
-    $path         = $parsed['path'] ?? '/';
+    // 判定対象はクエリまで含める。Disallow がクエリ文字列を指すことがあるため。
+    $target = ($parsed['path'] ?? '/') . (isset($parsed['query']) ? '?' . $parsed['query'] : '');
+
     $currentAgent = null;
+    $disallowLen  = -1;  // 一致した Disallow のうち最長のもの
+    $allowLen     = -1;  // 一致した Allow のうち最長のもの
 
     foreach (explode("\n", $content) as $line) {
-        $line = trim($line);
+        // 行内コメントを落としてから判定する
+        $line = trim((string)preg_replace('/#.*$/', '', $line));
+
         if (stripos($line, 'user-agent:') === 0) {
             $currentAgent = trim(substr($line, 11));
-        } elseif (stripos($line, 'disallow:') === 0 && $currentAgent === '*') {
-            $d = trim(substr($line, 9));
-            if ($d !== '' && strpos($path, $d) === 0) {
-                log_msg('WARNING', "robots.txt に Disallow あり: {$d}");
-                return false;
+            continue;
+        }
+        if ($currentAgent !== '*') {
+            continue; // 自分（一般クローラー）宛でないブロックは読み飛ばす
+        }
+
+        if (stripos($line, 'disallow:') === 0) {
+            $rule = trim(substr($line, 9));
+            // 空の Disallow は「制限なし」の意味なので無視する
+            if ($rule !== '' && robots_rule_matches($rule, $target)) {
+                $disallowLen = max($disallowLen, strlen($rule));
+            }
+        } elseif (stripos($line, 'allow:') === 0) {
+            $rule = trim(substr($line, 6));
+            if ($rule !== '' && robots_rule_matches($rule, $target)) {
+                $allowLen = max($allowLen, strlen($rule));
             }
         }
+    }
+
+    if ($disallowLen >= 0 && $disallowLen > $allowLen) {
+        log_msg('ERROR', "robots.txt が許可していない URL です（スキップします）: {$url}");
+        return false;
     }
 
     log_msg('INFO', "robots.txt チェック OK ({$robots_url})");
@@ -123,12 +184,6 @@ function check_robots_txt(string $url): bool
 // ──────────────────────────────────────────
 // スクレイピング
 // ──────────────────────────────────────────
-
-function _text($elem, string $selector): ?string
-{
-    $child = $elem->querySelector($selector);
-    return $child ? trim($child->getNodeValue()) : null;
-}
 
 // ディレクトリを再帰削除（壊れた Chrome プロファイルの掃除に使用）
 function remove_dir_recursive(string $dir): void
@@ -174,7 +229,7 @@ function detect_chrome_path(array $config): ?string
             '/usr/bin/google-chrome-stable',
             '/usr/bin/google-chrome',
             // Claude Code on the web のサンドボックスには Chrome が無く、セットアップ
-            // スクリプトで入れてここに symlink を張る（docs/cloud-setup.sh 参照）
+            // スクリプトで入れてここに symlink を張る（tools/cloud-setup.sh 参照）
             '/usr/local/bin/google-chrome-stable',
             '/usr/bin/chromium-browser',
             '/usr/bin/chromium',
@@ -552,7 +607,18 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
 </html>
 HTML;
 
-    file_put_contents(RESULTS_FILE, $html);
+    // 出力先は GitHub Pages の公開ディレクトリ。フォーク直後などで無い場合に備えて作る
+    $dir = dirname(RESULTS_FILE);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+
+    // ここで state だけ進むと、HTML が古いまま次回の差分がゼロになって更新されなくなる。
+    // 呼び出し元は直後に save_state するため、書けなかったら state ごと進めない。
+    if (file_put_contents(RESULTS_FILE, $html) === false) {
+        log_msg('ERROR', 'HTML の書き込みに失敗しました: ' . RESULTS_FILE);
+        exit(1);
+    }
     log_msg('INFO', "HTML 出力: " . RESULTS_FILE);
 }
 
@@ -662,6 +728,9 @@ function run_monitor(array $config, bool $dryRun = false): void
     $state      = load_state();
     $prevUrls   = array_keys($state['rooms'] ?? []);
     $currentMap = [];
+    // 「取得できた結果を信用してよい URL」が1つでもあったか。
+    // 取得失敗・robots 拒否・0 件保留で前回状態を引き継いだ URL は含めない。
+    $scrapedOk  = false;
     // 検索URLごとの「0 件が続いた回数」。一時的な取得失敗と本当の空き無しを区別するために持つ。
     $zeroStreak = $state['zero_streak'] ?? [];
 
@@ -673,7 +742,6 @@ function run_monitor(array $config, bool $dryRun = false): void
                 sleep(3); // 連続アクセスを避けるため URL 間に 3 秒待機
             }
             log_msg('INFO', "検索URL " . ($i + 1) . "/" . count($searchUrls) . " を処理中");
-            check_robots_txt($searchUrl);
 
             // 前回 state のうち、この検索URL 由来の分だけ取り出しておく（失敗時の引き継ぎ用）
             $prevForUrl = [];
@@ -681,6 +749,13 @@ function run_monitor(array $config, bool $dryRun = false): void
                 if (($prevRoom['source_url'] ?? '') === $searchUrl) {
                     $prevForUrl[$prevUrl] = $prevRoom;
                 }
+            }
+
+            // robots.txt が許可していない URL は取りに行かない。前回状態は引き継ぎ、
+            // 一時的な取得失敗と同じ扱いにする（誤った「成約」通知を出さないため）。
+            if (!check_robots_txt($searchUrl)) {
+                $currentMap += $prevForUrl;
+                continue;
             }
 
             try {
@@ -714,6 +789,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 log_msg('WARNING', "3 回連続で 0 件のため、実際に空きが無くなったと判断: {$searchUrl}");
             }
             unset($zeroStreak[$searchUrl]);
+            $scrapedOk = true;
 
             foreach ($rooms as $r) {
                 if (!empty($r['url'])) {
@@ -726,12 +802,19 @@ function run_monitor(array $config, bool $dryRun = false): void
         close_browser_safely($browser);
     }
 
-    if (empty($currentMap)) {
+    // 全 URL が引き継ぎ扱いで終わった＝結果を信用できないので、state も HTML も触らない。
+    // 逆に「ちゃんと取得できたうえで 0 件」なら、それは事実なので下へ進んで反映する。
+    // （ここで一律 return すると、3 回連続 0 件の判定が state に永久に書かれない）
+    if (empty($currentMap) && !$scrapedOk) {
         log_msg('WARNING', "部屋が1件も取得できませんでした。php ur_monitor.php --setup でセレクターを確認してください");
         return;
     }
 
-    log_msg('INFO', "現在の空き部屋: " . count($currentMap) . " 件（全URL合計）");
+    if (empty($currentMap)) {
+        log_msg('WARNING', "空き部屋は 0 件でした（取得自体は成功しています）");
+    } else {
+        log_msg('INFO', "現在の空き部屋: " . count($currentMap) . " 件（全URL合計）");
+    }
 
     $newUrls  = array_diff(array_keys($currentMap), $prevUrls);
     $goneUrls = array_diff($prevUrls, array_keys($currentMap));
@@ -815,8 +898,13 @@ try {
     if (in_array('--setup', $args)) {
         run_setup($config);
     } elseif (in_array('--check-robots', $args)) {
+        // 1件でも拒否があれば終了コードで分かるようにする（CI や手動確認で拾えるように）
+        $allowed = true;
         foreach ($config['search_urls'] ?? [] as $url) {
-            check_robots_txt($url);
+            $allowed = check_robots_txt($url) && $allowed;
+        }
+        if (!$allowed) {
+            exit(1);
         }
     } else {
         run_monitor($config, dryRun: in_array('--dry-run', $args));

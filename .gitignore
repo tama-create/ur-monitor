@@ -1,6 +1,8 @@
-# Composer（毎回 composer install するので追跡しない）
+# Composer
+# vendor/ は追跡しない（毎回 composer install する）が、composer.lock は追跡する。
+# 無いと composer install が実質 composer update になり、依存の新しい版が
+# 予告なく本番へ入る。PR で走る CI が無いため、壊れたことに気づくのは本番実行時になる。
 vendor/
-composer.lock
 
 # デバッグ用（--setup 実行時のみ生成）
 debug_*.png
@@ -11,6 +13,3 @@ monitor.log
 
 # PHP キャッシュ
 *.cache
-
-# Cloudflare Pages へ公開する一時ディレクトリ（Actions が実行時に作る）
-dist/
