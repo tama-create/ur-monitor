@@ -6,8 +6,8 @@
  * OS 固有の処理は置かず、Chrome の場所だけ detect_chrome_path() で吸収している。
  *
  * 使い方:
- *   php ur_monitor.php              # 通常監視実行（結果を results.html に出力）
- *   php ur_monitor.php --dry-run    # 開発用。Slack 送信と state.json / results.html 更新をしない
+ *   php ur_monitor.php              # 通常監視実行（結果を docs/index.html に出力）
+ *   php ur_monitor.php --dry-run    # 開発用。Slack 送信と state.json / docs/index.html 更新をしない
  *   php ur_monitor.php --setup      # セレクター確認用（ブラウザ表示 + スクリーンショット保存）
  *   php ur_monitor.php --check-robots  # robots.txt 確認のみ
  */
@@ -23,7 +23,9 @@ define('BASE_DIR', __DIR__);
 define('CONFIG_FILE',  BASE_DIR . '/config.json');
 define('STATE_FILE',   BASE_DIR . '/state.json');
 define('LOG_FILE',     BASE_DIR . '/monitor.log');
-define('RESULTS_FILE', BASE_DIR . '/results.html');
+// GitHub Pages が main の /docs を配信するため、一覧はそこへ直接書き出す。
+// index.html にしているのは、サイトのトップがそのまま一覧になるように。
+define('RESULTS_FILE', BASE_DIR . '/docs/index.html');
 
 // ──────────────────────────────────────────
 // ユーティリティ
@@ -508,7 +510,7 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<!-- 公開先（Cloudflare Pages）で検索エンジンに拾われないようにする。
+<!-- 公開先（GitHub Pages）で検索エンジンに拾われないようにする。
      狙っている物件が highlight_keywords から読み取れるため。 -->
 <meta name="robots" content="noindex, nofollow">
 <title>UR賃貸 空き部屋一覧</title>
@@ -631,7 +633,7 @@ function notify_slack(string $webhookUrl, array $newRooms, string $searchUrl): v
 // ──────────────────────────────────────────
 
 // $dryRun: 開発（Windows / macOS）用。スクレイプはするが Slack 送信と
-// state.json / results.html の書き込みを行わない。本番の状態を壊さずに動作確認できる。
+// state.json / docs/index.html の書き込みを行わない。本番の状態を壊さずに動作確認できる。
 function run_monitor(array $config, bool $dryRun = false): void
 {
     $searchUrls = $config['search_urls'] ?? [];
@@ -643,7 +645,7 @@ function run_monitor(array $config, bool $dryRun = false): void
     }
 
     if ($dryRun) {
-        log_msg('INFO', "dry-run: Slack 通知と state.json / results.html の更新は行いません");
+        log_msg('INFO', "dry-run: Slack 通知と state.json / docs/index.html の更新は行いません");
     }
 
     // 実行が毎時 :00/:30 ちょうどに揃う規則性を消すためのランダム待機。
@@ -763,7 +765,7 @@ function run_monitor(array $config, bool $dryRun = false): void
     }
 
     if ($dryRun) {
-        log_msg('INFO', "dry-run: ここで state.json / results.html を更新するところを省略しました");
+        log_msg('INFO', "dry-run: ここで state.json / docs/index.html を更新するところを省略しました");
         return;
     }
 
