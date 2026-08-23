@@ -1,5 +1,13 @@
 {
     "rooms": {
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000040102": {
+            "building": "所沢パークタウン並木通り",
+            "name": "所沢パークタウン並木通り 4号棟 102号室",
+            "price": "67,700円",
+            "floor_plan": "2DK / 48㎡ / 1階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000040102",
+            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
+        },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000050803": {
             "building": "所沢パークタウン並木通り",
             "name": "所沢パークタウン並木通り 5号棟 803号室",
@@ -22,14 +30,6 @@
             "price": "98,300円（割引前・要問合せ）",
             "floor_plan": "3DK / 66㎡ / 1階",
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
-        },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404": {
-            "building": "所沢パークタウン駅前通り",
-            "name": "所沢パークタウン駅前通り 7号棟 404号室",
-            "price": "80,200円",
-            "floor_plan": "2LDK / 58㎡ / 4階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000010702": {
@@ -186,5 +186,5 @@
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-23T16:19:31+09:00"
+    "last_checked": "2026-08-23T16:52:57+09:00"
 }
