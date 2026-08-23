@@ -193,6 +193,9 @@
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/area/222.html"
         }
     },
-    "zero_streak": [],
-    "last_checked": "2026-08-23T20:10:07+09:00"
+    "zero_streak": {
+        "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html": 1,
+        "https://www.ur-net.go.jp/chintai/kanto/tokyo/area/222.html": 1
+    },
+    "last_checked": "2026-08-23T20:34:22+09:00"
 }
