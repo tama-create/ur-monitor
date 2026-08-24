@@ -2,7 +2,7 @@
 
 UR賃貸の空き部屋を定期監視し、条件に合う新着があれば Slack へ通知する。
 
-作　**たましもん**（[@tama-create](https://github.com/tama-create)）
+Created by **たましもん**（[@tama-create](https://github.com/tama-create)）
 
 ## なぜ作ったのか
 
