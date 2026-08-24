@@ -184,6 +184,21 @@
   @media (prefers-reduced-motion: reduce) { .fig animateMotion { display: none; } }
 
   footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--sub); font-size: .88rem; }
+  /* 作者クレジット。名前を主役にしたいので、肩の「作」は小さく添える程度にする */
+  .author {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 22px; padding: 16px 18px;
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .author-mark { flex: none; }
+  .author-mark svg { width: 40px; height: 40px; display: block; border-radius: 10px; }
+  .author-by { margin: 0 0 2px; font-size: .7rem; letter-spacing: .22em; color: var(--sub); }
+  .author-name {
+    margin: 0; font-size: 1.16rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .12em;
+  }
+  .author-name a { color: inherit; text-decoration: none; }
+  .author-name a:hover { color: var(--accent); }
 
   /* ===== 狭い画面 ===== */
   @media (max-width: 900px) {
@@ -226,6 +241,8 @@
       <span>プログラミング不要</span><span class="sep">│</span>
       <span>パソコンは起動しっぱなしにしない</span><span class="sep">│</span>
       <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">見本の一覧ページを見る →</a>
+      <span class="sep">│</span>
+      <span>作　たましもん</span>
     </p>
   </div>
 </header>
@@ -1178,6 +1195,15 @@ UR のサイトへの負荷を抑えるため、<strong>15分間隔</strong>を�
 </p>
 
 <footer>
+
+<div class="author">
+  <span class="author-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+  <div>
+    <p class="author-by">つくったひと</p>
+    <p class="author-name"><a href="https://github.com/tama-create">たましもん</a></p>
+  </div>
+</div>
+
 <p>
 このツールは MIT ライセンスで公開されています。自由に使えますが<strong>無保証</strong>で、
 利用によって生じた不利益について作者は責任を負いません。個別のサポートも行っていません。
