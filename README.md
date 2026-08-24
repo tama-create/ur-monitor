@@ -2,6 +2,8 @@
 
 UR賃貸の空き部屋を定期監視し、条件に合う新着があれば Slack へ通知する。
 
+作　**たましもん**（[@tama-create](https://github.com/tama-create)）
+
 ## なぜ作ったのか
 
 **UR は、空室が出ても向こうから知らせてはくれません。** 公式の「よくあるご質問」でも、
@@ -360,3 +362,13 @@ GitHub Pages が `main` の `/docs` を配信しているので、**push され�
   （正常動作中はコミットが発生し続けるため、通常は問題にならない）
 - `jitter_max_seconds` は 0。Actions の cron はもともと実行時刻がゆらぐうえ、
   待機時間がそのまま課金対象になるため
+
+## 作者
+
+**たましもん** — [github.com/tama-create](https://github.com/tama-create)
+
+自分が UR に入りたくて作った。同じことで困っている人がいれば使ってほしいが、
+セットアップはご自身でお願いします（[手順書](https://tama-create.github.io/ur-monitor/setup.html)）。
+個別のサポートは行っていない。
+
+MIT ライセンス。自由に使えるが**無保証**で、利用によって生じた不利益について作者は責任を負わない。
