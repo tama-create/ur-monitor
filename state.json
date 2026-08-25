@@ -24,12 +24,12 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000061106",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102": {
-            "building": "所沢パークタウン駅前プラザ",
-            "name": "所沢パークタウン駅前プラザ 1号棟 102号室",
-            "price": "98,300円（割引前・要問合せ）",
-            "floor_plan": "3DK / 66㎡ / 1階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102",
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000120511": {
+            "building": "所沢パークタウン駅前通り",
+            "name": "所沢パークタウン駅前通り 12号棟 511号室",
+            "price": "76,000円",
+            "floor_plan": "2DK / 51㎡ / 5階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000120511",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404": {
@@ -38,6 +38,14 @@
             "price": "80,200円",
             "floor_plan": "2LDK / 58㎡ / 4階",
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404",
+            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
+        },
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102": {
+            "building": "所沢パークタウン駅前プラザ",
+            "name": "所沢パークタウン駅前プラザ 1号棟 102号室",
+            "price": "98,300円（割引前・要問合せ）",
+            "floor_plan": "3DK / 66㎡ / 1階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1970_room.html?JKSS=000030205": {
@@ -120,22 +128,6 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000060803",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000080605": {
-            "building": "プラザシティ新所沢　緑町第三",
-            "name": "プラザシティ新所沢　緑町第三 8号棟 605号室",
-            "price": "110,500円",
-            "floor_plan": "1LDK / 57㎡ / 6階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000080605",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
-        },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510": {
-            "building": "プラザシティ新所沢　緑町第三",
-            "name": "プラザシティ新所沢　緑町第三 9号棟 510号室",
-            "price": "136,500円",
-            "floor_plan": "2LDK / 73㎡ / 5階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
-        },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_4000_room.html?JKSS=000510206": {
             "building": "プラザシティ新所沢けやき通り第三",
             "name": "プラザシティ新所沢けやき通り第三 51号棟 206号室",
@@ -152,12 +144,28 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_4000_room.html?JKSS=000530102",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510": {
+            "building": "プラザシティ新所沢　緑町第三",
+            "name": "プラザシティ新所沢　緑町第三 9号棟 510号室",
+            "price": "136,500円",
+            "floor_plan": "2LDK / 73㎡ / 5階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510",
+            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
+        },
         "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000247504": {
             "building": "清瀬旭が丘",
             "name": "清瀬旭が丘 2-4-7号棟 504号室",
             "price": "58,100円",
             "floor_plan": "3DK / 50㎡ / 5階",
             "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000247504",
+            "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html"
+        },
+        "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000244408": {
+            "building": "清瀬旭が丘",
+            "name": "清瀬旭が丘 2-4-4号棟 408号室",
+            "price": "60,600円",
+            "floor_plan": "2LDK / 50㎡ / 4階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000244408",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000050107": {
@@ -202,5 +210,5 @@
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-25T09:26:31+09:00"
+    "last_checked": "2026-08-25T10:58:12+09:00"
 }
