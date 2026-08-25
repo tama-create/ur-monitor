@@ -120,12 +120,12 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000130508",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000060803": {
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000010508": {
             "building": "プラザシティ新所沢　けやき通り",
-            "name": "プラザシティ新所沢　けやき通り 6号棟 803号室",
-            "price": "111,200円",
-            "floor_plan": "2DK / 52㎡ / 8階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000060803",
+            "name": "プラザシティ新所沢　けやき通り 1号棟 508号室",
+            "price": "130,200円",
+            "floor_plan": "4DK / 72㎡ / 5階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000010508",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_4000_room.html?JKSS=000510206": {
@@ -210,5 +210,5 @@
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-25T11:52:50+09:00"
+    "last_checked": "2026-08-25T12:37:21+09:00"
 }
