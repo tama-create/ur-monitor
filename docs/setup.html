@@ -267,7 +267,7 @@
     <li><a href="#s1">このツールは何をするのか</a>
       <ol>
         <li><a href="#s1-1">全体の流れ</a></li>
-        <li><a href="#s1-2">「15分おき」は約束ではありません</a></li>
+        <li><a href="#s1-2">なぜ「5分おき」を守れるのか</a></li>
         <li><a href="#s1-3">パソコンは関係ありません</a></li>
       </ol>
     </li>
@@ -318,6 +318,15 @@
         <li><a href="#s8-1">自動実行を有効にする</a></li>
         <li><a href="#s8-2">手動で1回動かす</a></li>
         <li><a href="#s8-3">結果を確認する</a></li>
+      </ol>
+    </li>
+    <li><a href="#s8b">Cloudflare で時計を用意する</a>
+      <ol>
+        <li><a href="#s8b-1">GitHub のトークンを作る</a></li>
+        <li><a href="#s8b-2">Cloudflare に登録して Worker を作る</a></li>
+        <li><a href="#s8b-3">トークンを Worker に渡す</a></li>
+        <li><a href="#s8b-4">5分おきに動かす</a></li>
+        <li><a href="#s8b-5">動いているか確かめる</a></li>
       </ol>
     </li>
     <li><a href="#s9">通知を活かすコツ</a>
@@ -505,14 +514,14 @@ Slack 通知には<strong>その部屋のページへのリンク</strong>が入
 <h2 id="s1">このツールは何をするのか</h2>
 
 <p>
-UR賃貸のサイトを<strong>15分おきに自動で見に行き</strong>、あなたが指定した条件
+UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あなたが指定した条件
 （建物名・間取り）に合う部屋が新しく出たら、<strong>Slack に通知</strong>します。
 </p>
 
 <h3 id="s1-1">全体の流れ</h3>
 
 <figure class="fig">
-<svg viewBox="0 0 840 300" role="img" aria-label="15分おきにURのサイトを見に行き、前回と比較して、条件に合う新着をSlackへ通知し、一覧をWebページに公開する流れ">
+<svg viewBox="0 0 840 300" role="img" aria-label="5分おきにURのサイトを見に行き、前回と比較して、条件に合う新着をSlackへ通知し、一覧をWebページに公開する流れ">
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -524,7 +533,7 @@ UR賃貸のサイトを<strong>15分おきに自動で見に行き</strong>、�
   </defs>
   <g>
     <rect x="20" y="55" width="130" height="70" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
-    <text x="85" y="82" class="t1">⏰ 15分おき</text>
+    <text x="85" y="82" class="t1">⏰ 5分おき</text>
     <text x="85" y="104" class="t2">8:00〜21:00</text>
     <rect x="240" y="55" width="130" height="70" rx="8" fill="#e8f0fb" stroke="#005bac"/>
     <text x="305" y="82" class="t1">🏠 UR を見る</text>
@@ -562,20 +571,21 @@ UR賃貸のサイトを<strong>15分おきに自動で見に行き</strong>、�
 </svg>
 </figure>
 
-<h3 id="s1-2">「15分おき」は約束ではありません</h3>
+<h3 id="s1-2">なぜ「5分おき」を守れるのか</h3>
 
 <p>
-設定上は15分間隔ですが、<strong>GitHub が必ずその間隔で動かしてくれるわけではありません。</strong>
-混雑しているときは遅れますし、その回の実行が飛ばされることもあります。
+ここは少し込み入っていますが、<strong>このツールがきちんと動くかどうかを決めている一番大事な部分</strong>
+なので、先に説明させてください。時計の役目を GitHub ではなく <strong>Cloudflare</strong> に任せています。
 </p>
 
 <div class="warn">
-<p><strong>これは設定ミスでも故障でもなく、GitHub の自動実行がそういう性質のものだからです。</strong>
-無料で借りている仕組みなので、時刻をきっちり守る保証がありません。</p>
+<p><strong>GitHub の自動実行は、設定した間隔を守ってくれません。</strong>
+混雑しているときは遅れますし、その回の実行がまるごと飛ばされることもあります。
+設定ミスでも故障でもなく、無料で借りている仕組みがそういう性質だからです。</p>
 </div>
 
 <p>
-実際に30分間隔で運用していたときの記録がこちらです。設定は30分なのに、
+実際に30分間隔で動かしていたときの記録です。設定は30分なのに、
 <strong>間隔は46〜64分に広がり、9時間で18回動くはずが12回しか動きませんでした</strong>
 （およそ3分の1が飛ばされていた計算です）。
 </p>
@@ -584,10 +594,52 @@ UR賃貸のサイトを<strong>15分おきに自動で見に行き</strong>、�
   64分   46分   53分   54分   53分   48分   59分   56分   57分</code></pre>
 
 <p>
-15分に設定しているのは、<strong>試行の回数を増やして、実際の間隔を少しでも縮めるため</strong>です。
-15分おきに動くようになるからではありません。期待できるのは
-「実際には30分前後で動く」くらいのところだと思ってください。
+そこで15分間隔に詰めてみたのですが、これは効きませんでした。数日は動いたあと、
+<strong>1日2回まで落ちました</strong>（2026年8月27〜28日）。1日2回では、早い者勝ちの
+部屋探しにはまるで使えません。
 </p>
+
+<p>
+原因が「回数が足りない」ではなく「GitHub が間引いている」である以上、
+GitHub 側で粘っても解決しません。そこで<strong>時計を外に出しました</strong>。
+Cloudflare という別のサービスから「いま動け」と GitHub に指示を出す形にしています。
+</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 190" role="img" aria-label="Cloudflare が5分おきに GitHub へ実行を指示し、GitHub が UR を見に行く流れ">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+  <rect x="20" y="45" width="180" height="80" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
+  <text x="110" y="76" class="t1">☁️ Cloudflare</text>
+  <text x="110" y="98" class="t2">正確に5分おき</text>
+  <rect x="330" y="45" width="180" height="80" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+  <text x="420" y="76" class="t1">⚙️ GitHub</text>
+  <text x="420" y="98" class="t2">言われたら必ず動く</text>
+  <rect x="640" y="45" width="180" height="80" rx="8" fill="#e6f4ea" stroke="#1a7f37"/>
+  <text x="730" y="76" class="t1">🏠 UR を見る</text>
+  <text x="730" y="98" class="t2">新着なら Slack へ</text>
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#ar2)">
+    <path d="M200,85 H326"/><path d="M510,85 H636"/>
+  </g>
+  <text x="263" y="75" class="t3">動け</text>
+  <text x="420" y="170" class="t3">時計は Cloudflare、実際の作業は GitHub。役割を分けています</text>
+</svg>
+</figure>
+
+<p>
+GitHub は「決まった時刻に自分で動く」のは苦手ですが、<strong>「動け」と言われて動くのは確実</strong>です。
+この性質の違いを利用しています。切り替えたあとの実測では、
+<strong>5分ちょうどの間隔で、1回も飛ばさずに動いています</strong>（2026年8月28日）。
+</p>
+
+<div class="note">
+<p><strong>Cloudflare の設定は必須です。</strong>やり方は後の章（<a href="#s8b">Cloudflare で時計を用意する</a>）で
+説明します。ここをやらないと、GitHub 側に残してある保険の実行（1日4回）だけになり、
+ほとんど通知が来ません。</p>
+</div>
 
 <div class="note">
 <p><strong>何分おきに動いたかは、あとから正確に分かります。</strong>
@@ -611,52 +663,69 @@ UR賃貸のサイトを<strong>15分おきに自動で見に行き</strong>、�
   <tr><th>必要なもの</th><th>費用</th><th>備考</th></tr>
   <tr><td>GitHub アカウント</td><td>無料</td><td>必須。第 4 章で作ります</td></tr>
   <tr><td>Slack ワークスペース</td><td>無料</td><td>必須。通知の受け取り先</td></tr>
+  <tr><td>Cloudflare アカウント</td><td>無料</td><td>必須。第 10 章で作ります。5分おきに動かすための時計</td></tr>
 </table>
 
 <h3 id="s2-2">セットアップの全体像</h3>
 
 <figure class="fig">
-<svg viewBox="0 0 840 330" role="img" aria-label="第4章から第9章までが必須、第11章のWeb公開は任意という全体像">
+<svg viewBox="0 0 840 430" role="img" aria-label="第4章から第10章までが必須で第10章のCloudflareまでやると完成、第12章のWeb公開は任意という全体像">
   <defs>
     <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
     </marker>
   </defs>
-  <text x="20" y="24" class="t4">必須（ここまでで Slack 通知が動きます）</text>
-  <rect x="14" y="34" width="812" height="132" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
+
+  <text x="20" y="24" class="t4">必須（ここまでで5分おきの Slack 通知が動きます）</text>
+  <rect x="14" y="34" width="812" height="250" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
+
   <g>
     <rect x="30" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
     <text x="89" y="82" class="tn">第 4 章</text>
     <text x="89" y="106" class="t1">GitHub</text>
     <text x="89" y="126" class="t2">アカウント</text>
+
     <rect x="188" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
     <text x="247" y="82" class="tn">第 5 章</text>
     <text x="247" y="106" class="t1">フォーク</text>
     <text x="247" y="126" class="t2">自分にコピー</text>
+
     <rect x="346" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
     <text x="405" y="82" class="tn">第 6 章</text>
     <text x="405" y="106" class="t1">条件を設定</text>
     <text x="405" y="126" class="t2">config.json</text>
+
     <rect x="504" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
     <text x="563" y="82" class="tn">第 7〜8 章</text>
     <text x="563" y="106" class="t1">Slack</text>
     <text x="563" y="126" class="t2">通知先を用意</text>
-    <rect x="662" y="58" width="148" height="86" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
-    <text x="736" y="82" class="tn">第 9 章</text>
-    <text x="736" y="106" class="t1">動かす</text>
-    <text x="736" y="126" class="t2">ここで完成 ✓</text>
+
+    <rect x="30" y="176" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
+    <text x="89" y="200" class="tn">第 9 章</text>
+    <text x="89" y="224" class="t1">動かす</text>
+    <text x="89" y="244" class="t2">まず1回</text>
+
+    <rect x="188" y="176" width="158" height="86" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+    <text x="267" y="200" class="tn">第 10 章</text>
+    <text x="267" y="224" class="t1">Cloudflare</text>
+    <text x="267" y="244" class="t2">ここで完成 ✓</text>
   </g>
+
   <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#ar2)">
-    <path d="M148,101 H184"/><path d="M306,101 H342"/>
-    <path d="M464,101 H500"/><path d="M622,101 H658"/>
+    <path d="M148,101 H184"/><path d="M306,101 H342"/><path d="M464,101 H500"/>
+    <path d="M563,144 V160 H89 V172"/>
+    <path d="M148,219 H184"/>
   </g>
-  <text x="20" y="212" class="t4">任意（やらなくても通知は動きます）</text>
-  <rect x="14" y="222" width="812" height="94" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
-  <rect x="662" y="240" width="148" height="60" rx="8" fill="#fff" stroke="#8c959f" stroke-width="2"/>
-  <text x="736" y="262" class="tn">第 11 章</text>
-  <text x="736" y="284" class="t1">Web に公開</text>
-  <path d="M736,166 V236" fill="none" stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
-  <text x="330" y="276" class="t2">GitHub Pages で、空き部屋一覧をスマホからも見られるようにする</text>
+
+  <text x="596" y="224" class="t2">Cloudflare が「5分おきに動け」と GitHub に指示する時計になります</text>
+
+  <text x="20" y="316" class="t4">任意（やらなくても通知は動きます）</text>
+  <rect x="14" y="326" width="812" height="88" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
+  <rect x="188" y="340" width="158" height="60" rx="8" fill="#fff" stroke="#8c959f" stroke-width="2"/>
+  <text x="267" y="362" class="tn">第 12 章</text>
+  <text x="267" y="384" class="t1">Web に公開</text>
+  <path d="M267,262 V336" fill="none" stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
+  <text x="590" y="376" class="t2">GitHub Pages で、空き部屋一覧をスマホからも見られるようにする</text>
 </svg>
 </figure>
 
@@ -665,7 +734,9 @@ UR賃貸のサイトを<strong>15分おきに自動で見に行き</strong>、�
 <div class="ok">
 <p><strong>費用は一切かかりません。</strong>
 公開リポジトリ（誰でも見られる設定）なら、GitHub の自動実行は無制限に無料です。
-Slack も無料枠の範囲で収まります。<strong>外部の有料サービスは一切使いません。</strong></p>
+Slack も無料枠の範囲で収まります。第 10 章で使う Cloudflare も無料の範囲で、
+<strong>クレジットカードの登録も要りません</strong>（1日あたりの呼び出しは168回で、
+無料枠の10万回に対して誤差の範囲です）。<strong>有料サービスは一切使いません。</strong></p>
 </div>
 
 <h3 id="s2-4">公開リポジトリにするということ</h3>
@@ -944,8 +1015,112 @@ Slack も無料枠の範囲で収まります。<strong>外部の有料サービ
 </ul>
 
 <div class="ok">
+<p><strong>ここまでで監視そのものは動きます。</strong>
+ただしこのままだと動く回数がごく少ないので、次の章で時計を用意します。</p>
+</div>
+
+<h2 id="s8b">Cloudflare で時計を用意する <span class="step-time">（15分）</span></h2>
+
+<p>
+<a href="#s1-2">1.2</a> で説明したとおり、GitHub は決まった間隔で動いてくれません。
+<strong>ここをやらないと1日数回しか動かず、ほとんど通知が来ません。</strong>
+面倒に見えますが、このツールが役に立つかどうかはここで決まります。
+</p>
+
+<h3 id="s8b-1">GitHub のトークンを作る</h3>
+
+<p>Cloudflare から GitHub に「動け」と言うための鍵です。</p>
+
+<ol>
+  <li>GitHub の <strong>Settings</strong> → <strong>Developer settings</strong> →
+      <strong>Personal access tokens</strong> → <strong>Fine-grained tokens</strong></li>
+  <li><strong>Generate new token</strong></li>
+  <li><strong>Repository access</strong> で、このツールのリポジトリだけを選ぶ</li>
+  <li><strong>Permissions</strong> → <strong>Repository permissions</strong> →
+      <strong>Actions</strong> を <strong>Read and write</strong> にする</li>
+  <li>作成し、表示されたトークンをコピーする</li>
+</ol>
+
+<div class="warn">
+<p><strong>トークンは作成直後の一度しか表示されません。</strong>
+閉じる前にコピーしてください。また、<strong>誰にも見せないでください</strong>。
+チャットやメールに貼るのも避けてください。もし見られてしまったら、
+同じ画面から作り直せば古いものは無効になります。</p>
+</div>
+
+<h3 id="s8b-2">Cloudflare に登録して Worker を作る</h3>
+
+<ol>
+  <li><a href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">Cloudflare</a>
+      に無料で登録する（クレジットカードは不要です）</li>
+  <li><strong>Compute</strong> → <strong>Workers &amp; Pages</strong> → <strong>Create</strong></li>
+  <li><strong>Start with Hello World</strong> を選び、名前を <code>ur-monitor-trigger</code> にして
+      <strong>Deploy</strong></li>
+  <li><strong>コードを編集する</strong> を押し、中身をすべて消して、
+      このツールの <code>trigger/worker.js</code> の中身を貼り付ける</li>
+  <li>ファイルの先頭にある <code>OWNER</code> を<strong>自分の GitHub ユーザー名</strong>に書き換える</li>
+  <li><strong>Deploy</strong></li>
+</ol>
+
+<h3 id="s8b-3">トークンを Worker に渡す</h3>
+
+<ol>
+  <li>Worker の <strong>設定</strong> → <strong>変数とシークレット</strong> → <strong>追加</strong></li>
+  <li><strong>種類</strong>は必ず <strong>Secret</strong>（シークレット）を選ぶ</li>
+  <li><strong>名前</strong>は <code>GITHUB_TOKEN</code>、<strong>値</strong>は手順1のトークン</li>
+  <li>保存してデプロイ</li>
+</ol>
+
+<div class="warn">
+<p><strong>「Text（平文）」ではなく「Secret」を選んでください。</strong>
+Secret にすると、あとから画面上でも中身を読み出せなくなります。</p>
+</div>
+
+<h3 id="s8b-4">5分おきに動かす</h3>
+
+<ol>
+  <li>Worker の <strong>設定</strong> → <strong>トリガーイベント</strong> →
+      <strong>Cron トリガー</strong> → <strong>追加</strong></li>
+  <li>タブが2つ出るので、<strong>「Cron 式」のほう</strong>を選ぶ
+      （「スケジュール」は「○分ごと」しか指定できず、時間帯を絞れません）</li>
+  <li>次のとおり入力して <strong>更新</strong></li>
+</ol>
+
+<pre><code>*/5 0-12,23 * * *</code></pre>
+
+<p>
+これで <strong>日本時間の 8:00〜21:55、5分おき</strong>になります。
+数字が合わないように見えるのは、<strong>この欄が世界標準時（UTC）で書くルール</strong>だからです。
+日本は9時間進んでいるので、UTC の 23時が日本の 8時、UTC の 12時が日本の 21時にあたります。
+</p>
+
+<div class="note">
+<p><strong>入力すると「今後のイベントの予定（UTC）」に次の実行時刻が並びます。</strong>
+そこが5分刻みになっていれば成功です。この欄も UTC 表示なので、
+9を足した時刻が日本時間だと思って見てください。</p>
+</div>
+
+<h3 id="s8b-5">動いているか確かめる</h3>
+
+<p>5分ほど待ってから、Worker の <strong>Observability</strong>（観察可能性）でログを見ます。</p>
+
+<table>
+<thead><tr><th>出ているもの</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td><code>JST 15時: 起動した</code></td><td>成功</td></tr>
+<tr><td><code>起動に失敗: 401 ...</code></td><td>トークンが違う。貼り直す</td></tr>
+<tr><td><code>起動に失敗: 403 ...</code></td><td>トークンの権限不足。Actions を Read and write に</td></tr>
+<tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
+</tbody>
+</table>
+
+<p>
+GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完了です。
+</p>
+
+<div class="ok">
 <p><strong>ここまで来れば完成です。</strong>
-以降は 8:00〜21:00 の間、自動で動き続けます。もう何もしなくて構いません。</p>
+以降は 8:00〜21:00 の間、5分おきに自動で動き続けます。もう何もしなくて構いません。</p>
 </div>
 
 <h2 id="s9">通知を活かすコツ</h2>
@@ -1198,8 +1373,10 @@ GitHub の実行環境は毎回まっさらにリセットされ、ファイル�
 <h3 id="s12-3">やっていないこと</h3>
 
 <p>
-UR のサイトへの負荷を抑えるため、<strong>15分間隔</strong>を守り、URL 間に待機を入れ、
-<code>robots.txt</code> を確認したうえで動かしています。
+UR のサイトへの負荷を抑えるため、<strong>動きのある 8:00〜21:00 の間だけ</strong>5分間隔で、
+URL 間に待機を入れ、<code>robots.txt</code> を確認したうえで動かしています。
+夜間は動かしません。監視するページが3本なら UR へのアクセスは平均して100秒に1回ほどで、
+人がひとつの検索結果ページを開いて絞り込みを何度か押すのと変わらない量です。
 <strong>取得間隔を極端に短くする改造はしないでください。</strong>
 相手のサーバーに迷惑がかかり、この方法自体が使えなくなります。
 </p>
