@@ -283,6 +283,8 @@
     <p class="hero-meta">
       <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
       <span class="sep">│</span>
+      <a href="guide.html">使い方ガイド</a>
+      <span class="sep">│</span>
       <span class="current" aria-current="page">セットアップ手順書</span>
       <span class="sep">│</span>
       <a href="architecture.html">仕組みの技術資料</a>
@@ -297,15 +299,6 @@
 <nav class="toc" aria-label="目次">
   <p class="toc-ttl">目次</p>
   <ol>
-    <li><a href="#s0">なぜこのツールを作ったのか</a>
-      <ol>
-        <li><a href="#s0-1">空室が出ても、向こうからは知らせてくれない</a></li>
-        <li><a href="#s0-2">メールで届く公式サービスもあるが、対象が限られる</a></li>
-        <li><a href="#s0-3">気づくのが遅れると取られる</a></li>
-        <li><a href="#s0-4">通知が来たら、どうやって押さえるか</a></li>
-        <li><a href="#s0-5">入居を決めてから動くのでは遅い</a></li>
-      </ol>
-    </li>
     <li><a href="#s1">このツールは何をするのか</a>
       <ol>
         <li><a href="#s1-1">全体の流れ</a></li>
@@ -371,13 +364,6 @@
         <li><a href="#s8b-5">動いているか確かめる</a></li>
       </ol>
     </li>
-    <li><a href="#s9">通知を活かすコツ</a>
-      <ol>
-        <li><a href="#s9-1">スマートウォッチで受け取る</a></li>
-        <li><a href="#s9-2">通知は強めに設定してよい</a></li>
-        <li><a href="#s9-3">気づいたらすぐ電話する</a></li>
-      </ol>
-    </li>
     <li><a href="#s10">空き部屋一覧を Web で見る <span class="opt">（任意）</span></a>
       <ol>
         <li><a href="#s10-0">実際にできるページ（見本）</a></li>
@@ -391,13 +377,6 @@
         <li><a href="#s11-2">「前回状態を維持」と出る</a></li>
         <li><a href="#s11-3">実行が赤いバツになる</a></li>
         <li><a href="#s11-4">1件も部屋が取れない</a></li>
-      </ol>
-    </li>
-    <li><a href="#s12">使っている技術</a>
-      <ol>
-        <li><a href="#s12-1">技術の一覧</a></li>
-        <li><a href="#s12-2">状態の持ち方</a></li>
-        <li><a href="#s12-3">やっていないこと</a></li>
       </ol>
     </li>
   </ol>
@@ -436,142 +415,6 @@ UR賃貸の空き部屋を自動で監視し、条件に合う新着が出たら
 
 <p class="promise-note">途中で分からなくなっても壊れることはないので、落ち着いて進めてください。</p>
 
-
-<h2 id="s0">なぜこのツールを作ったのか</h2>
-
-<h3 id="s0-1">空室が出ても、向こうからは知らせてくれない</h3>
-
-<p>
-UR の公式サイトの「よくあるご質問」には、こういう問答があります。
-</p>
-
-<blockquote>
-<p><strong>Q. 希望する物件に空室が出たら連絡してくれるの？</strong><br>
-A. 空室情報につきましては随時更新されておりますので、UR賃貸住宅Webサイトまたは店舗で
-ご確認ください。</p>
-</blockquote>
-
-<p>
-つまり<strong>自分で何度も見に行くしかない</strong>、というのが公式の答えです。
-気になる物件のページを、思い出すたびに開いて確かめることになります。
-</p>
-
-<h3 id="s0-2">メールで届く公式サービスもあるが、対象が限られる</h3>
-
-<p>
-メールで知らせてくれる仕組みが、まったく無いわけではありません。UR には
-<a href="https://www.ur-net.go.jp/chintai/akishitsu/" target="_blank" rel="noopener">空室情報お届けサービス</a>
-があり、登録した条件に合う部屋の募集が始まるとメールが届きます。
-</p>
-
-<div class="warn">
-<p>ただし<strong>対象は子育て世帯と若者夫婦世帯に限られ、実施しているのも一部の団地だけ</strong>です。
-事前の申込みとマイページでの条件登録も必要になります。<br>
-<strong>ここから外れる人には使えません。</strong>まずご自分が対象になるか確かめて、
-対象なら公式サービスのほうが確実です。このツールが要るのは、対象外だった場合です。</p>
-</div>
-
-<h3 id="s0-3">気づくのが遅れると取られる</h3>
-
-<p>
-そして<strong>UR賃貸は、約70万戸のほとんどが抽選なしの先着順</strong>です
-（新築物件など一部は抽選になります）。
-気づくのが数時間遅れただけで、もう他の人に決まっていた、ということが普通に起こります。
-</p>
-
-<p>
-1件を見張るだけでも大変なのに、候補が複数あればなおさら現実的ではありません。
-仕事中も、寝ている間も、人間が張り付き続けることはできません。
-</p>
-
-<div class="ok">
-<p><strong>だから、入居したい物件を横断的に監視して、空きが出た瞬間に知らせる仕組みが要ります。</strong>
-このツールはそのために作りました。</p>
-<p>見張る作業は機械に任せて、<strong>人間は「見つけたらすぐ申し込む」という本当に大事な一手に集中できます。</strong></p>
-</div>
-
-<h3 id="s0-4">通知が来たら、どうやって押さえるか</h3>
-
-<p>
-Slack 通知には<strong>その部屋のページへのリンク</strong>が入っています。開くと、ページの中ほどに
-「お部屋の内覧・お申込みのお問い合わせ」という欄があり、そこに2つの導線が並んでいます。
-</p>
-
-<ul>
-  <li><strong>電話で今すぐお問い合わせ</strong> — 担当の UR賃貸ショップの直通番号。
-      <strong>スマホならタップするだけで発信できます</strong></li>
-  <li><strong>ネットで仮申込み</strong> — その場で仮申込みまで進めます（ユーザー登録が必要）</li>
-</ul>
-
-<div class="ok">
-<p><strong>一番速いのは、通知 → リンクをタップ → 電話ボタンをタップ、の流れです。</strong>
-スマートウォッチで気づいて、スマホを取り出してこの3タップ。
-早い者勝ちの世界では、この短さがそのまま効きます。</p>
-</div>
-
-<h3 id="s0-5">入居を決めてから動くのでは遅い</h3>
-
-<p>
-ここが一番大事なところです。UR の手続きは、こういう順番で組まれています。
-</p>
-
-<pre><code>お申込み（仮申込）→ 内覧 → 書類提出（本申込）→ 契約 → 入居</code></pre>
-
-<p>
-注目すべきは<strong>「仮申込」が内覧より前にある</strong>ことです。公式ページにも、この仮申込の
-段階で<strong>お部屋の確保が行われる</strong>と書かれています。
-<strong>つまり、実際に部屋を見るのは、押さえたあとなのです。</strong>
-</p>
-
-<div class="ok">
-<p><strong>だから「入居するかどうか」は、電話の時点では決まっていなくて構いません。</strong>
-まず押さえて内覧の予約を取り、見てから考える。制度がそういう順番になっています。
-迷っているあいだに他の人が押さえてしまえば、見ることすらできません。</p>
-</div>
-
-<p>
-押さえたあとには期限があります。公式ページに書かれているのは次のとおりです。
-</p>
-
-<table>
-  <tr><th>手続き</th><th>期限</th></tr>
-  <tr><td>内覧</td><td>お申込みの翌日から1週間以内</td></tr>
-  <tr><td>書類提出（本申込）</td><td>仮申込の翌日から1週間以内</td></tr>
-  <tr><td>契約</td><td>仮申込の翌日から10日以内</td></tr>
-</table>
-
-<div class="warn">
-<p><strong>お申込みは一世帯につき一件です。</strong>
-複数の部屋を同時に押さえておくことはできません。監視は何件でもできますが、
-<strong>押さえるときは1室を選ぶことになります。</strong></p>
-<p>キャンセルの可否や条件については公式ページに明記がありません。
-気になる場合は電話のときに直接確認してください。</p>
-</div>
-
-<div class="note">
-<p><strong>補足：</strong>公式FAQには「電話によるお申込みは受け付けておりません」とあります。これは
-<strong>申込み手続きそのものが電話で完結しない</strong>という意味で、電話してはいけないという話では
-ありません。物件ページが「内覧・お申込みのお問い合わせ」として電話番号を大きく出しているとおり、
-まず電話で当たるのは正規のやり方です。ショップの営業時間外に通知が来たときは、
-先にネットで仮申込みをしておく手もあります。</p>
-</div>
-
-<p>
-この手順書が扱うのは<strong>「空きに気づく」ところまで</strong>です。
-そこから先の問い合わせ・内覧・契約は、UR の案内に従ってください。
-</p>
-
-<div class="note">
-<p><strong>出典：</strong>
-<a href="https://www.ur-net.go.jp/chintai/rent/" target="_blank" rel="noopener">URの借り方</a>（2026年8月時点）</p>
-</div>
-
-<div class="note">
-<p><strong>出典：</strong>
-<a href="https://www.ur-net.go.jp/chintai/faq/" target="_blank" rel="noopener">UR賃貸住宅 よくあるご質問</a>、
-<a href="https://www.ur-net.go.jp/chintai/akishitsu/" target="_blank" rel="noopener">空室情報お届けサービス</a>
-（いずれも2026年8月時点）。制度は変わることがあるので、実際に動く前に公式で確かめてください。</p>
-</div>
 
 <h2 id="s1">このツールは何をするのか</h2>
 
@@ -636,35 +479,9 @@ UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あ
 <h3 id="s1-2">なぜ「5分おき」を守れるのか</h3>
 
 <p>
-ここは少し込み入っていますが、<strong>このツールがきちんと動くかどうかを決めている一番大事な部分</strong>
-なので、先に説明させてください。時計の役目を GitHub ではなく <strong>Cloudflare</strong> に任せています。
-</p>
-
-<div class="warn">
-<p><strong>GitHub の自動実行は、設定した間隔を守ってくれません。</strong>
-混雑しているときは遅れますし、その回の実行がまるごと飛ばされることもあります。
-設定ミスでも故障でもなく、無料で借りている仕組みがそういう性質だからです。</p>
-</div>
-
-<p>
-実際に30分間隔で動かしていたときの記録です。設定は30分なのに、
-<strong>間隔は46〜64分に広がり、9時間で18回動くはずが12回しか動きませんでした</strong>
-（およそ3分の1が飛ばされていた計算です）。
-</p>
-
-<pre><code>02:17 → 03:21 → 04:07 → 05:00 → 05:54 → 06:47 → 07:35 → 08:34 → 09:30 → 10:27
-  64分   46分   53分   54分   53分   48分   59分   56分   57分</code></pre>
-
-<p>
-そこで15分間隔に詰めてみたのですが、これは効きませんでした。数日は動いたあと、
-<strong>1日2回まで落ちました</strong>（2026年8月27〜28日）。1日2回では、早い者勝ちの
-部屋探しにはまるで使えません。
-</p>
-
-<p>
-原因が「回数が足りない」ではなく「GitHub が間引いている」である以上、
-GitHub 側で粘っても解決しません。そこで<strong>時計を外に出しました</strong>。
-Cloudflare という別のサービスから「いま動け」と GitHub に指示を出す形にしています。
+時計の役目を GitHub ではなく <strong>Cloudflare</strong> に任せています。
+<strong>GitHub の自動実行は、設定した間隔を守ってくれない</strong>ためです
+（30分設定で実測46〜64分、15分設定では1日2回まで落ちました）。
 </p>
 
 <figure class="fig">
@@ -693,21 +510,19 @@ Cloudflare という別のサービスから「いま動け」と GitHub に指�
 
 <p>
 GitHub は「決まった時刻に自分で動く」のは苦手ですが、<strong>「動け」と言われて動くのは確実</strong>です。
-この性質の違いを利用しています。切り替えたあとの実測では、
-<strong>5分ちょうどの間隔で、1回も飛ばさずに動いています</strong>（2026年8月28日）。
+この性質の違いを利用しています。切り替えたあとの実測は<strong>5分ちょうど、1回も飛ばさず</strong>です。
 </p>
 
-<div class="note">
-<p><strong>Cloudflare の設定は必須です。</strong>やり方は後の章（<a href="#s8b">Cloudflare で時計を用意する</a>）で
-説明します。ここをやらないと、GitHub 側に残してある保険の実行（1日4回）だけになり、
-ほとんど通知が来ません。</p>
+<div class="stop">
+<p><strong>Cloudflare の設定は必須です（<a href="#s8b">第 9 章</a>）。</strong>
+ここをやらないと GitHub 側の保険の実行（1日4回）だけになり、ほとんど通知が来ません。</p>
 </div>
 
 <div class="note">
-<p><strong>何分おきに動いたかは、あとから正確に分かります。</strong>
-実行のたびに記録がリポジトリに残るので、リポジトリの
-<strong>Commits</strong>（コミット履歴）を見れば、実際に動いた時刻が全部並んでいます。
-「思ったより通知が来ないな」と感じたら、ここを見てください。</p>
+<p>実際に何分おきに動いたかは、リポジトリの <strong>Commits</strong>（コミット履歴）で確かめられます。
+実行のたびに記録が残るためです。<br>
+なぜ GitHub が間引くのか、Cloudflare がどう叩いているのかは
+<a href="architecture.html">技術資料</a>に詳しく書いてあります。</p>
 </div>
 
 <h3 id="s1-3">パソコンは関係ありません</h3>
@@ -723,15 +538,15 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
 
 <table>
   <tr><th>必要なもの</th><th>費用</th><th>備考</th></tr>
-  <tr><td>GitHub アカウント</td><td>無料</td><td>必須。第 4 章で作ります</td></tr>
+  <tr><td>GitHub アカウント</td><td>無料</td><td>必須。第 3 章で作ります</td></tr>
   <tr><td>Slack ワークスペース</td><td>無料</td><td>必須。通知の受け取り先</td></tr>
-  <tr><td>Cloudflare アカウント</td><td>無料</td><td>必須。第 10 章で作ります。5分おきに動かすための時計</td></tr>
+  <tr><td>Cloudflare アカウント</td><td>無料</td><td>必須。第 9 章で作ります。5分おきに動かすための時計</td></tr>
 </table>
 
 <h3 id="s2-2">セットアップの全体像</h3>
 
 <figure class="fig">
-<svg viewBox="0 0 840 430" role="img" aria-label="第4章から第10章までが必須で第10章のCloudflareまでやると完成、第12章のWeb公開は任意という全体像">
+<svg viewBox="0 0 840 430" role="img" aria-label="第3章から第9章までが必須で第9章のCloudflareまでやると完成、第10章のWeb公開は任意という全体像">
   <defs>
     <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -743,32 +558,32 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
 
   <g>
     <rect x="30" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="89" y="82" class="tn">第 4 章</text>
+    <text x="89" y="82" class="tn">第 3 章</text>
     <text x="89" y="106" class="t1">GitHub</text>
     <text x="89" y="126" class="t2">アカウント</text>
 
     <rect x="188" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="247" y="82" class="tn">第 5 章</text>
+    <text x="247" y="82" class="tn">第 4 章</text>
     <text x="247" y="106" class="t1">フォーク</text>
     <text x="247" y="126" class="t2">自分にコピー</text>
 
     <rect x="346" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="405" y="82" class="tn">第 6 章</text>
+    <text x="405" y="82" class="tn">第 5 章</text>
     <text x="405" y="106" class="t1">条件を設定</text>
     <text x="405" y="126" class="t2">config.json</text>
 
     <rect x="504" y="58" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="563" y="82" class="tn">第 7〜8 章</text>
+    <text x="563" y="82" class="tn">第 6〜7 章</text>
     <text x="563" y="106" class="t1">Slack</text>
     <text x="563" y="126" class="t2">通知先を用意</text>
 
     <rect x="30" y="176" width="118" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
-    <text x="89" y="200" class="tn">第 9 章</text>
+    <text x="89" y="200" class="tn">第 8 章</text>
     <text x="89" y="224" class="t1">動かす</text>
     <text x="89" y="244" class="t2">まず1回</text>
 
     <rect x="188" y="176" width="158" height="86" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
-    <text x="267" y="200" class="tn">第 10 章</text>
+    <text x="267" y="200" class="tn">第 9 章</text>
     <text x="267" y="224" class="t1">Cloudflare</text>
     <text x="267" y="244" class="t2">ここで完成 ✓</text>
   </g>
@@ -784,7 +599,7 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
   <text x="20" y="316" class="t4">任意（やらなくても通知は動きます）</text>
   <rect x="14" y="326" width="812" height="88" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
   <rect x="188" y="340" width="158" height="60" rx="8" fill="#fff" stroke="#8c959f" stroke-width="2"/>
-  <text x="267" y="362" class="tn">第 12 章</text>
+  <text x="267" y="362" class="tn">第 10 章</text>
   <text x="267" y="384" class="t1">Web に公開</text>
   <path d="M267,262 V336" fill="none" stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
   <text x="590" y="376" class="t2">GitHub Pages で、空き部屋一覧をスマホからも見られるようにする</text>
@@ -796,7 +611,7 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
 <div class="ok">
 <p><strong>費用は一切かかりません。</strong>
 公開リポジトリ（誰でも見られる設定）なら、GitHub の自動実行は無制限に無料です。
-Slack も無料枠の範囲で収まります。第 10 章で使う Cloudflare も無料の範囲で、
+Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare も無料の範囲で、
 <strong>クレジットカードの登録も要りません</strong>（1日あたりの呼び出しは168回で、
 無料枠の10万回に対して誤差の範囲です）。<strong>有料サービスは一切使いません。</strong></p>
 </div>
@@ -873,7 +688,7 @@ Slack も無料枠の範囲で収まります。第 10 章で使う Cloudflare �
 
 <div class="warn">
 <p><strong>フォークした直後は、自動実行が止まっています。</strong>
-これは GitHub の安全のための仕様です。第 9 章で有効にします。</p>
+これは GitHub の安全のための仕様です。第 8 章で有効にします。</p>
 </div>
 
 <h2 id="s5">監視する条件を設定する <span class="step-time">（10分）</span></h2>
@@ -943,6 +758,47 @@ Slack も無料枠の範囲で収まります。第 10 章で使う Cloudflare �
 </div>
 
 <h2 id="s6">Slack の通知先を用意する <span class="step-time">（15分）</span></h2>
+
+<figure class="fig">
+<svg viewBox="0 0 840 200" role="img" aria-label="ワークスペース、チャンネル、アプリ、招待、Webhook URL の5段階でSlackの通知先を用意する流れ">
+  <defs>
+    <marker id="sm1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+  <rect x="12" y="52" width="140" height="72" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
+  <text x="82" y="78" class="tn">6.1</text>
+  <text x="82" y="100" class="t1">ワークスペース</text>
+  <text x="82" y="118" class="t2">無ければ作る</text>
+
+  <rect x="182" y="52" width="140" height="72" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
+  <text x="252" y="78" class="tn">6.2</text>
+  <text x="252" y="100" class="t1">チャンネル</text>
+  <text x="252" y="118" class="t2">通知専用に1つ</text>
+
+  <rect x="352" y="52" width="140" height="72" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
+  <text x="422" y="78" class="tn">6.3</text>
+  <text x="422" y="100" class="t1">アプリを作る</text>
+  <text x="422" y="118" class="t2">Slack API の画面で</text>
+
+  <rect x="522" y="52" width="140" height="72" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
+  <text x="592" y="78" class="tn">6.4</text>
+  <text x="592" y="100" class="t1">招待する</text>
+  <text x="592" y="118" class="t2">アプリをチャンネルへ</text>
+
+  <rect x="692" y="52" width="136" height="72" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="760" y="78" class="tn">6.5</text>
+  <text x="760" y="100" class="t1">Webhook URL</text>
+  <text x="760" y="118" class="t2">これが欲しいもの</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#sm1)">
+    <path d="M152,88 H178"/><path d="M322,88 H348"/>
+    <path d="M492,88 H518"/><path d="M662,88 H688"/>
+  </g>
+  <text x="420" y="24" class="t4">ゴールは最後の「Webhook URL」を1本手に入れること</text>
+  <text x="420" y="166" class="t3">この URL に文字を送ると、選んだチャンネルに投稿される。次の章で GitHub に預ける</text>
+</svg>
+</figure>
 
 <h3 id="s6-1">ワークスペースを用意する</h3>
 
@@ -1083,6 +939,46 @@ Slack も無料枠の範囲で収まります。第 10 章で使う Cloudflare �
 
 <h2 id="s8b">Cloudflare で時計を用意する <span class="step-time">（15分）</span></h2>
 
+<figure class="fig">
+<svg viewBox="0 0 840 250" role="img" aria-label="トークンを作り、Workerを作り、トークンを預け、5分おきの設定をする4段階の流れ">
+  <defs>
+    <marker id="cm1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect x="14" y="56" width="186" height="84" rx="8" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
+  <text x="107" y="82" class="tn">9.1　GitHub 側</text>
+  <text x="107" y="106" class="t1">🔑 トークンを作る</text>
+  <text x="107" y="126" class="t2">Actions を Read and write</text>
+
+  <rect x="230" y="56" width="186" height="84" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="323" y="82" class="tn">9.2　Cloudflare 側</text>
+  <text x="323" y="106" class="t1">☁️ Worker を作る</text>
+  <text x="323" y="126" class="t2">worker.js を貼る</text>
+
+  <rect x="446" y="56" width="186" height="84" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="539" y="82" class="tn">9.3　Cloudflare 側</text>
+  <text x="539" y="106" class="t1">🔒 トークンを預ける</text>
+  <text x="539" y="126" class="t2">必ず Secret 種別で</text>
+
+  <rect x="662" y="56" width="166" height="84" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="745" y="82" class="tn">9.4　Cloudflare 側</text>
+  <text x="745" y="106" class="t1">⏰ 5分おきに</text>
+  <text x="745" y="126" class="t2">Cron 式タブで設定</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#cm1)">
+    <path d="M200,98 H226"/><path d="M416,98 H442"/><path d="M632,98 H658"/>
+  </g>
+
+  <path d="M107,140 V166 H539 V152" fill="none" stroke="#005bac" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#cm1)"/>
+  <text x="323" y="186" class="t3">9.1 で作った鍵を 9.3 で預ける</text>
+
+  <text x="420" y="24" class="t4">GitHub で鍵を作り、Cloudflare に預けて、時刻を設定する</text>
+  <text x="420" y="222" class="t2">鍵は作成直後の一度しか表示されない。閉じる前にコピーすること</text>
+</svg>
+</figure>
+
 <p>
 <a href="#s1-2">1.2</a> で説明したとおり、GitHub は決まった間隔で動いてくれません。
 <strong>ここをやらないと1日数回しか動かず、ほとんど通知が来ません。</strong>
@@ -1183,77 +1079,6 @@ GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完�
 <div class="ok">
 <p><strong>ここまで来れば完成です。</strong>
 以降は 8:00〜21:00 の間、5分おきに自動で動き続けます。もう何もしなくて構いません。</p>
-</div>
-
-<h2 id="s9">通知を活かすコツ</h2>
-
-<p>
-セットアップはここまでで終わりです。この章は<strong>通知を実際に役立てるための使い方</strong>の話で、
-設定作業ではありません。
-</p>
-
-<h3 id="s9-1">スマートウォッチで受け取る</h3>
-
-<p>
-スマートウォッチをお持ちなら、<strong>Slack の通知をウォッチに転送する設定を有効にしておく</strong>ことを
-おすすめします。
-</p>
-
-<p>
-空室は早い者勝ちなので、<strong>気づくまでの数分が結果を分けます。</strong>
-スマホを見ていない時間帯 — 通勤中、会議中、家事や運転の最中 — でも、
-手首の振動なら気づけます。ポケットからスマホを出して確認するより明らかに速いです。
-</p>
-
-<h3 id="s9-2">通知は強めに設定してよい</h3>
-
-<p>
-このツールは<strong>条件に合う新着が出たときだけ</strong>通知します。
-毎回の実行結果を送りつけたりはしませんし、<code>notify_all_new</code> も既定でオフです。
-</p>
-
-<div class="note">
-<p><strong>つまり、通知が鳴るのは「本当に見るべきとき」だけです。</strong>
-だから遠慮なく強めに設定して構いません。</p>
-<p>Slack のチャンネル設定で <strong>「すべての新しい投稿」</strong> を選び、
-モバイル通知もオンにしておくと取りこぼしません。専用のプライベートチャンネルを作ったのは、
-この設定を<strong>他の会話に影響させずに済ませる</strong>ためでもあります。</p>
-</div>
-
-<h3 id="s9-3">気づいたらすぐ電話する</h3>
-
-<p>
-通知には物件名・間取り・家賃と、<strong>その部屋のページへのリンク</strong>が入っています。
-このリンク先が効いてきます。
-</p>
-
-<ol>
-  <li>ウォッチが震える。条件に合う部屋が出たときだけなので、見る価値がある通知です</li>
-  <li>スマホで通知のリンクをタップ。<strong>その部屋のページが直接開きます</strong>
-      （検索し直す必要はありません）</li>
-  <li>ページ中ほどの<strong>「電話で今すぐお問い合わせ」をタップして、そのまま発信</strong></li>
-</ol>
-
-<div class="ok">
-<p><strong>この3タップが、現状いちばん速い動き方です。</strong>
-通知のリンクを物件ページ直リンクにしてあるのは、この流れを想定してのことです。</p>
-</div>
-
-<p>
-<strong>迷っている時間がそのまま不利になります。</strong>
-条件を満たしているなら、まず電話で当たってから細かい検討をするほうが結果的に得です。
-このツールは「気づく」までを速くしますが、<strong>その先の一手はご自身の行動しだい</strong>です。
-</p>
-
-<p>
-電話でやることは<strong>「仮申込と内覧の予約」</strong>です。入居するかどうかを決めてから
-かける必要はありません（<a href="#s0-5">1.5</a> のとおり、UR の手続きは押さえてから内覧する
-順番になっています）。<strong>とりあえず押さえて、見てから考える。</strong>これが実際の動き方です。
-</p>
-
-<div class="note">
-<p>ショップの営業時間外（多くは10:00〜18:00、水曜休み）に通知が来たときは、
-同じページの<strong>「ネットで仮申込み」</strong>から先に進めておく手もあります。</p>
 </div>
 
 <h2 id="s10">空き部屋一覧を Web で見る <span class="step-time">（任意・3分）</span></h2>
@@ -1385,62 +1210,6 @@ GitHub の設定を1つ切り替えるだけです。</p>
 UR のサイトの作りが変わった可能性があります。その場合は <code>config.json</code> の
 <code>selectors</code> という項目を直す必要があり、少し専門的な作業になります。
 リポジトリの Issues から相談してみてください。
-</p>
-
-<h2 id="s12">使っている技術</h2>
-
-<p>仕組みに興味がある方向けの説明です。<strong>読まなくてもセットアップには影響しません。</strong></p>
-
-<h3 id="s12-1">技術の一覧</h3>
-
-<table>
-  <tr><th>技術</th><th>役割</th></tr>
-  <tr>
-    <td><strong>GitHub Actions</strong></td>
-    <td>決まった時刻にプログラムを自動実行する仕組み。パソコンを起動しなくても動く理由がこれです</td>
-  </tr>
-  <tr>
-    <td><strong>PHP</strong></td>
-    <td>本体のプログラムの言語。<code>ur_monitor.php</code> の1ファイルだけで動いています</td>
-  </tr>
-  <tr>
-    <td><strong>Headless Chrome</strong></td>
-    <td>画面のない Chrome。UR のサイトは物件情報を後から JavaScript で表示するため、
-        普通にページを取得するだけでは中身が空になります。本物のブラウザで開いて、
-        表示が終わるのを待ってから読み取っています</td>
-  </tr>
-  <tr>
-    <td><strong>Slack Incoming Webhook</strong></td>
-    <td>指定の URL にメッセージを送ると Slack に投稿される仕組み</td>
-  </tr>
-  <tr>
-    <td><strong>GitHub Pages</strong></td>
-    <td>リポジトリ内の HTML をそのまま Web 公開できる仕組み。<code>docs/</code> に置いたものが
-        push のたびに自動で配信される（任意機能）</td>
-  </tr>
-  <tr>
-    <td><strong>GitHub Secrets</strong></td>
-    <td>パスワードや鍵を安全に預ける場所。登録後は本人でも中身を見られません</td>
-  </tr>
-</table>
-
-<h3 id="s12-2">状態の持ち方</h3>
-
-<p>
-「前回どの部屋があったか」は <code>state.json</code> というファイルに記録され、
-実行のたびにリポジトリへ自動コミットされます。
-GitHub の実行環境は毎回まっさらにリセットされ、ファイルが残らないためです。
-</p>
-
-<h3 id="s12-3">やっていないこと</h3>
-
-<p>
-UR のサイトへの負荷を抑えるため、<strong>動きのある 8:00〜21:00 の間だけ</strong>5分間隔で、
-URL 間に待機を入れ、<code>robots.txt</code> を確認したうえで動かしています。
-夜間は動かしません。監視するページが3本なら UR へのアクセスは平均して100秒に1回ほどで、
-人がひとつの検索結果ページを開いて絞り込みを何度か押すのと変わらない量です。
-<strong>取得間隔を極端に短くする改造はしないでください。</strong>
-相手のサーバーに迷惑がかかり、この方法自体が使えなくなります。
 </p>
 
 <footer>

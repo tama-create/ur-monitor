@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ur-monitor 使い方ガイド — 気づいて、押さえるまで</title>
+<!-- 体裁は setup.html / architecture.html と同じものを持たせてある。
+     片方だけ直すと見た目がずれるので、色や余白を変えるときは3ファイルとも直すこと。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<style>
+  :root {
+    --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
+    --accent: #005bac; --accent-bg: #e8f0fb;
+    --warn-bg: #fff8e5; --warn-line: #d4a72c;
+    --stop-bg: #ffebe9; --stop-line: #cf222e;
+    --ok-bg: #e6f4ea; --ok-line: #1a7f37;
+    --code-bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
+  }
+
+  /* ===== 冒頭のヒーロー ===== */
+  /* 本文の前に置く帯。読み手が用があるのは手順であって表紙ではないので、
+     縦を詰めて1画面に本文が入るようにしている。 */
+  .hero {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      radial-gradient(120% 200% at 84% 30%, #1a6fd0 0%, rgba(26,111,208,0) 62%),
+      linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+    background-size: 20px 20px; opacity: .45;
+  }
+  /* 帯が低いので装飾も小さく。文字に被らないよう右端へ寄せる */
+  .hero-art {
+    position: absolute; top: 50%; right: 26px; transform: translateY(-50%);
+    width: 150px; height: 150px; opacity: .14; pointer-events: none;
+  }
+  .hero-art svg { width: 100%; height: 100%; display: block; }
+  .hero-inner {
+    position: relative; z-index: 2;
+    max-width: 1200px; margin: 0 auto; padding: 20px 24px 18px;
+  }
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
+  .hero-kicker {
+    margin: 0 0 3px; font-size: .8rem; font-weight: 700;
+    letter-spacing: .16em; color: #8fc2f5;
+  }
+  .hero h1 {
+    border: none; padding: 0; margin: 0;
+    font-size: 1.72rem; line-height: 1.3; letter-spacing: .01em; color: #fff;
+  }
+  /* 見出しの下に1行だけ添える情報。区切りは │ で詰めて置く */
+  .hero-meta {
+    margin: 14px 0 0; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,.16);
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  }
+  .hero-meta .sep { color: rgba(255,255,255,.32); }
+  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .hero-meta a:hover { border-bottom-color: #fff; }
+  /* いま見ているページ。リンクにせず「ここにいる」ことだけ示す。
+     並びは2ページで揃えてあるので、順番を変えるときは両方を直すこと。 */
+  .hero-meta .current {
+    color: #fff; font-weight: 700;
+    background: rgba(255,255,255,.16);
+    padding: 2px 10px; border-radius: 999px;
+  }
+
+  /* ===== レイアウト ===== */
+  .wrap {
+    display: grid; grid-template-columns: 272px minmax(0, 1fr);
+    gap: 48px; max-width: 1200px; margin: 0 auto; padding: 32px 24px 120px;
+  }
+  main { min-width: 0; counter-reset: h2; }
+
+  /* ===== 左サイドバー目次 ===== */
+  .toc {
+    position: sticky; top: 24px; align-self: start;
+    max-height: calc(100vh - 48px); overflow-y: auto;
+    border-right: 1px solid var(--line); padding-right: 20px;
+    font-size: .88rem; line-height: 1.6;
+  }
+  .toc-ttl {
+    font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--sub); margin: 0 0 14px; text-transform: uppercase;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; counter-reset: t2; }
+  .toc ol ol { counter-reset: t3; margin: 4px 0 8px; }
+  .toc > ol > li { margin: 10px 0; }
+  .toc > ol > li > a { font-weight: 700; }
+  .toc > ol > li > a::before {
+    counter-increment: t2; content: counter(t2) ". ";
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .toc ol ol li { margin: 2px 0 2px 14px; }
+  .toc ol ol a { color: var(--sub); font-size: .84rem; }
+  .toc ol ol a::before {
+    counter-increment: t3; content: counter(t2) "." counter(t3) " ";
+    color: #8c959f; font-variant-numeric: tabular-nums;
+  }
+  .toc a {
+    color: var(--ink); text-decoration: none; display: block;
+    padding: 2px 8px; border-left: 3px solid transparent; border-radius: 0 4px 4px 0;
+  }
+  .toc a:hover { background: var(--code-bg); }
+  .toc a.active {
+    background: var(--accent-bg); border-left-color: var(--accent);
+    color: var(--accent); font-weight: 700;
+  }
+  .toc .opt { color: #8c959f; font-weight: 400; font-size: .78rem; }
+
+  /* ===== 見出しの番号（自動採番） ===== */
+  h1 { font-size: 1.65rem; border-bottom: 3px solid var(--accent); padding-bottom: 12px; margin: 0 0 8px; }
+  h2 {
+    counter-increment: h2; counter-reset: h3;
+    font-size: 1.22rem; margin: 60px 0 16px; padding: 11px 16px;
+    background: var(--accent-bg); border-left: 5px solid var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h2::before { content: counter(h2) ". "; font-variant-numeric: tabular-nums; }
+  h3 {
+    counter-increment: h3; counter-reset: h4;
+    font-size: 1.04rem; margin: 34px 0 8px; color: var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h3::before { content: counter(h2) "." counter(h3) " "; font-variant-numeric: tabular-nums; }
+  h4 {
+    counter-increment: h4; font-size: .97rem; margin: 22px 0 6px; color: var(--ink);
+  }
+  h4::before {
+    content: counter(h2) "." counter(h3) "." counter(h4) " ";
+    color: var(--sub); font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== 本文 ===== */
+  p, li { font-size: .97rem; }
+  a { color: var(--accent); }
+  code {
+    background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    font-family: ui-monospace, Consolas, monospace; font-size: .9em;
+    border: 1px solid var(--line); word-break: break-all;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px; overflow-x: auto; font-size: .88rem;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  /* 公式サイトの引用を、地の文と区別して見せる */
+  blockquote {
+    margin: 18px 0; padding: 12px 18px; border-left: 5px solid var(--line);
+    background: var(--code-bg); border-radius: 0 6px 6px 0; color: var(--sub);
+  }
+  blockquote p { margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); white-space: nowrap; }
+  .note, .warn, .stop, .ok {
+    padding: 14px 18px; margin: 18px 0; border-radius: 6px; border-left: 5px solid;
+  }
+  .note { background: var(--code-bg); border-color: var(--line); }
+  .warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  .stop { background: var(--stop-bg); border-color: var(--stop-line); }
+  .ok   { background: var(--ok-bg);   border-color: var(--ok-line); }
+  .note p:first-child, .warn p:first-child, .stop p:first-child, .ok p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .stop p:last-child, .ok p:last-child { margin-bottom: 0; }
+  .lead { color: var(--sub); font-size: 1rem; }
+
+  /* ===== 冒頭の「前提」カード =====
+     費用・所要・プログラミング不要・パソコン不要の4つは、このツールが何を
+     約束しているかであってナビゲーションではない。以前はヒーローのメタ行に
+     並べていたが、読む前に一番知りたいことなので本文の先頭へ出した。 */
+  .promise {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px; margin: 22px 0 16px;
+  }
+  .promise-item {
+    padding: 16px 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--code-bg);
+  }
+  .promise-mark { font-size: 1.3rem; line-height: 1; display: block; margin-bottom: 8px; }
+  .promise-ttl { margin: 0 0 6px; font-size: .98rem; font-weight: 700; color: var(--ink); line-height: 1.5; }
+  .promise-sub { margin: 0; font-size: .8rem; color: var(--sub); line-height: 1.7; }
+  .promise-note { margin: 0 0 26px; font-size: .88rem; color: var(--sub); }
+
+  .step-time { color: var(--sub); font-size: .82rem; font-weight: normal; }
+
+  /* ===== 図 ===== */
+  .fig { margin: 24px 0; padding: 0; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig .t1 { font-size: 14px; font-weight: 700; text-anchor: middle; fill: #24292f; }
+  .fig .t2 { font-size: 11.5px; text-anchor: middle; fill: #57606a; }
+  .fig .t3 { font-size: 12px; text-anchor: middle; fill: #57606a; }
+  .fig .t4 { font-size: 12.5px; font-weight: 700; fill: #57606a; }
+  .fig .tn { font-size: 11px; font-weight: 700; text-anchor: middle; fill: #005bac; letter-spacing: .04em; }
+  @media (prefers-reduced-motion: reduce) { .fig animateMotion { display: none; } }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--sub); font-size: .88rem; }
+  /* 作者クレジット。名前を主役にしたいので、肩の「作」は小さく添える程度にする */
+  .author {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 22px; padding: 16px 18px;
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .author-updated {
+    margin-left: auto; text-align: right; flex: none;
+  }
+  .author-updated .lbl {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-updated .val {
+    margin: 0; font-size: .92rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  .author-mark { flex: none; }
+  .author-mark svg { width: 40px; height: 40px; display: block; border-radius: 10px; }
+  .author-by {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-name {
+    margin: 0; font-size: 1.16rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .12em;
+  }
+  .author-name a { color: inherit; text-decoration: none; }
+  .author-name a:hover { color: var(--accent); }
+
+  /* ===== 狭い画面 ===== */
+  @media (max-width: 900px) {
+    .hero-inner { padding: 16px 18px 14px; }
+    .hero h1 { font-size: 1.3rem; }
+    .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
+    .hero-meta { font-size: .76rem; margin-top: 12px; padding-top: 10px; }
+    /* 装飾は本文の可読性より優先しない。狭い画面では消す */
+    .hero-art { display: none; }
+    .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
+    .toc {
+      position: static; max-height: none; overflow: visible;
+      border-right: none; border: 1px solid var(--line);
+      border-radius: 8px; padding: 16px 18px; background: var(--code-bg);
+    }
+    .toc ol ol { display: none; }
+    h2 { margin-top: 44px; }
+    /* 4枚を横並びにすると1枚が狭くなりすぎるので2列に折る */
+    .promise { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 520px) {
+    .promise { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-art"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><circle cx="41" cy="39" r="13" fill="none" stroke="#fff" stroke-width="6"/><path d="M50 48L59 57" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg></div>
+  <div class="hero-inner">
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>使い方ガイド</h1>
+      </div>
+    </div>
+    <p class="hero-meta">
+      <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
+      <span class="sep">│</span>
+      <span class="current" aria-current="page">使い方ガイド</span>
+      <span class="sep">│</span>
+      <a href="setup.html">セットアップ手順書</a>
+      <span class="sep">│</span>
+      <a href="architecture.html">仕組みの技術資料</a>
+      <span class="sep">│</span>
+      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="toc" aria-label="目次">
+  <p class="toc-ttl">目次</p>
+  <ol>
+    <li><a href="#g1">なぜ急ぐ必要があるのか</a>
+      <ol>
+        <li><a href="#g1-1">空きが出ても知らせてくれない</a></li>
+        <li><a href="#g1-2">公式のメール通知は対象が限られる</a></li>
+        <li><a href="#g1-3">ほとんどが抽選なしの先着順</a></li>
+      </ol>
+    </li>
+    <li><a href="#g2">UR は「押さえてから見る」順番</a>
+      <ol>
+        <li><a href="#g2-1">手続きの流れ</a></li>
+        <li><a href="#g2-2">押さえたあとの期限</a></li>
+        <li><a href="#g2-3">同時に押さえられるのは1室だけ</a></li>
+      </ol>
+    </li>
+    <li><a href="#g3">通知が来たらどう動くか</a>
+      <ol>
+        <li><a href="#g3-1">3タップで電話まで</a></li>
+        <li><a href="#g3-2">スマートウォッチで受け取る</a></li>
+        <li><a href="#g3-3">通知は強めに設定してよい</a></li>
+        <li><a href="#g3-4">営業時間外に通知が来たら</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+
+<main>
+
+<p class="lead">
+このページは<strong>セットアップの話ではありません</strong>。
+なぜ空き部屋探しが速さ勝負になるのか、そして通知が来たときにどう動くのかをまとめています。
+入れ方は<a href="setup.html">セットアップ手順書</a>をご覧ください。
+</p>
+
+<h2 id="g1">なぜ急ぐ必要があるのか</h2>
+
+<h3 id="g1-1">空きが出ても知らせてくれない</h3>
+
+<p>UR の公式サイトの「よくあるご質問」には、こういう問答があります。</p>
+
+<blockquote>
+<p><strong>Q. 希望する物件に空室が出たら連絡してくれるの？</strong><br>
+A. 空室情報につきましては随時更新されておりますので、UR賃貸住宅Webサイトまたは店舗で
+ご確認ください。</p>
+</blockquote>
+
+<p><strong>自分で何度も見に行くしかない</strong>、というのが公式の答えです。</p>
+
+<h3 id="g1-2">公式のメール通知は対象が限られる</h3>
+
+<p>
+メールで知らせてくれる仕組みが、まったく無いわけではありません。UR には
+<a href="https://www.ur-net.go.jp/chintai/akishitsu/" target="_blank" rel="noopener">空室情報お届けサービス</a>
+があり、登録した条件に合う部屋の募集が始まるとメールが届きます。
+</p>
+
+<div class="warn">
+<p>ただし<strong>対象は子育て世帯と若者夫婦世帯に限られ、実施しているのも一部の団地だけ</strong>です。
+事前の申込みとマイページでの条件登録も必要になります。<br>
+<strong>まずご自分が対象か確かめてください。対象なら公式サービスのほうが確実です。</strong>
+このツールが要るのは、対象外だった場合です。</p>
+</div>
+
+<h3 id="g1-3">ほとんどが抽選なしの先着順</h3>
+
+<p>
+<strong>UR賃貸は約70万戸のほとんどが抽選なしの先着順</strong>です（新築物件など一部は抽選）。
+気づくのが数時間遅れただけで、もう決まっていた、ということが普通に起こります。
+</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 250" role="img" aria-label="空きが出てから気づくまでの時間が、人力と自動監視でどれだけ違うかを比べた図">
+  <defs>
+    <marker id="gm1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <circle cx="70" cy="40" r="9" fill="#1a7f37"/>
+  <text x="70" y="72" class="t1">空きが出る</text>
+  <line x1="70" y1="40" x2="70" y2="215" stroke="#d0d7de" stroke-width="2" stroke-dasharray="4 4"/>
+
+  <rect x="110" y="96" width="600" height="46" rx="8" fill="#ffebe9" stroke="#cf222e" stroke-width="2"/>
+  <text x="410" y="115" class="t1">人が思い出したときに見に行く</text>
+  <text x="410" y="133" class="t2">数時間〜翌日。そのあいだに他の人が押さえてしまう</text>
+  <circle cx="710" cy="119" r="8" fill="#cf222e"/>
+  <text x="770" y="124" class="t2">気づく</text>
+
+  <rect x="110" y="166" width="130" height="46" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="175" y="185" class="t1">このツール</text>
+  <text x="175" y="203" class="t2">最大5分</text>
+  <circle cx="240" cy="189" r="8" fill="#1a7f37"/>
+  <text x="300" y="194" class="t2">気づく</text>
+
+  <path d="M70,40 H100" fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#gm1)"/>
+  <text x="410" y="240" class="t3">先着順なので、この差がそのまま結果の差になる</text>
+</svg>
+</figure>
+
+<div class="ok">
+<p>1件を見張るだけでも大変なのに、候補が複数あればなおさら現実的ではありません。
+仕事中も寝ている間も、人間が張り付き続けることはできません。<br>
+<strong>見張る作業は機械に任せて、人間は「見つけたらすぐ動く」一手に集中する。</strong>
+このツールはそのために作りました。</p>
+</div>
+
+<h2 id="g2">UR は「押さえてから見る」順番</h2>
+
+<h3 id="g2-1">手続きの流れ</h3>
+
+<p><strong>ここが一番大事なところです。</strong>UR の手続きはこの順番で組まれています。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 210" role="img" aria-label="お申込み・内覧・書類提出・契約・入居の順で進み、最初のお申込みの時点で部屋が確保されることを示す図">
+  <defs>
+    <marker id="gm2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect x="14" y="58" width="176" height="66" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="3"/>
+  <text x="102" y="84" class="t1">お申込み</text>
+  <text x="102" y="106" class="t2">＝ 仮申込</text>
+
+  <rect x="216" y="58" width="136" height="66" rx="8" fill="#fff" stroke="#8c959f"/>
+  <text x="284" y="95" class="t1">内覧</text>
+
+  <rect x="378" y="58" width="136" height="66" rx="8" fill="#fff" stroke="#8c959f"/>
+  <text x="446" y="84" class="t1">書類提出</text>
+  <text x="446" y="106" class="t2">＝ 本申込</text>
+
+  <rect x="540" y="58" width="126" height="66" rx="8" fill="#fff" stroke="#8c959f"/>
+  <text x="603" y="95" class="t1">契約</text>
+
+  <rect x="692" y="58" width="134" height="66" rx="8" fill="#fff" stroke="#8c959f"/>
+  <text x="759" y="95" class="t1">入居</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#gm2)">
+    <path d="M190,91 H212"/><path d="M352,91 H374"/>
+    <path d="M514,91 H536"/><path d="M666,91 H688"/>
+  </g>
+
+  <path d="M102,58 V32" fill="none" stroke="#1a7f37" stroke-width="2"/>
+  <rect x="14" y="6" width="290" height="26" rx="6" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="159" y="24" class="t1">ここで部屋が確保される</text>
+
+  <text x="284" y="158" class="t2">部屋を見るのは、押さえたあと</text>
+  <path d="M284,124 V146" fill="none" stroke="#cf222e" stroke-width="2" marker-end="url(#gm2)"/>
+
+  <text x="420" y="192" class="t3">迷っているあいだに他の人が押さえてしまえば、見ることすらできない</text>
+</svg>
+</figure>
+
+<div class="ok">
+<p><strong>「入居するかどうか」は、電話の時点では決まっていなくて構いません。</strong>
+公式ページにも、仮申込の段階で<strong>お部屋の確保が行われる</strong>と書かれています。
+まず押さえて内覧の予約を取り、見てから考える。制度がそういう順番になっています。</p>
+</div>
+
+<h3 id="g2-2">押さえたあとの期限</h3>
+
+<table>
+  <tr><th>手続き</th><th>期限</th></tr>
+  <tr><td>内覧</td><td>お申込みの翌日から1週間以内</td></tr>
+  <tr><td>書類提出（本申込）</td><td>仮申込の翌日から1週間以内</td></tr>
+  <tr><td>契約</td><td>仮申込の翌日から10日以内</td></tr>
+</table>
+
+<h3 id="g2-3">同時に押さえられるのは1室だけ</h3>
+
+<div class="warn">
+<p><strong>お申込みは一世帯につき一件です。</strong>
+複数の部屋を同時に押さえておくことはできません。
+<strong>監視は何件でもできますが、押さえるときは1室を選ぶことになります。</strong></p>
+<p>キャンセルの可否や条件については公式ページに明記がありません。
+気になる場合は電話のときに直接確認してください。</p>
+</div>
+
+<h2 id="g3">通知が来たらどう動くか</h2>
+
+<h3 id="g3-1">3タップで電話まで</h3>
+
+<figure class="fig">
+<svg viewBox="0 0 840 220" role="img" aria-label="ウォッチが震える、リンクをタップ、電話ボタンをタップの3ステップで発信までたどり着く図">
+  <defs>
+    <marker id="gm3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect x="20" y="46" width="220" height="96" rx="10" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="130" y="74" class="tn">1タップ目のまえ</text>
+  <text x="130" y="100" class="t1">⌚ ウォッチが震える</text>
+  <text x="130" y="122" class="t2">条件に合う部屋が出たときだけ</text>
+
+  <rect x="310" y="46" width="220" height="96" rx="10" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
+  <text x="420" y="74" class="tn">1〜2タップ目</text>
+  <text x="420" y="100" class="t1">📱 通知のリンクをタップ</text>
+  <text x="420" y="122" class="t2">その部屋のページが直接開く</text>
+
+  <rect x="600" y="46" width="220" height="96" rx="10" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="710" y="74" class="tn">3タップ目</text>
+  <text x="710" y="100" class="t1">📞 電話ボタンをタップ</text>
+  <text x="710" y="122" class="t2">そのまま発信できる</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#gm3)">
+    <path d="M240,94 H306"/><path d="M530,94 H596"/>
+  </g>
+
+  <text x="420" y="176" class="t2">検索し直す必要はない。通知のリンクを物件ページ直リンクにしてあるのはこのため</text>
+  <text x="420" y="202" class="t3">電話ですることは「仮申込と内覧の予約」。入居を決めてからかける必要はない</text>
+</svg>
+</figure>
+
+<p>
+物件ページの中ほどに「お部屋の内覧・お申込みのお問い合わせ」という欄があり、
+そこに2つの導線が並んでいます。
+</p>
+
+<table>
+<thead><tr><th>導線</th><th>中身</th></tr></thead>
+<tbody>
+<tr><td><strong>電話で今すぐお問い合わせ</strong></td><td>担当の UR賃貸ショップの直通番号。<strong>スマホならタップするだけで発信できます</strong></td></tr>
+<tr><td><strong>ネットで仮申込み</strong></td><td>その場で仮申込みまで進めます（ユーザー登録が必要）</td></tr>
+</tbody>
+</table>
+
+<div class="ok">
+<p><strong>迷っている時間がそのまま不利になります。</strong>
+条件を満たしているなら、まず電話で当たってから細かい検討をするほうが結果的に得です。
+このツールは「気づく」までを速くしますが、<strong>その先の一手はご自身の行動しだい</strong>です。</p>
+</div>
+
+<h3 id="g3-2">スマートウォッチで受け取る</h3>
+
+<p>
+スマートウォッチをお持ちなら、<strong>Slack の通知をウォッチに転送する設定</strong>を有効にしておくことを
+おすすめします。スマホを見ていない時間帯 — 通勤中、会議中、家事や運転の最中 — でも、
+手首の振動なら気づけます。ポケットからスマホを出して確認するより明らかに速いです。
+</p>
+
+<h3 id="g3-3">通知は強めに設定してよい</h3>
+
+<p>
+このツールは<strong>条件に合う新着が出たときだけ</strong>通知します。
+毎回の実行結果を送りつけたりはしません。
+</p>
+
+<div class="note">
+<p><strong>通知が鳴るのは「本当に見るべきとき」だけです。</strong>だから遠慮なく強めに設定して構いません。<br>
+Slack のチャンネル設定で<strong>「すべての新しい投稿」</strong>を選び、モバイル通知もオンにしておくと
+取りこぼしません。専用のプライベートチャンネルを作るのは、この設定を
+<strong>他の会話に影響させずに済ませる</strong>ためでもあります。</p>
+</div>
+
+<h3 id="g3-4">営業時間外に通知が来たら</h3>
+
+<p>
+UR賃貸ショップの営業時間は多くが 10:00〜18:00、水曜休みです。時間外に通知が来たときは、
+同じページの<strong>「ネットで仮申込み」</strong>から先に進めておく手があります。
+</p>
+
+<div class="note">
+<p><strong>補足：</strong>公式FAQには「電話によるお申込みは受け付けておりません」とあります。これは
+<strong>申込み手続きそのものが電話で完結しない</strong>という意味で、電話してはいけないという話では
+ありません。物件ページが「内覧・お申込みのお問い合わせ」として電話番号を大きく出しているとおり、
+まず電話で当たるのは正規のやり方です。</p>
+</div>
+
+<div class="note">
+<p><strong>出典：</strong>
+<a href="https://www.ur-net.go.jp/chintai/rent/" target="_blank" rel="noopener">URの借り方</a>、
+<a href="https://www.ur-net.go.jp/chintai/faq/" target="_blank" rel="noopener">UR賃貸住宅 よくあるご質問</a>、
+<a href="https://www.ur-net.go.jp/chintai/akishitsu/" target="_blank" rel="noopener">空室情報お届けサービス</a>
+（いずれも2026年8月時点）。<strong>制度は変わることがあるので、実際に動く前に公式で確かめてください。</strong></p>
+</div>
+
+<footer>
+<div class="author">
+  <span class="author-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+  <div>
+    <p class="author-by">Created by</p>
+    <p class="author-name"><a href="https://github.com/tama-create">たましもん</a></p>
+  </div>
+  <div class="author-updated">
+    <p class="lbl">Last updated</p>
+    <p class="val"><time datetime="2026-08-28">2026年8月28日</time></p>
+  </div>
+</div>
+<p>
+このページは<strong>使い方の話</strong>だけを扱っています。入れ方は
+<a href="setup.html">セットアップ手順書</a>、内部の動きは
+<a href="architecture.html">技術資料</a>にあります。
+</p>
+<p>
+リポジトリ: <a href="https://github.com/tama-create/ur-monitor">github.com/tama-create/ur-monitor</a>
+</p>
+</footer>
+</main>
+
+</div>
+<script>
+// 現在読んでいる節を目次で強調する
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var map = {};
+  var targets = [];
+  links.forEach(function (a) {
+    var el = document.getElementById(a.getAttribute('href').slice(1));
+    if (el) { map[el.id] = a; targets.push(el); }
+  });
+  if (!targets.length || !('IntersectionObserver' in window)) return;
+
+  var visible = {};
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    var current = null;
+    for (var i = 0; i < targets.length; i++) {
+      if (visible[targets[i].id]) { current = targets[i].id; break; }
+    }
+    if (!current) return;
+    links.forEach(function (a) { a.classList.remove('active'); });
+    if (map[current]) {
+      map[current].classList.add('active');
+      // 目次が長いとき、選択中の項目を見える位置へ寄せる
+      var nav = document.querySelector('.toc');
+      if (nav && nav.scrollHeight > nav.clientHeight) {
+        var top = map[current].offsetTop - nav.clientHeight / 2;
+        nav.scrollTo({ top: top, behavior: 'smooth' });
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  targets.forEach(function (t) { io.observe(t); });
+})();
+</script>
+</body>
+</html>
