@@ -76,6 +76,10 @@
     background: rgba(255,255,255,.16);
     padding: 2px 10px; border-radius: 999px;
   }
+  /* 左＝このサイトの資料3つ、右＝資料ではないもの（一覧・リポジトリ）。
+     性質が違うので離す。狭い画面では折り返すため右寄せを解除する。 */
+  .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .hero-meta > .grp-right { margin-left: auto; }
 
   /* ===== レイアウト ===== */
   .wrap {
@@ -243,6 +247,8 @@
     .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
     .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
     .hero-meta { font-size: .76rem; margin-top: 12px; padding-top: 10px; }
+    /* 右寄せを解くと2つの群が地続きに見えるので、行を分けて区別を保つ */
+    .hero-meta > .grp-right { margin-left: 0; flex-basis: 100%; }
     /* 装飾は本文の可読性より優先しない。狭い画面では消す */
     .hero-art { display: none; }
     .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
@@ -275,15 +281,18 @@
       </div>
     </div>
     <p class="hero-meta">
-      <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
-      <span class="sep">│</span>
-      <span class="current" aria-current="page">使い方ガイド</span>
-      <span class="sep">│</span>
-      <a href="setup.html">セットアップ手順書</a>
-      <span class="sep">│</span>
-      <a href="architecture.html">仕組みの技術資料</a>
-      <span class="sep">│</span>
-      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+      <span class="grp">
+        <span class="current" aria-current="page">使い方ガイド</span>
+        <span class="sep">│</span>
+        <a href="setup.html">セットアップ手順書</a>
+        <span class="sep">│</span>
+        <a href="architecture.html">仕組みの技術資料</a>
+      </span>
+      <span class="grp grp-right">
+        <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
+        <span class="sep">│</span>
+        <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+      </span>
     </p>
   </div>
 </header>
