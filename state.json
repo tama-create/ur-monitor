@@ -152,14 +152,6 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_4000_room.html?JKSS=000530102",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000243209": {
-            "building": "清瀬旭が丘",
-            "name": "清瀬旭が丘 2-4-3号棟 209号室",
-            "price": "53,800円",
-            "floor_plan": "2DK / 39㎡ / 2階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000243209",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html"
-        },
         "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000050107": {
             "building": "グリーンヒルズ東久留米",
             "name": "グリーンヒルズ東久留米 5号棟 107号室",
@@ -202,5 +194,5 @@
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-28T18:31:44+09:00"
+    "last_checked": "2026-08-28T18:36:09+09:00"
 }
