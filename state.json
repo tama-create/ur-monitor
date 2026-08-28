@@ -160,14 +160,6 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000243209",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000247504": {
-            "building": "清瀬旭が丘",
-            "name": "清瀬旭が丘 2-4-7号棟 504号室",
-            "price": "58,100円",
-            "floor_plan": "3DK / 50㎡ / 5階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1580_room.html?JKSS=000247504",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html"
-        },
         "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000050107": {
             "building": "グリーンヒルズ東久留米",
             "name": "グリーンヒルズ東久留米 5号棟 107号室",
@@ -210,5 +202,5 @@
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-28T16:31:25+09:00"
+    "last_checked": "2026-08-28T16:35:46+09:00"
 }
