@@ -263,7 +263,7 @@ Web 公開を諦め、Slack 通知だけを使うこと。
 | `zero_streak_limit` |  | 怪しい結果を何回連続で見たら受け入れるか。既定 18。**時間ではなく回数**なので、実行間隔を変えたら必ず合わせる |
 | `shrink_guard_ratio` |  | 前回比でこれを下回る件数を「怪しい」とみなす。既定 0.7。**勘で緩めない** |
 | `stale_warning_hours` |  | 実行がこの時間ぶん空いたら Slack に警告。既定 3 |
-| `monitoring_hours` |  | 稼働時間帯 `[開始時, 終了時]`（JST）。既定 `[8, 21]` |
+| `monitoring_hours` |  | 稼働時間帯 `[開始時, 終了時]`（JST）。既定 `[8, 21]`。UR の営業時間を余裕をもって包む値で、**狭めると取りこぼす** |
 | `selectors` |  | UR ページの CSS セレクター。省略時はコード内の既定値が使われる |
 | `slack_webhook_url` |  | Slack の Webhook URL。**環境変数 `SLACK_WEBHOOK_URL` があればそちらが優先**。実値は書かない |
 | `chrome_path` |  | Chrome 実行ファイルのパス。省略時は自動検出 |
