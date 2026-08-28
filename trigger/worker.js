@@ -4,6 +4,10 @@
 // （2026-08-27〜28）。schedule はベストエフォートで、混雑時は間引かれる。
 // このワーカーは workflow_dispatch を叩くだけで、監視そのものは従来どおり
 // GitHub Actions 側で走る。ここに UR のスクレイピングは持ち込まない。
+//
+// 発火が正確になった副作用として、毎回きっかり同じ秒に UR を叩く形になった。
+// ゆらぎは config.json の jitter_max_seconds（PHP 側の待機）で入れている。
+// ここで待つと Workers の実行時間を無駄に使うため、待機はワーカーに置かない。
 
 // フォークした人はここを自分のリポジトリに変えること。
 const OWNER = 'tama-create';
@@ -12,8 +16,10 @@ const WORKFLOW = 'monitor.yml';
 const REF = 'main';
 
 // 稼働時間帯（JST）。START <= 時 <= END の間だけ起動する。
-// cron は無料プランで1ワーカー3本までなので、24時間叩いて時間帯はここで絞る。
-// 3本使い切ると後で足せなくなるため、1本＋コード側の判定にしてある。
+// wrangler.toml の cron 側でも同じ時間帯に絞ってあるので、通常ここには
+// 時間外の呼び出しは来ない。二重になるが消さないこと。cron は UTC 指定で
+// 時がずれるため間違えやすく、これが時間外へはみ出すのを止める最後の番人になる。
+// 変えるときは wrangler.toml の crons と config.json の monitoring_hours も一緒に。
 const START_HOUR = 8;
 const END_HOUR = 21;
 

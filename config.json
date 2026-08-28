@@ -11,8 +11,8 @@
     { "building": "プラザシティ新所沢　けやき通り", "madori": "2DK" }
   ],
 
-  "jitter_max_seconds": 0,
-  "zero_streak_limit": 6,
+  "jitter_max_seconds": 40,
+  "zero_streak_limit": 18,
   "shrink_guard_ratio": 0.7,
   "stale_warning_hours": 3,
   "monitoring_hours": [8, 21],
