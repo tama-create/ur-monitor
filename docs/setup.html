@@ -171,6 +171,24 @@
   .note p:first-child, .warn p:first-child, .stop p:first-child, .ok p:first-child { margin-top: 0; }
   .note p:last-child, .warn p:last-child, .stop p:last-child, .ok p:last-child { margin-bottom: 0; }
   .lead { color: var(--sub); font-size: 1rem; }
+
+  /* ===== 冒頭の「前提」カード =====
+     費用・所要・プログラミング不要・パソコン不要の4つは、このツールが何を
+     約束しているかであってナビゲーションではない。以前はヒーローのメタ行に
+     並べていたが、読む前に一番知りたいことなので本文の先頭へ出した。 */
+  .promise {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px; margin: 22px 0 16px;
+  }
+  .promise-item {
+    padding: 16px 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--code-bg);
+  }
+  .promise-mark { font-size: 1.3rem; line-height: 1; display: block; margin-bottom: 8px; }
+  .promise-ttl { margin: 0 0 6px; font-size: .98rem; font-weight: 700; color: var(--ink); line-height: 1.5; }
+  .promise-sub { margin: 0; font-size: .8rem; color: var(--sub); line-height: 1.7; }
+  .promise-note { margin: 0 0 26px; font-size: .88rem; color: var(--sub); }
+
   .step-time { color: var(--sub); font-size: .82rem; font-weight: normal; }
 
   /* ===== 図 ===== */
@@ -231,6 +249,12 @@
     }
     .toc ol ol { display: none; }
     h2 { margin-top: 44px; }
+    /* 4枚を横並びにすると1枚が狭くなりすぎるので2列に折る */
+    .promise { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 520px) {
+    .promise { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -250,13 +274,11 @@
       </div>
     </div>
     <p class="hero-meta">
-      <span>費用 0円</span><span class="sep">│</span>
-      <span>所要 30〜60分</span><span class="sep">│</span>
-      <span>プログラミング不要</span><span class="sep">│</span>
-      <span>パソコンは起動しっぱなしにしない</span><span class="sep">│</span>
-      <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">見本の一覧ページを見る →</a>
+      <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
       <span class="sep">│</span>
-      <a href="architecture.html">仕組みの技術資料 →</a>
+      <a href="architecture.html">仕組みの技術資料</a>
+      <span class="sep">│</span>
+      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
     </p>
   </div>
 </header>
@@ -380,11 +402,31 @@ UR賃貸の空き部屋を自動で監視し、条件に合う新着が出たら
 コードを書く必要はなく、画面の操作と設定値のコピー＆ペーストだけで完了します。
 </p>
 
-<div class="note">
-<p><strong>所要時間の目安：30〜60分。</strong>
-アカウントを新しく作る場合は、その分が加算されます。<br>
-途中で分からなくなっても壊れることはないので、落ち着いて進めてください。</p>
-</div>
+<section class="promise" aria-label="このツールの前提">
+  <div class="promise-item">
+    <span class="promise-mark">💴</span>
+    <p class="promise-ttl">費用 0円</p>
+    <p class="promise-sub">無料の枠だけで動きます。有料サービスは使いません</p>
+  </div>
+  <div class="promise-item">
+    <span class="promise-mark">⏱️</span>
+    <p class="promise-ttl">所要 30〜60分</p>
+    <p class="promise-sub">設定は最初の一度だけ。アカウントを新しく作る場合はその分が加算されます</p>
+  </div>
+  <div class="promise-item">
+    <span class="promise-mark">⌨️</span>
+    <p class="promise-ttl">プログラミング不要</p>
+    <p class="promise-sub">画面の操作と、設定値のコピー＆ペーストだけで完了します</p>
+  </div>
+  <div class="promise-item">
+    <span class="promise-mark">🌙</span>
+    <p class="promise-ttl">パソコンは<br>起動しっぱなしにしない</p>
+    <p class="promise-sub">GitHub のサーバー上で動くので、寝ている間も動き続けます</p>
+  </div>
+</section>
+
+<p class="promise-note">途中で分からなくなっても壊れることはないので、落ち着いて進めてください。</p>
+
 
 <h2 id="s0">なぜこのツールを作ったのか</h2>
 
