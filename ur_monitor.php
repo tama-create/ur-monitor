@@ -695,6 +695,68 @@ function notify_slack(string $webhookUrl, array $newRooms, string $searchUrl): v
 }
 
 // ──────────────────────────────────────────
+// 監視が止まっていないかの見張り
+// ──────────────────────────────────────────
+
+// 2つの時刻の間で、稼働時間帯に何分あったかを数える。
+// 夜間に動かないのは正常なので、その分を差し引かないと毎朝「11時間空いた」と誤報になる。
+function monitoring_gap_minutes(int $from, int $to, int $startHour, int $endHour): int
+{
+    if ($to <= $from) {
+        return 0;
+    }
+    $minutes = 0;
+    // 日をまたぐことがあるため、前日の 0 時から1日ずつ窓と重なりを足していく
+    for ($day = strtotime('today', $from) - 86400; $day <= $to; $day += 86400) {
+        $windowStart = $day + $startHour * 3600;
+        $windowEnd   = $day + $endHour   * 3600;
+        $overlap = min($to, $windowEnd) - max($from, $windowStart);
+        if ($overlap > 0) {
+            $minutes += (int)($overlap / 60);
+        }
+    }
+    return $minutes;
+}
+
+// 前回の実行から不自然に空いていたら Slack に知らせる。
+//
+// 外部トリガー（Cloudflare Workers）が死んでも、トークンが切れても、GitHub の遅延が
+// 悪化しても、症状はすべて「黙って止まる」になる。実際に4日間気づかなかったことがある。
+// GitHub の schedule を低頻度で残してあるので、そこで動いた回がこの見張りを実行し、
+// 空白に気づける。この関数は実行のたびに呼ばれるが、警告後は last_checked が
+// 更新されるため連投にはならない。
+function warn_if_stale(array $state, string $webhookUrl, array $config): void
+{
+    $last = (string)($state['last_checked'] ?? '');
+    if ($last === '') {
+        return;  // 初回。比べる相手がいない
+    }
+    $lastTs = strtotime($last);
+    if ($lastTs === false) {
+        return;
+    }
+
+    $limitMinutes = (int)(((float)($config['stale_warning_hours'] ?? 3)) * 60);
+    if ($limitMinutes <= 0) {
+        return;  // 0 以下で無効
+    }
+
+    [$startHour, $endHour] = $config['monitoring_hours'] ?? [8, 21];
+    $gap = monitoring_gap_minutes($lastTs, time(), (int)$startHour, (int)$endHour);
+    if ($gap < $limitMinutes) {
+        return;
+    }
+
+    log_msg('WARNING', "前回実行から稼働時間帯で {$gap} 分空いていました");
+    slack_send($webhookUrl, sprintf(
+        ":warning: *監視が止まっていました*\n"
+        . "稼働時間帯で %d時間%d分 空きました（前回の確認 %s）。\n"
+        . "起動トリガーの停止、トークンの期限切れ、GitHub の遅延などが考えられます。",
+        intdiv($gap, 60), $gap % 60, date('n/j H:i', $lastTs)
+    ));
+}
+
+// ──────────────────────────────────────────
 // メイン処理
 // ──────────────────────────────────────────
 
@@ -751,6 +813,12 @@ function run_monitor(array $config, bool $dryRun = false): void
     }
 
     $state      = load_state();
+
+    // スクレイプの成否に関わらず、まず前回からの空白を見る
+    if (!$dryRun) {
+        warn_if_stale($state, $webhookUrl, $config);
+    }
+
     $prevUrls   = array_keys($state['rooms'] ?? []);
     $currentMap = [];
     // 「取得できた結果を信用してよい URL」が1つでもあったか。
