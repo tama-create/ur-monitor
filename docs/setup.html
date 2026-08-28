@@ -72,6 +72,13 @@
   .hero-meta .sep { color: rgba(255,255,255,.32); }
   .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
   .hero-meta a:hover { border-bottom-color: #fff; }
+  /* いま見ているページ。リンクにせず「ここにいる」ことだけ示す。
+     並びは2ページで揃えてあるので、順番を変えるときは両方を直すこと。 */
+  .hero-meta .current {
+    color: #fff; font-weight: 700;
+    background: rgba(255,255,255,.16);
+    padding: 2px 10px; border-radius: 999px;
+  }
 
   /* ===== レイアウト ===== */
   .wrap {
@@ -275,6 +282,8 @@
     </div>
     <p class="hero-meta">
       <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
+      <span class="sep">│</span>
+      <span class="current" aria-current="page">セットアップ手順書</span>
       <span class="sep">│</span>
       <a href="architecture.html">仕組みの技術資料</a>
       <span class="sep">│</span>
