@@ -64,6 +64,12 @@ UR営業センターの窓口での書類提出（本申込み）になる。
 
 GitHub アカウントの作り方から順に、図を交えて説明しています。はじめての方はこちらをどうぞ。
 
+### 🔧 [技術資料 — 内部の動き](https://tama-create.github.io/ur-monitor/architecture.html)
+
+Cloudflare に叩かれてから Slack に通知が届くまで、**内部で何が起きているか**を図と表でまとめたもの。
+実行の時系列（実測秒つき）、取得に失敗したときの粘り方、UTC と JST の扱いなど。
+コードを触る前に読むと早い。
+
 手順書には次が含まれます。
 
 - 全体の仕組み（図解）
@@ -327,6 +333,7 @@ GitHub Pages が `main` の `/docs` を配信しているので、**push され�
 |---|---|
 | `https://<ユーザー名>.github.io/ur-monitor/` | 空き部屋一覧 |
 | `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
+| `https://<ユーザー名>.github.io/ur-monitor/architecture.html` | 技術資料（内部の動き） |
 
 有効化の手順は下記「セットアップ手順書の公開（GitHub Pages）」と共通。**設定は1回だけ**でよい。
 

@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ur-monitor 技術資料 — 内部の動き</title>
+<!-- 体裁は setup.html と揃えている。CSS は同じものを持たせてあり、
+     片方だけ直すと見た目がずれる。色や余白を変えるときは両方を直すこと。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<style>
+  :root {
+    --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
+    --accent: #005bac; --accent-bg: #e8f0fb;
+    --warn-bg: #fff8e5; --warn-line: #d4a72c;
+    --stop-bg: #ffebe9; --stop-line: #cf222e;
+    --ok-bg: #e6f4ea; --ok-line: #1a7f37;
+    --code-bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
+  }
+
+  /* ===== 冒頭のヒーロー ===== */
+  /* 本文の前に置く帯。読み手が用があるのは手順であって表紙ではないので、
+     縦を詰めて1画面に本文が入るようにしている。 */
+  .hero {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      radial-gradient(120% 200% at 84% 30%, #1a6fd0 0%, rgba(26,111,208,0) 62%),
+      linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+    background-size: 20px 20px; opacity: .45;
+  }
+  /* 帯が低いので装飾も小さく。文字に被らないよう右端へ寄せる */
+  .hero-art {
+    position: absolute; top: 50%; right: 26px; transform: translateY(-50%);
+    width: 150px; height: 150px; opacity: .14; pointer-events: none;
+  }
+  .hero-art svg { width: 100%; height: 100%; display: block; }
+  .hero-inner {
+    position: relative; z-index: 2;
+    max-width: 1200px; margin: 0 auto; padding: 20px 24px 18px;
+  }
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
+  .hero-kicker {
+    margin: 0 0 3px; font-size: .8rem; font-weight: 700;
+    letter-spacing: .16em; color: #8fc2f5;
+  }
+  .hero h1 {
+    border: none; padding: 0; margin: 0;
+    font-size: 1.72rem; line-height: 1.3; letter-spacing: .01em; color: #fff;
+  }
+  /* 見出しの下に1行だけ添える情報。区切りは │ で詰めて置く */
+  .hero-meta {
+    margin: 14px 0 0; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,.16);
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  }
+  .hero-meta .sep { color: rgba(255,255,255,.32); }
+  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .hero-meta a:hover { border-bottom-color: #fff; }
+
+  /* ===== レイアウト ===== */
+  .wrap {
+    display: grid; grid-template-columns: 272px minmax(0, 1fr);
+    gap: 48px; max-width: 1200px; margin: 0 auto; padding: 32px 24px 120px;
+  }
+  main { min-width: 0; counter-reset: h2; }
+
+  /* ===== 左サイドバー目次 ===== */
+  .toc {
+    position: sticky; top: 24px; align-self: start;
+    max-height: calc(100vh - 48px); overflow-y: auto;
+    border-right: 1px solid var(--line); padding-right: 20px;
+    font-size: .88rem; line-height: 1.6;
+  }
+  .toc-ttl {
+    font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--sub); margin: 0 0 14px; text-transform: uppercase;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; counter-reset: t2; }
+  .toc ol ol { counter-reset: t3; margin: 4px 0 8px; }
+  .toc > ol > li { margin: 10px 0; }
+  .toc > ol > li > a { font-weight: 700; }
+  .toc > ol > li > a::before {
+    counter-increment: t2; content: counter(t2) ". ";
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .toc ol ol li { margin: 2px 0 2px 14px; }
+  .toc ol ol a { color: var(--sub); font-size: .84rem; }
+  .toc ol ol a::before {
+    counter-increment: t3; content: counter(t2) "." counter(t3) " ";
+    color: #8c959f; font-variant-numeric: tabular-nums;
+  }
+  .toc a {
+    color: var(--ink); text-decoration: none; display: block;
+    padding: 2px 8px; border-left: 3px solid transparent; border-radius: 0 4px 4px 0;
+  }
+  .toc a:hover { background: var(--code-bg); }
+  .toc a.active {
+    background: var(--accent-bg); border-left-color: var(--accent);
+    color: var(--accent); font-weight: 700;
+  }
+  .toc .opt { color: #8c959f; font-weight: 400; font-size: .78rem; }
+
+  /* ===== 見出しの番号（自動採番） ===== */
+  h1 { font-size: 1.65rem; border-bottom: 3px solid var(--accent); padding-bottom: 12px; margin: 0 0 8px; }
+  h2 {
+    counter-increment: h2; counter-reset: h3;
+    font-size: 1.22rem; margin: 60px 0 16px; padding: 11px 16px;
+    background: var(--accent-bg); border-left: 5px solid var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h2::before { content: counter(h2) ". "; font-variant-numeric: tabular-nums; }
+  h3 {
+    counter-increment: h3; counter-reset: h4;
+    font-size: 1.04rem; margin: 34px 0 8px; color: var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h3::before { content: counter(h2) "." counter(h3) " "; font-variant-numeric: tabular-nums; }
+  h4 {
+    counter-increment: h4; font-size: .97rem; margin: 22px 0 6px; color: var(--ink);
+  }
+  h4::before {
+    content: counter(h2) "." counter(h3) "." counter(h4) " ";
+    color: var(--sub); font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== 本文 ===== */
+  p, li { font-size: .97rem; }
+  a { color: var(--accent); }
+  code {
+    background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    font-family: ui-monospace, Consolas, monospace; font-size: .9em;
+    border: 1px solid var(--line); word-break: break-all;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px; overflow-x: auto; font-size: .88rem;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  /* 公式サイトの引用を、地の文と区別して見せる */
+  blockquote {
+    margin: 18px 0; padding: 12px 18px; border-left: 5px solid var(--line);
+    background: var(--code-bg); border-radius: 0 6px 6px 0; color: var(--sub);
+  }
+  blockquote p { margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); white-space: nowrap; }
+  .note, .warn, .stop, .ok {
+    padding: 14px 18px; margin: 18px 0; border-radius: 6px; border-left: 5px solid;
+  }
+  .note { background: var(--code-bg); border-color: var(--line); }
+  .warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  .stop { background: var(--stop-bg); border-color: var(--stop-line); }
+  .ok   { background: var(--ok-bg);   border-color: var(--ok-line); }
+  .note p:first-child, .warn p:first-child, .stop p:first-child, .ok p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .stop p:last-child, .ok p:last-child { margin-bottom: 0; }
+  .lead { color: var(--sub); font-size: 1rem; }
+  .step-time { color: var(--sub); font-size: .82rem; font-weight: normal; }
+
+  /* ===== 図 ===== */
+  .fig { margin: 24px 0; padding: 0; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig .t1 { font-size: 14px; font-weight: 700; text-anchor: middle; fill: #24292f; }
+  .fig .t2 { font-size: 11.5px; text-anchor: middle; fill: #57606a; }
+  .fig .t3 { font-size: 12px; text-anchor: middle; fill: #57606a; }
+  .fig .t4 { font-size: 12.5px; font-weight: 700; fill: #57606a; }
+  .fig .tn { font-size: 11px; font-weight: 700; text-anchor: middle; fill: #005bac; letter-spacing: .04em; }
+  @media (prefers-reduced-motion: reduce) { .fig animateMotion { display: none; } }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--sub); font-size: .88rem; }
+  /* 作者クレジット。名前を主役にしたいので、肩の「作」は小さく添える程度にする */
+  .author {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 22px; padding: 16px 18px;
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .author-updated {
+    margin-left: auto; text-align: right; flex: none;
+  }
+  .author-updated .lbl {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-updated .val {
+    margin: 0; font-size: .92rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  .author-mark { flex: none; }
+  .author-mark svg { width: 40px; height: 40px; display: block; border-radius: 10px; }
+  .author-by {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-name {
+    margin: 0; font-size: 1.16rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .12em;
+  }
+  .author-name a { color: inherit; text-decoration: none; }
+  .author-name a:hover { color: var(--accent); }
+
+  /* ===== 狭い画面 ===== */
+  @media (max-width: 900px) {
+    .hero-inner { padding: 16px 18px 14px; }
+    .hero h1 { font-size: 1.3rem; }
+    .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
+    .hero-meta { font-size: .76rem; margin-top: 12px; padding-top: 10px; }
+    /* 装飾は本文の可読性より優先しない。狭い画面では消す */
+    .hero-art { display: none; }
+    .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
+    .toc {
+      position: static; max-height: none; overflow: visible;
+      border-right: none; border: 1px solid var(--line);
+      border-radius: 8px; padding: 16px 18px; background: var(--code-bg);
+    }
+    .toc ol ol { display: none; }
+    h2 { margin-top: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-art"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><circle cx="41" cy="39" r="13" fill="none" stroke="#fff" stroke-width="6"/><path d="M50 48L59 57" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg></div>
+  <div class="hero-inner">
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>技術資料 — 内部の動き</h1>
+      </div>
+    </div>
+    <p class="hero-meta">
+      <span>Cloudflare → GitHub → PHP → Slack</span><span class="sep">│</span>
+      <span>1回 約60秒</span><span class="sep">│</span>
+      <a href="setup.html">セットアップ手順書へ →</a>
+      <span class="sep">│</span>
+      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ →</a>
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="toc" aria-label="目次">
+  <p class="toc-ttl">目次</p>
+  <ol>
+    <li><a href="#a1">登場人物は3つ</a></li>
+    <li><a href="#a2">1回の実行で何が起きるか</a></li>
+    <li><a href="#a3">PHP の中の流れ</a></li>
+    <li><a href="#a4">怪しい結果を弾く3段構え</a></li>
+    <li><a href="#a5">通知するかの判定</a></li>
+    <li><a href="#a6">時刻の扱い（UTC と JST）</a></li>
+    <li><a href="#a7">状態はリポジトリにある</a></li>
+    <li><a href="#a8">止まったときに気づく仕組み</a></li>
+    <li><a href="#a9">数字のまとめ</a></li>
+    <li><a href="#a10">おかしいときにどこを見るか</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<div class="note">
+<p><strong>この資料は「動いている最中に何が起きているか」だけを書いています。</strong>
+導入手順は<a href="setup.html">セットアップ手順書</a>、設定項目は
+<a href="https://github.com/tama-create/ur-monitor#readme" target="_blank" rel="noopener">README</a>、
+コードを触るときの注意は
+<a href="https://github.com/tama-create/ur-monitor/blob/main/CLAUDE.md" target="_blank" rel="noopener">CLAUDE.md</a>
+にあります。</p>
+</div>
+
+<h2 id="a1">登場人物は3つ</h2>
+
+<figure class="fig">
+<svg viewBox="0 0 840 300" role="img" aria-label="Cloudflareが時計、GitHubが作業場、PHPが作業者という役割分担の図">
+  <defs>
+    <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect x="20" y="40" width="220" height="110" rx="10" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="130" y="70" class="t1">☁️ Cloudflare Workers</text>
+  <text x="130" y="94" class="t2">時計。5分ごとに叩くだけ</text>
+  <text x="130" y="116" class="t2">UR には一切さわらない</text>
+  <text x="130" y="138" class="t3">trigger/worker.js</text>
+
+  <rect x="310" y="40" width="220" height="110" rx="10" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
+  <text x="420" y="70" class="t1">⚙️ GitHub Actions</text>
+  <text x="420" y="94" class="t2">作業場。毎回まっさら</text>
+  <text x="420" y="116" class="t2">終わると消える</text>
+  <text x="420" y="138" class="t3">.github/workflows/monitor.yml</text>
+
+  <rect x="600" y="40" width="220" height="110" rx="10" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="710" y="70" class="t1">🐘 PHP + Chrome</text>
+  <text x="710" y="94" class="t2">作業者。全処理がここ</text>
+  <text x="710" y="116" class="t2">約950行の1ファイル</text>
+  <text x="710" y="138" class="t3">ur_monitor.php</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m1)">
+    <path d="M240,95 H306"/>
+    <path d="M530,95 H596"/>
+  </g>
+  <text x="273" y="84" class="t3">動け</text>
+  <text x="563" y="84" class="t3">実行</text>
+
+  <rect x="20" y="205" width="800" height="70" rx="10" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
+  <text x="130" y="232" class="t1">🏠 UR</text>
+  <text x="130" y="254" class="t2">読むだけ</text>
+  <text x="420" y="232" class="t1">💬 Slack</text>
+  <text x="420" y="254" class="t2">条件に合う新着だけ</text>
+  <text x="710" y="232" class="t1">📦 リポジトリ</text>
+  <text x="710" y="254" class="t2">state.json / docs/index.html</text>
+  <path d="M710,150 V199" fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m1)"/>
+</svg>
+</figure>
+
+<table>
+<thead><tr><th>役割</th><th>やること</th><th>やらないこと</th></tr></thead>
+<tbody>
+<tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く</td><td>UR を見ない。データを持たない</td></tr>
+<tr><td>GitHub Actions</td><td>PHP を動かす箱を用意する</td><td>時刻を守れない（下記 2 章）</td></tr>
+<tr><td>PHP + Chrome</td><td>取得・比較・通知・書き出し</td><td>常駐しない。毎回終了する</td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<p><strong>なぜ時計を分けているのか。</strong>GitHub の <code>schedule</code> は設定した間隔で動きません。
+30分設定で実測46〜64分、15分設定では<strong>1日2回まで落ちました</strong>。
+一方 <code>workflow_dispatch</code>（外から叩く）は確実に動きます。
+<strong>「時刻を守るのは苦手、言われたら動くのは確実」</strong>という性質の差を利用しています。</p>
+</div>
+<h2 id="a2">1回の実行で何が起きるか</h2>
+
+<p>2026年8月28日 15:15 の実行（run #114）の実測です。<strong>秒数は実際のログから取っています。</strong></p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 560" role="img" aria-label="Cloudflareの発火から62秒で完了するまでの時系列">
+  <defs>
+    <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <line x1="96" y1="40" x2="96" y2="530" stroke="#d0d7de" stroke-width="2"/>
+
+  <g>
+    <circle cx="96" cy="56" r="7" fill="#d4a72c"/>
+    <text x="76" y="61" class="t3" style="text-anchor:end">0秒</text>
+    <rect x="120" y="34" width="700" height="44" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
+    <text x="136" y="52" class="t1" style="text-anchor:start">Cloudflare の cron が発火</text>
+    <text x="136" y="70" class="t2" style="text-anchor:start">JST の時を計算 → 8〜21時なら続行。GitHub に workflow_dispatch を POST → 204 が返れば成功</text>
+  </g>
+
+  <g>
+    <circle cx="96" cy="112" r="7" fill="#005bac"/>
+    <text x="76" y="117" class="t3" style="text-anchor:end">2秒</text>
+    <rect x="120" y="90" width="700" height="44" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+    <text x="136" y="108" class="t1" style="text-anchor:start">まっさらな Ubuntu が起動</text>
+    <text x="136" y="126" class="t2" style="text-anchor:start">前回のファイルは何も残っていない。だから状態はリポジトリに置いてある（7章）</text>
+  </g>
+
+  <g>
+    <circle cx="96" cy="168" r="7" fill="#005bac"/>
+    <text x="76" y="173" class="t3" style="text-anchor:end">4〜10秒</text>
+    <rect x="120" y="146" width="700" height="44" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+    <text x="136" y="164" class="t1" style="text-anchor:start">準備</text>
+    <text x="136" y="182" class="t2" style="text-anchor:start">リポジトリ取得 1秒 → PHP 8.1 導入 4秒 → composer 1秒 → Chrome の場所確認</text>
+  </g>
+
+  <g>
+    <circle cx="96" cy="224" r="7" fill="#1a7f37"/>
+    <text x="76" y="229" class="t3" style="text-anchor:end">10秒</text>
+    <rect x="120" y="202" width="700" height="44" rx="8" fill="#e6f4ea" stroke="#1a7f37"/>
+    <text x="136" y="220" class="t1" style="text-anchor:start">php ur_monitor.php 開始 → まず 0〜40秒ランダムに待つ</text>
+    <text x="136" y="238" class="t2" style="text-anchor:start">この回は28秒待った。毎回同じ秒に UR を叩かないためのゆらぎ（jitter_max_seconds）</text>
+  </g>
+
+  <g>
+    <rect x="120" y="258" width="700" height="180" rx="8" fill="#f6f8fa" stroke="#1a7f37" stroke-dasharray="5 4"/>
+    <circle cx="96" cy="280" r="7" fill="#1a7f37"/>
+    <text x="76" y="285" class="t3" style="text-anchor:end">38秒</text>
+    <text x="136" y="284" class="t1" style="text-anchor:start">Chrome を1回だけ起動し、監視URL 3本を順に処理</text>
+
+    <rect x="140" y="298" width="215" height="60" rx="6" fill="#fff" stroke="#1a7f37"/>
+    <text x="247" y="320" class="t1">① 埼玉 208</text>
+    <text x="247" y="342" class="t2">robots 1秒 → 取得 7秒 → 38件</text>
+
+    <rect x="382" y="298" width="215" height="60" rx="6" fill="#fff" stroke="#1a7f37"/>
+    <text x="490" y="320" class="t1">② 東京 eki/1989</text>
+    <text x="490" y="342" class="t2">取得 4秒 → 14件</text>
+
+    <rect x="624" y="298" width="180" height="60" rx="6" fill="#fff" stroke="#1a7f37"/>
+    <text x="714" y="320" class="t1">③ 東京 222</text>
+    <text x="714" y="342" class="t2">取得 3秒 → 10件</text>
+
+    <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m2)">
+      <path d="M355,328 H378"/><path d="M597,328 H620"/>
+    </g>
+    <text x="366" y="378" class="t3">3秒</text>
+    <text x="608" y="378" class="t3">3秒</text>
+    <text x="470" y="400" class="t2">URL の間に3秒あける（連続アクセスを避けるため）</text>
+    <text x="470" y="424" class="t2">Chrome は起動しっぱなしで使い回す（3回立ち上げると遅い）</text>
+  </g>
+
+  <g>
+    <circle cx="96" cy="470" r="7" fill="#1a7f37"/>
+    <text x="76" y="475" class="t3" style="text-anchor:end">60秒</text>
+    <rect x="120" y="448" width="700" height="44" rx="8" fill="#e6f4ea" stroke="#1a7f37"/>
+    <text x="136" y="466" class="t1" style="text-anchor:start">前回と比較 → 新着があれば Slack → HTML を書き出す</text>
+    <text x="136" y="484" class="t2" style="text-anchor:start">この回は「現在26件・新着なし」。合計62件から重複を除いて26件</text>
+  </g>
+
+  <g>
+    <circle cx="96" cy="518" r="7" fill="#005bac"/>
+    <text x="76" y="523" class="t3" style="text-anchor:end">62秒</text>
+    <rect x="120" y="500" width="700" height="36" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+    <text x="136" y="523" class="t2" style="text-anchor:start">state.json と docs/index.html をコミットして push → 作業場は破棄される</text>
+  </g>
+</svg>
+</figure>
+
+<div class="note">
+<p><strong>push がぶつかることがあります。</strong>前の実行のコミットと重なると弾かれるので、
+<code>git fetch</code> → <code>rebase -X theirs</code> → 再push を最大3回試します。
+5分間隔・実行62秒なので通常は重なりませんが、手作業のコミットとは重なり得ます。</p>
+</div>
+<h2 id="a3">PHP の中の流れ</h2>
+
+<figure class="fig">
+<svg viewBox="0 0 840 430" role="img" aria-label="1つのURLを処理するときの流れ。robots確認、ページ取得、描画待ち、抽出、信用判定">
+  <defs>
+    <marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect x="250" y="20" width="340" height="46" rx="8" fill="#f6f8fa" stroke="#8c959f"/>
+  <text x="420" y="41" class="t1">robots.txt を確認</text>
+  <text x="420" y="59" class="t2">PHP が直接取得（Chrome は使わない）・10秒で諦める</text>
+
+  <rect x="250" y="94" width="340" height="46" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+  <text x="420" y="115" class="t1">Chrome でページを開く</text>
+  <text x="420" y="133" class="t2">画像は読まない（imagesEnabled=false）</text>
+
+  <rect x="230" y="168" width="380" height="86" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="420" y="192" class="t1">描画されるまで待つ　wait_for_rooms()</text>
+  <text x="420" y="214" class="t2">0.3秒ごとに部屋の件数を数える</text>
+  <text x="420" y="234" class="t2">件数が1秒間変わらなくなったら完了・最長20秒</text>
+
+  <rect x="250" y="282" width="340" height="46" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+  <text x="420" y="303" class="t1">部屋を抜き出す</text>
+  <text x="420" y="321" class="t2">建物名・部屋番号・家賃・間取り・URL</text>
+
+  <rect x="250" y="356" width="340" height="46" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="420" y="377" class="t1">結果は信用できるか</text>
+  <text x="420" y="395" class="t2">→ 4章へ</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m3)">
+    <path d="M420,66 V88"/><path d="M420,140 V162"/>
+    <path d="M420,254 V276"/><path d="M420,328 V350"/>
+  </g>
+
+  <rect x="620" y="20" width="200" height="46" rx="8" fill="#ffebe9" stroke="#cf222e"/>
+  <text x="720" y="41" class="t1">拒否されていたら</text>
+  <text x="720" y="59" class="t2">この URL を飛ばす</text>
+  <path d="M590,43 H616" fill="none" stroke="#cf222e" stroke-width="2" marker-end="url(#m3)"/>
+
+  <rect x="20" y="168" width="190" height="86" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="4 3"/>
+  <text x="115" y="196" class="t2">固定秒数の待機に</text>
+  <text x="115" y="218" class="t2">置き換えないこと。</text>
+  <text x="115" y="240" class="t2">順次描画を取りこぼす</text>
+</svg>
+</figure>
+
+<table>
+<thead><tr><th>なぜ Chrome が要るのか</th></tr></thead>
+<tbody>
+<tr><td>UR のページは <strong>HTML と一緒に部屋情報を返しません</strong>。表示したあとに JavaScript が差し込みます。
+<code>file_get_contents()</code> で取れる HTML には部屋が1件も入っていないため、ブラウザで描画させる必要があります。</td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<p><strong>robots.txt は確認して終わりではありません。</strong>結果を実際に使って、拒否された URL を飛ばします。
+UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <code>*</code> とクエリを使うため、
+前方一致では判定できません。<code>*</code> と末尾の <code>$</code> を正規表現に直し、クエリを含めた文字列で照合しています。</p>
+</div>
+
+<h2 id="a4">怪しい結果を弾く3段構え</h2>
+
+<p>ページは開けたのに<strong>0件</strong>や<strong>中途半端な件数</strong>で返ることが実際に起きます。
+そのまま受け取ると、消えた分が「成約」扱いになり、<strong>次に復活したとき誤った新着通知が飛びます</strong>。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 400" role="img" aria-label="怪しい結果を3段階で弾く仕組みの分岐図">
+  <defs>
+    <marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect x="290" y="16" width="260" height="46" rx="8" fill="#f6f8fa" stroke="#8c959f"/>
+  <text x="420" y="37" class="t1">取れた件数は怪しいか</text>
+  <text x="420" y="55" class="t2">untrusted_result_reason()</text>
+
+  <rect x="60" y="100" width="290" height="70" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="205" y="126" class="t1">怪しくない</text>
+  <text x="205" y="148" class="t2">そのまま採用して次へ</text>
+
+  <rect x="450" y="100" width="330" height="70" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="615" y="120" class="tn">1段目</text>
+  <text x="615" y="142" class="t1">5秒待って、もう1回だけ取り直す</text>
+  <text x="615" y="162" class="t2">描画待ちが足りなかっただけなら、ここで直る</text>
+
+  <rect x="450" y="196" width="330" height="80" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="615" y="216" class="tn">2段目</text>
+  <text x="615" y="238" class="t1">前回の状態を維持して、この URL を飛ばす</text>
+  <text x="615" y="258" class="t2">zero_streak に「何回続いたか」を記録する</text>
+
+  <rect x="450" y="302" width="330" height="80" rx="8" fill="#ffebe9" stroke="#cf222e" stroke-width="2"/>
+  <text x="615" y="322" class="tn">3段目</text>
+  <text x="615" y="344" class="t1">18回続いたら、本当にそうなったと認める</text>
+  <text x="615" y="364" class="t2">5分 × 18回 = 約90分ぶん粘ってから受け入れる</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m4)">
+    <path d="M350,39 H340 Q205,39 205,94"/>
+    <path d="M550,39 H560 Q615,39 615,94"/>
+    <path d="M615,170 V190"/>
+    <path d="M615,276 V296"/>
+  </g>
+  <text x="250" y="80" class="t3">いいえ</text>
+  <text x="590" y="80" class="t3">はい</text>
+  <text x="684" y="185" class="t3">まだ怪しい</text>
+  <text x="700" y="292" class="t3">ずっと怪しいまま</text>
+</svg>
+</figure>
+
+<p><strong>「怪しい」の判定は2つ。</strong>0件だけを見ていると足りません。</p>
+
+<table>
+<thead><tr><th>条件</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td><strong>0件</strong>（前回この URL に部屋があった場合）</td><td>取得そのものが失敗した可能性</td></tr>
+<tr><td><strong>前回の 0.7 倍を下回った</strong>（<code>shrink_guard_ratio</code>）</td><td>描画の途中で読んだ可能性</td></tr>
+</tbody>
+</table>
+
+<div class="stop">
+<p><strong>0.7 という数字は実測から決めたもので、勘で緩めてはいけません。</strong>
+103回ぶんの履歴にあった減少事象は5件。そのうち誤検知2件（18→12件、19→7件）を捕まえ、
+本物1件（20→19件）を通す値が 0.7 でした。<strong>19→7件のときは実際に誤通知が飛んでいます</strong>
+（12件が33分後に復活し、うち11件は元からあった部屋）。</p>
+</div>
+
+<div class="note">
+<p><strong>前回5件未満の URL は割合の判定から外しています。</strong>
+少ない一覧では1〜2件の出入りで割合が大きく振れ、誤って保留してしまうためです。</p>
+</div>
+
+<div class="warn">
+<p>ログに <code>... のため前回状態を維持</code> が出るのは<strong>正しく働いている姿</strong>で、
+直すべき不具合ではありません。</p>
+</div>
+<h2 id="a5">通知するかの判定</h2>
+
+<figure class="fig">
+<svg viewBox="0 0 840 240" role="img" aria-label="今回の部屋と前回の部屋を比べて新着を見つけ、watch条件に合えばSlackへ送る流れ">
+  <defs>
+    <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+  <rect x="20" y="30" width="180" height="64" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+  <text x="110" y="56" class="t1">今回の部屋</text>
+  <text x="110" y="78" class="t2">URL をキーにする</text>
+
+  <rect x="20" y="126" width="180" height="64" rx="8" fill="#f6f8fa" stroke="#8c959f"/>
+  <text x="110" y="152" class="t1">前回の部屋</text>
+  <text x="110" y="174" class="t2">state.json</text>
+
+  <rect x="260" y="78" width="180" height="64" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
+  <text x="350" y="104" class="t1">差を取る</text>
+  <text x="350" y="126" class="t2">前回に無い URL＝新着</text>
+
+  <rect x="500" y="78" width="180" height="64" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
+  <text x="590" y="104" class="t1">watch と照合</text>
+  <text x="590" y="126" class="t2">建物名・間取り</text>
+
+  <rect x="720" y="78" width="100" height="64" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="770" y="104" class="t1">💬 Slack</text>
+  <text x="770" y="126" class="t2">送る</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m5)">
+    <path d="M200,62 H230 Q250,62 250,100 H256"/>
+    <path d="M200,158 H230 Q250,158 250,120 H256"/>
+    <path d="M440,110 H496"/>
+    <path d="M680,110 H716"/>
+  </g>
+</svg>
+</figure>
+
+<table>
+<thead><tr><th>項目</th><th>動き</th></tr></thead>
+<tbody>
+<tr><td>照合のしかた</td><td><strong>部分一致</strong>（<code>str_contains</code>）。完全一致ではない</td></tr>
+<tr><td>空文字を書いたとき</td><td>「その条件は問わない」の意味になる</td></tr>
+<tr><td><code>notify_all_new</code></td><td>既定 <strong>オフ</strong>。オンにすると条件に関係なく全新着が飛ぶ（スパム防止のため既定オフ）</td></tr>
+<tr><td>Webhook URL</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code> から渡す。<strong>設定ファイルに実値を書かない</strong></td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<p><strong>建物名の全角スペースは意味を持ちます。</strong>
+「プラザシティ新所沢　けやき通り」の空白は全角（U+3000）で、半角にすると一致しません。
+UR のページからそのままコピーするのが確実です。</p>
+</div>
+
+<h2 id="a6">時刻の扱い（UTC と JST）</h2>
+
+<p><strong>ここが一番間違えやすい場所です。</strong>稼働時間帯が3か所に書かれていて、単位が違います。</p>
+
+<table>
+<thead><tr><th>場所</th><th>書き方</th><th>単位</th><th>効くところ</th></tr></thead>
+<tbody>
+<tr><td><code>trigger/wrangler.toml</code></td><td><code>*/5 0-12,23 * * *</code></td><td><strong>UTC</strong></td><td>そもそも発火するか</td></tr>
+<tr><td><code>trigger/worker.js</code></td><td><code>START_HOUR</code> / <code>END_HOUR</code></td><td>JST</td><td>発火しても叩かずに帰る番人</td></tr>
+<tr><td><code>config.json</code></td><td><code>monitoring_hours</code></td><td>JST</td><td>空白検知が数える時間帯</td></tr>
+</tbody>
+</table>
+
+<figure class="fig">
+<svg viewBox="0 0 840 170" role="img" aria-label="UTCの23時から12時が日本時間の8時から21時にあたることを示す対応表">
+  <text x="420" y="24" class="t4">cron の時の欄は UTC。日本は9時間進んでいる</text>
+  <g>
+    <rect x="40" y="44" width="760" height="40" rx="6" fill="#f6f8fa" stroke="#8c959f"/>
+    <text x="70" y="69" class="t2" style="text-anchor:start">UTC</text>
+    <text x="180" y="69" class="t1">23</text><text x="250" y="69" class="t1">0</text>
+    <text x="320" y="69" class="t1">1</text><text x="390" y="69" class="t1">…</text>
+    <text x="460" y="69" class="t1">10</text><text x="530" y="69" class="t1">11</text>
+    <text x="600" y="69" class="t1">12</text>
+    <text x="710" y="69" class="t2">13〜22 は対象外</text>
+  </g>
+  <g>
+    <rect x="40" y="98" width="760" height="40" rx="6" fill="#e8f0fb" stroke="#005bac"/>
+    <text x="70" y="123" class="t2" style="text-anchor:start">JST</text>
+    <text x="180" y="123" class="t1">8</text><text x="250" y="123" class="t1">9</text>
+    <text x="320" y="123" class="t1">10</text><text x="390" y="123" class="t1">…</text>
+    <text x="460" y="123" class="t1">19</text><text x="530" y="123" class="t1">20</text>
+    <text x="600" y="123" class="t1">21</text>
+    <text x="710" y="123" class="t2">22〜7 は動かさない</text>
+  </g>
+  <text x="420" y="160" class="t3">日本に夏時間は無いので、ずれは常に +9 で固定</text>
+</svg>
+</figure>
+
+<div class="stop">
+<p><strong><code>monitoring_hours</code> だけずれると、毎朝「監視が止まっていました」と誤警告します。</strong>
+空白検知がどの時間を数えるかを決めているのがこの値だからです。3か所は必ず揃えてください。</p>
+</div>
+
+<div class="note">
+<p><strong>8〜21 という数字自体は、作者が「だいたいこんなもん」で決めたものです。</strong>
+UR の営業時間から導いたものではありません。ただし後から確かめたところ、
+UR大宮営業センターは 10:00〜18:00、住まいセンターは 9:30〜17:30、
+実際に新着が現れた時間帯は 09:26〜19:28 で、<strong>すべてこの中に収まっていました</strong>。
+上端の 19:28 は営業終了より1時間半あとなので、<strong>「営業時間＋1時間」のような理屈で狭めると取りこぼします</strong>。</p>
+</div>
+<h2 id="a7">状態はリポジトリにある</h2>
+
+<figure class="fig">
+<svg viewBox="0 0 840 200" role="img" aria-label="実行環境は毎回消えるので、状態をリポジトリのファイルとして残している図">
+  <defs>
+    <marker id="m6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+  <rect x="30" y="40" width="200" height="90" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="5 4"/>
+  <text x="130" y="70" class="t1">作業場</text>
+  <text x="130" y="92" class="t2">毎回まっさら</text>
+  <text x="130" y="114" class="t2">終わると消える</text>
+
+  <rect x="320" y="40" width="200" height="90" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="420" y="70" class="t1">📦 リポジトリ</text>
+  <text x="420" y="92" class="t2">state.json</text>
+  <text x="420" y="114" class="t2">docs/index.html</text>
+
+  <rect x="610" y="40" width="200" height="90" rx="8" fill="#e8f0fb" stroke="#005bac"/>
+  <text x="710" y="70" class="t1">🌐 GitHub Pages</text>
+  <text x="710" y="92" class="t2">main の /docs を配信</text>
+  <text x="710" y="114" class="t2">push だけで公開が更新</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m6)">
+    <path d="M230,70 H316"/>
+    <path d="M316,100 H234"/>
+    <path d="M520,85 H606"/>
+  </g>
+  <text x="273" y="60" class="t3">書き出す</text>
+  <text x="273" y="122" class="t3">前回を読む</text>
+  <text x="420" y="172" class="t2">実行のたびにコミットが残るので、コミット履歴が「取りこぼしのない全実行記録」になる</text>
+</svg>
+</figure>
+
+<table>
+<thead><tr><th>気をつけること</th><th>理由</th></tr></thead>
+<tbody>
+<tr><td>ローカルで <code>--dry-run</code> を付けずに実行しない</td><td>2ファイルが書き換わり、Actions のコミットと衝突する</td></tr>
+<tr><td><code>docs/.nojekyll</code> を消さない</td><td>HTML 内の <code>{{ }}</code> がテンプレート記法と解釈されて壊れる</td></tr>
+<tr><td>監視のコミットに <code>[skip ci]</code> を付けない</td><td>Pages のビルドまで止まる恐れがある</td></tr>
+<tr><td><code>docs/</code> に開発用ファイルを置かない</td><td>置いたものは全部そのまま Web に公開される</td></tr>
+</tbody>
+</table>
+
+<div class="stop">
+<p><strong><code>state.json</code> が壊れていたら、処理を中止します（exit 1）。</strong>
+空とみなして続けると<strong>全部屋が「新着」になり</strong>、条件に合うものがまとめて Slack へ飛ぶためです。
+<strong>取得失敗より誤通知のほうが害が大きい</strong>、というのがこのツール全体の判断基準です。</p>
+</div>
+
+<h2 id="a8">止まったときに気づく仕組み</h2>
+
+<p>外部トリガーの停止・トークンの期限切れ・GitHub の遅延は、症状がすべて<strong>「黙って止まる」</strong>になります。
+実際に4日間気づかなかったことがあります。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 210" role="img" aria-label="稼働時間帯の中の空白だけを数えて、3時間以上空いていたらSlackに警告する仕組み">
+  <text x="420" y="24" class="t4">前回の実行からの空白を、稼働時間帯の中だけで数える</text>
+
+  <rect x="40" y="46" width="180" height="46" rx="6" fill="#e8f0fb" stroke="#005bac"/>
+  <text x="130" y="66" class="t1">8:00〜21:00</text>
+  <text x="130" y="84" class="t2">数える</text>
+
+  <rect x="240" y="46" width="180" height="46" rx="6" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="4 3"/>
+  <text x="330" y="66" class="t1">21:00〜翌8:00</text>
+  <text x="330" y="84" class="t2">数えない（正常な停止）</text>
+
+  <rect x="460" y="46" width="160" height="46" rx="6" fill="#fff8e5" stroke="#d4a72c"/>
+  <text x="540" y="66" class="t1">3時間以上？</text>
+  <text x="540" y="84" class="t2">stale_warning_hours</text>
+
+  <rect x="660" y="46" width="160" height="46" rx="6" fill="#ffebe9" stroke="#cf222e"/>
+  <text x="740" y="66" class="t1">⚠️ Slack へ警告</text>
+  <text x="740" y="84" class="t2">「監視が止まっていました」</text>
+
+  <path d="M620,69 H656" fill="none" stroke="#cf222e" stroke-width="2" marker-end="url(#m6)"/>
+
+  <rect x="40" y="120" width="780" height="66" rx="8" fill="#ffebe9" stroke="#cf222e" stroke-dasharray="5 4"/>
+  <text x="420" y="146" class="t1">ここを単純な引き算にすると、毎朝「11時間空いた」と誤報する</text>
+  <text x="420" y="170" class="t2">夜間に動かないのは正常なので、稼働時間帯の中の分だけを数えている（monitoring_gap_minutes）</text>
+</svg>
+</figure>
+
+<div class="warn">
+<p><strong>警告は、実行できたときにしか出せません。</strong>
+だから GitHub 側の <code>schedule</code> を完全には外さず、<strong>1日4回の心拍</strong>として残してあります。
+外部トリガーが死んだときの保険と、見張りを兼ねています。<strong>この4回を「間隔」として当てにしないでください。</strong></p>
+</div>
+<h2 id="a9">数字のまとめ</h2>
+
+<table>
+<thead><tr><th>項目</th><th>値</th><th>どこで決まるか</th></tr></thead>
+<tbody>
+<tr><td>実行間隔</td><td><strong>5分</strong></td><td>Cloudflare の cron</td></tr>
+<tr><td>稼働時間帯</td><td>JST 8:00〜21:55</td><td>cron ＋ worker.js ＋ config.json（3か所）</td></tr>
+<tr><td>1日の実行回数</td><td>168回</td><td>14時間 × 12</td></tr>
+<tr><td>1回の所要</td><td>45〜85秒（＋ jitter 最大40秒）</td><td>実測</td></tr>
+<tr><td>開始前のゆらぎ</td><td>0〜40秒</td><td><code>jitter_max_seconds</code></td></tr>
+<tr><td>URL 間の待機</td><td>3秒</td><td>コード内で固定</td></tr>
+<tr><td>描画待ち</td><td>件数が1秒安定するまで・最長20秒</td><td><code>wait_for_rooms()</code></td></tr>
+<tr><td>取り直しの待機</td><td>5秒・1回だけ</td><td>失敗対策の1段目</td></tr>
+<tr><td>怪しいと判断する減り方</td><td>前回の <strong>0.7 倍</strong>未満</td><td><code>shrink_guard_ratio</code></td></tr>
+<tr><td>粘る回数</td><td><strong>18回</strong>（＝約90分）</td><td><code>zero_streak_limit</code></td></tr>
+<tr><td>止まったと判断する空白</td><td>3時間</td><td><code>stale_warning_hours</code></td></tr>
+<tr><td>UR へのアクセス</td><td>平均 100秒に1回（稼働時間帯のみ）</td><td>3URL × 168回</td></tr>
+</tbody>
+</table>
+
+<div class="stop">
+<p><strong><code>zero_streak_limit</code> は「時間」ではなく「回数」です。</strong>
+実行間隔を変えたら必ずここも合わせてください。<strong>実行間隔 × この回数</strong>が、
+UR 側の一時的な不調に耐えられる時間になります。5分に詰めたとき 6 のままだと、
+90分あった耐性が<strong>30分に縮みます</strong>。</p>
+</div>
+
+<table>
+<thead><tr><th>無料枠との関係</th><th>使用量</th><th>枠</th></tr></thead>
+<tbody>
+<tr><td>Cloudflare Workers</td><td>168回／日</td><td>10万回／日</td></tr>
+<tr><td>GitHub Actions（公開リポジトリ）</td><td>—</td><td><strong>無制限に無料</strong></td></tr>
+<tr><td>GitHub Actions（非公開に戻した場合）</td><td>月およそ7,500分</td><td>月2,000分 → <strong>大幅超過</strong></td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<p><strong>非公開リポジトリに戻すなら、実行間隔も戻す必要があります。</strong>
+また非公開にすると GitHub Pages が使えなくなり（GitHub Free では公開リポジトリのみ）、
+一覧ページの公開もできなくなります。</p>
+</div>
+
+<h2 id="a10">おかしいときにどこを見るか</h2>
+
+<table>
+<thead><tr><th>症状</th><th>まず見る場所</th><th>ありがちな原因</th></tr></thead>
+<tbody>
+<tr><td>通知が来ない・実行が少ない</td><td>Cloudflare の <strong>Observability</strong></td><td>トークン切れ（401）、権限不足（403）</td></tr>
+<tr><td>いつ動いたか知りたい</td><td>リポジトリの <strong>コミット履歴</strong></td><td>—（履歴が全実行記録になっている）</td></tr>
+<tr><td>全 URL が0件になる</td><td><strong>まず環境</strong>を疑う</td><td>Chrome がそもそも到達できていない</td></tr>
+<tr><td>件数が中途半端</td><td>ログの <code>前回状態を維持</code></td><td>正常動作。3段構えが効いている</td></tr>
+<tr><td>実行が赤い</td><td>Actions のログ</td><td>依存の更新、push の衝突</td></tr>
+</tbody>
+</table>
+
+<div class="note">
+<p><strong>0件のときに、セレクターより先に環境を疑う理由。</strong>
+<code>robots.txt チェック OK</code> が出ていても、Chrome が通信できているとは限りません。
+robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome を通らないからです。
+実際に <code>curl</code> は 200 を返すのに Chrome だけ <code>ERR_CONNECTION_RESET</code> になる環境がありました。
+ページ内で <code>location.href</code> を見るのが早く、<code>chrome-error://chromewebdata/</code> なら
+描画待ちの問題ではなく取得そのものの失敗です。</p>
+</div>
+
+<table>
+<thead><tr><th>Cloudflare のログに出るもの</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td><code>JST 15時: 起動した</code></td><td>成功</td></tr>
+<tr><td><code>起動に失敗: 401 Bad credentials</code></td><td>トークンが認識されていない。作り直して入れ直す</td></tr>
+<tr><td><code>起動に失敗: 403 ...</code></td><td>権限不足。Actions を Read and write に</td></tr>
+<tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
+</tbody>
+</table>
+
+<footer>
+<div class="author">
+  <span class="author-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+  <div>
+    <p class="author-by">Created by</p>
+    <p class="author-name"><a href="https://github.com/tama-create">たましもん</a></p>
+  </div>
+  <div class="author-updated">
+    <p class="lbl">Last updated</p>
+    <p class="val"><time datetime="2026-08-28">2026年8月28日</time></p>
+  </div>
+</div>
+<p>
+この資料は<strong>動いている最中の話だけ</strong>を扱っています。導入手順は
+<a href="setup.html">セットアップ手順書</a>、設定項目の一覧は
+<a href="https://github.com/tama-create/ur-monitor#readme" target="_blank" rel="noopener">README</a>、
+コードを触るときの判断基準は
+<a href="https://github.com/tama-create/ur-monitor/blob/main/CLAUDE.md" target="_blank" rel="noopener">CLAUDE.md</a> にあります。
+</p>
+<p>
+リポジトリ: <a href="https://github.com/tama-create/ur-monitor">github.com/tama-create/ur-monitor</a>
+</p>
+</footer>
+</main>
+
+</div>
+</body>
+</html>
