@@ -118,11 +118,16 @@ docs/                 ＝ GitHub Pages の公開ディレクトリ。置いた�
   setup.html          セットアップ手順書
   .nojekyll           Jekyll の変換を止める空ファイル。消さないこと
 
+trigger/              起動トリガー（Cloudflare Workers）
+  worker.js           15分おきに workflow_dispatch を叩くだけ。監視処理は持たない
+  wrangler.toml       cron の設定
+  README.md           セットアップ手順
+
 tools/
   cloud-setup.sh      Claude Code on the web 用のセットアップスクリプト（開発用）
 
 .github/workflows/
-  monitor.yml             本番実行（15分間隔で起動を試みる）
+  monitor.yml             本番実行（Cloudflare から起動。schedule は保険と心拍）
   verify-cloud-setup.yml  cloud-setup.sh の検証（手動実行のみ）
 ```
 
@@ -361,9 +366,19 @@ GitHub Pages が `main` の `/docs` を配信しているので、**push され�
 つまりコミット履歴が取りこぼしのない全実行記録になっていて、**9時間で18回動くはずが12回**しか
 動いていなかった。約3分の1が欠落し、実効間隔は50分前後だった。
 
-15分にしたのは、**発火の試行を増やして実効間隔を縮めるため**であって、15分間隔で動くように
-なるからではない。期待できるのは「実効50分が実効30分前後になる」程度。
 **厳密な間隔が要るなら GitHub Actions の `schedule` は向いていない。**
+15分間隔に詰めても数日後には**1日2回**まで落ちた（2026-08-27〜28）。試行を増やす程度では
+どうにもならないと判断し、**発火は Cloudflare Workers から与える**ことにした（[trigger/](trigger/)）。
+
+`monitor.yml` に残した `schedule` は1日4回で、外部トリガーが死んだときの保険と、
+監視が止まっていないかを見張る心拍を兼ねる。
+
+### 監視が止まったら気づけるようにしてある
+
+外部トリガーの停止、トークンの期限切れ、GitHub の遅延——症状はすべて「黙って止まる」に
+なる。実際に4日間気づかなかったことがある。そのため実行のたびに前回からの空白を見て、
+稼働時間帯で `stale_warning_hours`（既定3時間）以上空いていたら Slack に警告を出す。
+夜間の停止は正常なので、稼働時間帯の分だけを数えている（`monitoring_gap_minutes()`）。
 
 ## 既知の制約
 - **公開リポジトリなら Actions は無料枠の対象外（無制限に無料）**。以下はプライベートに

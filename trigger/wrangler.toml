@@ -1,0 +1,8 @@
+name = "ur-monitor-trigger"
+main = "worker.js"
+compatibility_date = "2026-08-28"
+
+# UTC で15分おきに起動する。稼働時間帯（JST 08:00〜21:00）の判定は worker.js 側。
+# 無料プランは1ワーカーあたり cron 3本まで。ここで使い切らないよう1本にしてある。
+[triggers]
+crons = ["*/15 * * * *"]

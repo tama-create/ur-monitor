@@ -14,6 +14,8 @@
   "jitter_max_seconds": 0,
   "zero_streak_limit": 6,
   "shrink_guard_ratio": 0.7,
+  "stale_warning_hours": 3,
+  "monitoring_hours": [8, 21],
 
   "highlight_keywords": [
     "プラザシティ新所沢　けやき通り"
