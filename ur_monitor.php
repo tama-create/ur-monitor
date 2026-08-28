@@ -698,6 +698,31 @@ function notify_slack(string $webhookUrl, array $newRooms, string $searchUrl): v
 // メイン処理
 // ──────────────────────────────────────────
 
+// 取得結果を信用してよいかを判定する。信用できないなら理由を返し、できるなら null。
+//
+// 0 件だけでなく「前回より大幅に減った」も疑う。描画待ちが足りないと件数が 0 ではなく
+// 中途半端な数で返ることがあり、素通しすると消えた分が「成約」、戻ってきた分が「新着」
+// として通知される。実際に2回起きた:
+//   2026-08-22 16:36  18 → 12 件（うち5件が1時間後に復活）
+//   2026-08-24 14:34  19 →  7 件（12件が33分後に復活し、誤った新着通知が飛んだ）
+// この2件を両方捕まえるため、既定のしきい値は「前回の 70% 未満」にしてある。
+// 同じ103回の履歴で本物の減少は 20 → 19 件（95%）だけで、これは誤って捕まえない。
+function untrusted_result_reason(array $rooms, array $prevForUrl, float $ratio): ?string
+{
+    $prevCount = count($prevForUrl);
+    if ($prevCount === 0) {
+        return null;  // 前回が無ければ比べようがない（初回や、新しく足した URL）
+    }
+    if (empty($rooms)) {
+        return '0 件';
+    }
+    // 少ない一覧は 1〜2 件の出入りで割合が大きく振れるため、割合判定の対象から外す
+    if ($prevCount >= 5 && count($rooms) < $prevCount * $ratio) {
+        return sprintf('件数が急減（%d → %d 件）', $prevCount, count($rooms));
+    }
+    return null;
+}
+
 // $dryRun: 開発（Windows / macOS）用。スクレイプはするが Slack 送信と
 // state.json / docs/index.html の書き込みを行わない。本番の状態を壊さずに動作確認できる。
 function run_monitor(array $config, bool $dryRun = false): void
@@ -731,13 +756,18 @@ function run_monitor(array $config, bool $dryRun = false): void
     // 「取得できた結果を信用してよい URL」が1つでもあったか。
     // 取得失敗・robots 拒否・0 件保留で前回状態を引き継いだ URL は含めない。
     $scrapedOk  = false;
-    // 検索URLごとの「0 件が続いた回数」。一時的な取得失敗と本当の空き無しを区別するために持つ。
+    // 検索URLごとの「信用できない結果が続いた回数」。一時的な取得失敗と本当の減少を
+    // 区別するために持つ。キー名が zero_streak なのは 0 件だけを見ていた頃の名残で、
+    // 既存の state.json と互換を保つためそのままにしてある。
     $zeroStreak = $state['zero_streak'] ?? [];
 
-    // 何回連続で 0 件なら「本当に空きが尽きた」と認めるか。
+    // 何回連続で信用できない結果が続いたら「本当にそうなった」と認めるか。
     // これは回数であって時間ではないため、実行間隔を変えたらここも合わせること。
     // 実行間隔 × この回数 が、UR 側の一時的な不調に耐えられる時間になる。
     $zeroLimit = max(1, (int)($config['zero_streak_limit'] ?? 6));
+
+    // 前回のこの割合を下回ったら部分取得を疑う。1.0 で無効（0 件だけを見る）。
+    $shrinkRatio = min(1.0, max(0.0, (float)($config['shrink_guard_ratio'] ?? 0.7)));
 
     // Chrome を1回だけ起動してすべての URL を処理（高速化）
     $browser = create_browser($config, headless: true);
@@ -766,10 +796,11 @@ function run_monitor(array $config, bool $dryRun = false): void
             try {
                 $rooms = scrape_url($browser, $searchUrl, $config);
 
-                // ページは開けたのに 0 件になることがある（描画完了前に読み取ってしまう等）。
-                // 前回この URL に部屋があったなら異常を疑い、1 度だけ取り直す。
-                if (empty($rooms) && !empty($prevForUrl)) {
-                    log_msg('WARNING', "0 件だったため取得し直します: {$searchUrl}");
+                // ページは開けたのに 0 件や中途半端な件数になることがある
+                // （描画完了前に読み取ってしまう等）。疑わしければ 1 度だけ取り直す。
+                $reason = untrusted_result_reason($rooms, $prevForUrl, $shrinkRatio);
+                if ($reason !== null) {
+                    log_msg('WARNING', "{$reason}のため取得し直します: {$searchUrl}");
                     sleep(5);
                     $rooms = scrape_url($browser, $searchUrl, $config);
                 }
@@ -781,17 +812,18 @@ function run_monitor(array $config, bool $dryRun = false): void
                 continue;
             }
 
-            // 取り直しても 0 件。一時障害なら前回状態を維持したいが、本当に空きが尽きた場合に
+            // 取り直しても怪しい。一時障害なら前回状態を維持したいが、本当に減った場合に
             // 古い部屋を永久に表示し続けてしまうため、一定回数続いたら実態として受け入れる。
-            if (empty($rooms) && !empty($prevForUrl)) {
+            $reason = untrusted_result_reason($rooms, $prevForUrl, $shrinkRatio);
+            if ($reason !== null) {
                 $streak = (int)($zeroStreak[$searchUrl] ?? 0) + 1;
                 if ($streak < $zeroLimit) {
                     $zeroStreak[$searchUrl] = $streak;
-                    log_msg('ERROR', "0 件のため前回状態を維持（{$streak}/{$zeroLimit} 回目）: {$searchUrl}");
+                    log_msg('ERROR', "{$reason}のため前回状態を維持（{$streak}/{$zeroLimit} 回目）: {$searchUrl}");
                     $currentMap += $prevForUrl;
                     continue;
                 }
-                log_msg('WARNING', "{$zeroLimit} 回連続で 0 件のため、実際に空きが無くなったと判断: {$searchUrl}");
+                log_msg('WARNING', "{$zeroLimit} 回連続で{$reason}のため、実態として受け入れます: {$searchUrl}");
             }
             unset($zeroStreak[$searchUrl]);
             $scrapedOk = true;
