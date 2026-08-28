@@ -16,8 +16,10 @@ const WORKFLOW = 'monitor.yml';
 const REF = 'main';
 
 // 稼働時間帯（JST）。START <= 時 <= END の間だけ起動する。
-// cron は無料プランで1ワーカー3本までなので、24時間叩いて時間帯はここで絞る。
-// 3本使い切ると後で足せなくなるため、1本＋コード側の判定にしてある。
+// wrangler.toml の cron 側でも同じ時間帯に絞ってあるので、通常ここには
+// 時間外の呼び出しは来ない。二重になるが消さないこと。cron は UTC 指定で
+// 時がずれるため間違えやすく、これが時間外へはみ出すのを止める最後の番人になる。
+// 変えるときは wrangler.toml の crons と config.json の monitoring_hours も一緒に。
 const START_HOUR = 8;
 const END_HOUR = 21;
 

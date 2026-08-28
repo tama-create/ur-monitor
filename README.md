@@ -92,8 +92,9 @@ GitHub アカウントの作り方から順に、図を交えて説明してい�
   知られたくない場合はプライベートにしてください（その場合 GitHub Pages は使えなくなり、
   Actions は無料枠の消費対象になります）
 
-UR のサイトへアクセスするツールです。`robots.txt` を確認し、URL間に待機を入れ、5分間隔で
-動かしています。監視URLは3本なので UR へのアクセスは平均して**100秒に1回程度**で、
+UR のサイトへアクセスするツールです。`robots.txt` を確認し、URL間に待機を入れ、
+**動きのある時間帯（08:00〜21:00 JST）だけ**5分間隔で動かしています。夜間は動かしません。
+監視URLは3本なので UR へのアクセスは平均して**100秒に1回程度**で、
 人がひとつの検索結果ページを開いて絞り込みを何度か押すのと変わらない量です。
 UR の `robots.txt` に `Crawl-delay` の指定はありません（2026-08-28 時点）が、
 **取得間隔をこれ以上詰めるような改変はしないでください。** 相手のサーバーに
@@ -101,7 +102,7 @@ UR の `robots.txt` に `Crawl-delay` の指定はありません（2026-08-28 �
 
 ## 仕組み
 
-- 08:00〜21:00 JST・5分間隔で `.github/workflows/monitor.yml` が実行される
+- 08:00〜21:00 JST・5分間隔で `.github/workflows/monitor.yml` が実行される（1日168回）
   （間隔を守っているのは Cloudflare Workers 側。GitHub の `schedule` は保険と心拍のみ。
   下の「実行間隔は設定どおりにならない」を参照）
 - `config.json` の `search_urls` を巡回してスクレイピング
@@ -123,7 +124,7 @@ docs/                 ＝ GitHub Pages の公開ディレクトリ。置いた�
   .nojekyll           Jekyll の変換を止める空ファイル。消さないこと
 
 trigger/              起動トリガー（Cloudflare Workers）
-  worker.js           5分おきに workflow_dispatch を叩くだけ。監視処理は持たない
+  worker.js           稼働時間帯に5分おきで workflow_dispatch を叩く。監視処理は持たない
   wrangler.toml       cron の設定
   README.md           セットアップ手順
 
