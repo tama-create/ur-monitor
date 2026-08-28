@@ -60,6 +60,11 @@ UR営業センターの窓口での書類提出（本申込み）になる。
 **プログラミングの知識がなくても使えます。** 画面の操作と設定値のコピー＆ペーストだけで、
 30〜60分ほどでセットアップできます。
 
+### 📘 [使い方ガイド](https://tama-create.github.io/ur-monitor/guide.html)
+
+**なぜ空き部屋探しが速さ勝負になるのか**、通知が来たらどう動くのか。UR は「押さえてから内覧する」
+順番なので、入居を決めてから動くのでは遅い。ツールを入れる前に読むと、何を急ぐのかが分かる。
+
 ### 📖 [セットアップ手順書（図解つき）](https://tama-create.github.io/ur-monitor/setup.html)
 
 GitHub アカウントの作り方から順に、図を交えて説明しています。はじめての方はこちらをどうぞ。
@@ -332,6 +337,7 @@ GitHub Pages が `main` の `/docs` を配信しているので、**push され�
 | URL | 中身 |
 |---|---|
 | `https://<ユーザー名>.github.io/ur-monitor/` | 空き部屋一覧 |
+| `https://<ユーザー名>.github.io/ur-monitor/guide.html` | 使い方ガイド |
 | `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
 | `https://<ユーザー名>.github.io/ur-monitor/architecture.html` | 技術資料（内部の動き） |
 

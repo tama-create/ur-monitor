@@ -253,6 +253,8 @@
     <p class="hero-meta">
       <a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener">空き部屋一覧（見本）</a>
       <span class="sep">│</span>
+      <a href="guide.html">使い方ガイド</a>
+      <span class="sep">│</span>
       <a href="setup.html">セットアップ手順書</a>
       <span class="sep">│</span>
       <span class="current" aria-current="page">仕組みの技術資料</span>
@@ -266,7 +268,9 @@
 <nav class="toc" aria-label="目次">
   <p class="toc-ttl">目次</p>
   <ol>
-    <li><a href="#a1">登場人物は3つ</a></li>
+    <li><a href="#a1">登場人物は3つ</a>
+      <ol><li><a href="#a1-1">登場する技術</a></li></ol>
+    </li>
     <li><a href="#a2">1回の実行で何が起きるか</a></li>
     <li><a href="#a3">PHP の中の流れ</a></li>
     <li><a href="#a4">怪しい結果を弾く3段構え</a></li>
@@ -342,6 +346,21 @@
 <tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く</td><td>UR を見ない。データを持たない</td></tr>
 <tr><td>GitHub Actions</td><td>PHP を動かす箱を用意する</td><td>時刻を守れない（下記 2 章）</td></tr>
 <tr><td>PHP + Chrome</td><td>取得・比較・通知・書き出し</td><td>常駐しない。毎回終了する</td></tr>
+</tbody>
+</table>
+
+<h3 id="a1-1">登場する技術</h3>
+
+<table>
+<thead><tr><th>技術</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td><strong>Cloudflare Workers</strong></td><td>時計。5分ごとに GitHub を叩くだけの小さなプログラムを、Cloudflare のサーバー上で動かす仕組み</td></tr>
+<tr><td><strong>GitHub Actions</strong></td><td>プログラムを自動実行する仕組み。パソコンを起動しなくても動く理由がこれ</td></tr>
+<tr><td><strong>PHP</strong></td><td>本体の言語。<code>ur_monitor.php</code> の1ファイルだけで動いている</td></tr>
+<tr><td><strong>Headless Chrome</strong></td><td>画面のない Chrome。UR は物件情報を後から JavaScript で表示するため、本物のブラウザで開いて描画を待つ必要がある</td></tr>
+<tr><td><strong>Slack Incoming Webhook</strong></td><td>指定の URL にメッセージを送ると Slack に投稿される仕組み</td></tr>
+<tr><td><strong>GitHub Pages</strong></td><td>リポジトリ内の HTML をそのまま Web 公開できる仕組み。<code>docs/</code> に置いたものが push のたびに配信される</td></tr>
+<tr><td><strong>GitHub Secrets</strong></td><td>パスワードや鍵を預ける場所。登録後は本人でも中身を見られない</td></tr>
 </tbody>
 </table>
 
