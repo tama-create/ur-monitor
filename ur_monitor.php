@@ -507,9 +507,18 @@ function scrape_rooms(array $config, bool $headless = true): array
 
 function save_html(array $rooms, array $newUrls, array $searchUrls, array $highlightKeywords = []): void
 {
-    $ts       = date('Y-m-d H:i:s');
+    $ts       = date('Y-m-d H:i');
     $count    = count($rooms);
     $newCount = count($newUrls);
+
+    // 狙っている物件（highlight_keywords に一致）の件数も出す。
+    // 一覧を開いたとき、まずここを見れば用が足りることが多いため。
+    $hotCount = 0;
+    foreach ($rooms as $r) {
+        foreach ($highlightKeywords as $kw) {
+            if ($kw !== '' && str_contains($r['name'], $kw)) { $hotCount++; break; }
+        }
+    }
 
     // search_url ごとにグループ化（順序を search_urls の定義順に揃える）
     $grouped = array_fill_keys($searchUrls, []);
@@ -522,87 +531,224 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
 
     $sections = '';
     foreach ($grouped as $srcUrl => $areaRooms) {
-        $aCount  = count($areaRooms);
-        $urlEsc  = htmlspecialchars($srcUrl);
-        $sections .= "<section>\n<h2><a href=\"{$urlEsc}\" target=\"_blank\">エリア " . (array_search($srcUrl, $searchUrls) + 1) . "</a> <span class=\"room-count\">{$aCount}件</span></h2>\n";
-        $sections .= "<p class=\"area-url\"><a href=\"{$urlEsc}\" target=\"_blank\">{$urlEsc}</a></p>\n";
+        $aCount = count($areaRooms);
+        $urlEsc = htmlspecialchars($srcUrl);
+        $no     = array_search($srcUrl, $searchUrls) + 1;
+
+        $sections .= "<section class=\"area\">\n";
+        $sections .= "<div class=\"area-head\">\n";
+        $sections .= "  <h2>エリア {$no}<span class=\"area-count\">{$aCount} 件</span></h2>\n";
+        $sections .= "  <a class=\"area-src\" href=\"{$urlEsc}\" target=\"_blank\" rel=\"noopener\">UR のページで見る →</a>\n";
+        $sections .= "</div>\n";
 
         if ($aCount === 0) {
-            $sections .= "<p class=\"no-rooms\">空き部屋なし</p>\n</section>\n";
+            $sections .= "<p class=\"empty\">いま空き部屋はありません</p>\n</section>\n";
             continue;
         }
 
-        $rows = '';
+        $cards = '';
         foreach ($areaRooms as $r) {
-            $isNew  = in_array($r['url'], $newUrls);
-            $badge  = $isNew ? '<span class="badge">NEW</span>' : '';
-            $link   = $r['url'] ? "<a href=\"" . htmlspecialchars($r['url']) . "\" target=\"_blank\">詳細を見る</a>" : '―';
-            $name   = htmlspecialchars($r['name']);
-            $price  = htmlspecialchars($r['price']);
-            $fp     = htmlspecialchars($r['floor_plan']);
+            $isNew = in_array($r['url'], $newUrls, true);
 
-            // highlight_keywords に一致する物件名は色＋ボールドで目立たせる
             $isHot = false;
             foreach ($highlightKeywords as $kw) {
-                if ($kw !== '' && str_contains($r['name'], $kw)) {
-                    $isHot = true;
-                    break;
-                }
+                if ($kw !== '' && str_contains($r['name'], $kw)) { $isHot = true; break; }
             }
-            $classes = [];
-            if ($isNew) { $classes[] = 'new-row'; }
-            if ($isHot) { $classes[] = 'highlight-row'; }
-            $rowCls = $classes ? ' class="' . implode(' ', $classes) . '"' : '';
-            $rows  .= "<tr{$rowCls}><td>{$badge}{$name}</td><td>{$fp}</td><td>{$price}</td><td>{$link}</td></tr>\n";
+
+            $cls = 'card';
+            if ($isNew) { $cls .= ' is-new'; }
+            if ($isHot) { $cls .= ' is-hot'; }
+
+            $name  = htmlspecialchars($r['name']);
+            $price = htmlspecialchars($r['price']);
+            $fp    = htmlspecialchars($r['floor_plan']);
+            $href  = $r['url'] ? htmlspecialchars($r['url']) : '';
+
+            $badges = '';
+            if ($isNew) { $badges .= '<span class="tag tag-new">NEW</span>'; }
+            if ($isHot) { $badges .= '<span class="tag tag-hot">候補</span>'; }
+            if ($badges !== '') { $badges = "<p class=\"tags\">{$badges}</p>\n"; }
+
+            // カード全体をリンクにする。通知から来てそのまま指で押せるようにするため
+            $open  = $href ? "<a class=\"{$cls}\" href=\"{$href}\" target=\"_blank\" rel=\"noopener\">" : "<div class=\"{$cls}\">";
+            $close = $href ? '</a>' : '</div>';
+            $arrow = $href ? '<span class="go">詳細 →</span>' : '';
+
+            $cards .= "{$open}\n{$badges}<p class=\"c-name\">{$name}</p>\n"
+                    . "<p class=\"c-plan\">{$fp}</p>\n"
+                    . "<p class=\"c-foot\"><span class=\"c-price\">{$price}</span>{$arrow}</p>\n{$close}\n";
         }
-        $sections .= "<table>\n<thead><tr><th>物件名</th><th>間取り</th><th>家賃</th><th>詳細</th></tr></thead>\n<tbody>\n{$rows}</tbody>\n</table>\n</section>\n";
+        $sections .= "<div class=\"cards\">\n{$cards}</div>\n</section>\n";
     }
 
-    $newBadge = $newCount > 0 ? "／ <span class=\"new-count\">新着: {$newCount} 件</span>" : '';
+    $hotTile = $hotCount > 0
+        ? "  <div class=\"tile tile-hot\"><p class=\"t-num\">{$hotCount}</p><p class=\"t-lbl\">候補の部屋</p></div>\n"
+        : '';
+    $newTile = "  <div class=\"tile" . ($newCount > 0 ? ' tile-new' : '') . "\"><p class=\"t-num\">{$newCount}</p><p class=\"t-lbl\">新着</p></div>\n";
 
     $html = <<<HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 公開先（GitHub Pages）で検索エンジンに拾われないようにする。
      狙っている物件が highlight_keywords から読み取れるため。 -->
 <meta name="robots" content="noindex, nofollow">
 <title>UR賃貸 空き部屋一覧</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 <style>
-  body { font-family: sans-serif; max-width: 960px; margin: 40px auto; padding: 0 16px; color: #333; }
-  h1 { font-size: 1.4rem; margin-bottom: 4px; }
-  h2 { font-size: 1.1rem; margin: 28px 0 4px; padding: 6px 12px; background: #e8f0fb; border-left: 4px solid #005bac; }
-  h2 a { color: #005bac; text-decoration: none; }
-  h2 a:hover { text-decoration: underline; }
-  .room-count { font-size: .85rem; font-weight: normal; color: #555; margin-left: 8px; }
-  .area-url { font-size: .78rem; color: #888; margin: 0 0 8px; word-break: break-all; }
-  .area-url a { color: #888; }
-  .meta { color: #666; font-size: .9rem; margin-bottom: 16px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-  th { background: #005bac; color: #fff; padding: 10px 12px; text-align: left; }
-  td { padding: 9px 12px; border-bottom: 1px solid #ddd; }
-  tr:hover td { background: #f5f9ff; }
-  tr.new-row td { background: #fff8e1; }
-  tr.highlight-row td { background: #ffe3e3; color: #c62828; font-weight: bold; }
-  tr.highlight-row.new-row td { background: #ffd9b3; }
-  .badge { background: #e53935; color: #fff; font-size: .75rem; padding: 2px 6px; border-radius: 4px; margin-right: 6px; }
-  a { color: #0066cc; }
-  .summary { margin-bottom: 12px; }
-  .new-count { color: #e53935; font-weight: bold; }
-  .no-rooms { color: #999; font-size: .9rem; margin: 4px 0 16px; }
-  section { margin-bottom: 32px; }
+  :root {
+    --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
+    --accent: #005bac; --accent-bg: #e8f0fb;
+    --hot: #cf222e; --hot-bg: #ffebe9;
+    --new: #bf8700; --new-bg: #fff8e5;
+    --code-bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.8;
+  }
+
+  .hero {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      radial-gradient(120% 200% at 84% 30%, #1a6fd0 0%, rgba(26,111,208,0) 62%),
+      linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+    background-size: 20px 20px; opacity: .45;
+  }
+  .hero-inner { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 20px 24px 18px; }
+  .hero-kicker { margin: 0 0 3px; font-size: .8rem; font-weight: 700; letter-spacing: .16em; color: #8fc2f5; }
+  .hero h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; color: #fff; }
+
+  /* 資料ページと同じ、追従するメニュー。.hero は overflow:hidden なので外に置く */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+    border-bottom: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 2px 10px rgba(0,0,0,.22);
+  }
+  .nav {
+    max-width: 1100px; margin: 0 auto; padding: 11px 24px;
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  }
+  .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .nav > .grp-right { margin-left: auto; }
+  .nav .sep { color: rgba(255,255,255,.32); }
+  .nav a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .nav a:hover { border-bottom-color: #fff; }
+  .nav .current { color: #fff; font-weight: 700; background: rgba(255,255,255,.16); padding: 2px 10px; border-radius: 999px; }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 24px 90px; }
+
+  /* 上段の数字。開いてまず見るのはここ */
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin: 0 0 10px; }
+  .tile { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--code-bg); }
+  .tile-new { border-color: var(--new); background: var(--new-bg); }
+  .tile-hot { border-color: var(--hot); background: var(--hot-bg); }
+  .t-num { margin: 0; font-size: 1.6rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .tile-new .t-num { color: var(--new); }
+  .tile-hot .t-num { color: var(--hot); }
+  .t-lbl { margin: 0; font-size: .78rem; color: var(--sub); letter-spacing: .04em; }
+  .updated { margin: 0 0 30px; font-size: .8rem; color: var(--sub); }
+
+  .area { margin: 0 0 34px; }
+  .area-head {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px;
+    border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 14px;
+  }
+  .area h2 { margin: 0; font-size: 1.08rem; letter-spacing: .02em; }
+  .area-count { margin-left: 10px; font-size: .82rem; font-weight: 400; color: var(--sub); }
+  .area-src { margin-left: auto; font-size: .78rem; color: var(--accent); text-decoration: none; }
+  .area-src:hover { text-decoration: underline; }
+  .empty { color: var(--sub); font-size: .9rem; margin: 0; }
+
+  /* カード。通知から来てそのまま指で押せる大きさにしてある */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px; }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 12px;
+    background: #fff; transition: box-shadow .15s, transform .15s, border-color .15s;
+  }
+  .card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.10); transform: translateY(-1px); border-color: var(--accent); }
+  .card.is-new { background: var(--new-bg); border-color: var(--new); }
+  .card.is-hot { border-color: var(--hot); border-width: 2px; }
+  .card.is-hot.is-new { background: var(--hot-bg); }
+  .tags { margin: 0 0 6px; display: flex; gap: 6px; }
+  .tag { font-size: .68rem; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; color: #fff; }
+  .tag-new { background: var(--new); }
+  .tag-hot { background: var(--hot); }
+  .c-name { margin: 0 0 4px; font-size: .98rem; font-weight: 700; line-height: 1.55; }
+  .card.is-hot .c-name { color: var(--hot); }
+  .c-plan { margin: 0 0 10px; font-size: .82rem; color: var(--sub); }
+  .c-foot { margin: 0; display: flex; align-items: baseline; gap: 10px; }
+  .c-price { font-size: 1.06rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .go { margin-left: auto; font-size: .78rem; color: var(--accent); font-weight: 700; }
+
+  footer { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; color: var(--sub); font-size: .82rem; }
+  footer a { color: var(--accent); }
+
+  @media (max-width: 720px) {
+    .hero-inner { padding: 16px 18px 14px; }
+    .hero h1 { font-size: 1.3rem; }
+    .nav { padding: 9px 18px; font-size: .76rem; }
+    .nav > .grp-right { margin-left: 0; flex-basis: 100%; }
+    .wrap { padding: 20px 18px 70px; }
+    .tiles { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .tile { padding: 10px 12px; }
+    .t-num { font-size: 1.3rem; }
+    .cards { grid-template-columns: 1fr; }
+    .area-src { margin-left: 0; flex-basis: 100%; }
+  }
 </style>
 </head>
 <body>
-<h1>UR賃貸 空き部屋一覧</h1>
-<div class="meta">取得日時: {$ts}</div>
-<div class="summary">
-  空き部屋: <strong>{$count} 件</strong>
-  {$newBadge}
-</div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+    <h1>空き部屋一覧</h1>
+  </div>
+</header>
+
+<nav class="topbar" aria-label="ページ切り替え">
+  <p class="nav">
+    <span class="grp">
+      <a href="guide.html">使い方ガイド</a>
+      <span class="sep">│</span>
+      <a href="setup.html">セットアップ手順書</a>
+      <span class="sep">│</span>
+      <a href="architecture.html">仕組みの技術資料</a>
+    </span>
+    <span class="grp grp-right">
+      <span class="current" aria-current="page">空き部屋一覧</span>
+      <span class="sep">│</span>
+      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+    </span>
+  </p>
+</nav>
+
+<div class="wrap">
+
+<div class="tiles">
+  <div class="tile"><p class="t-num">{$count}</p><p class="t-lbl">空き部屋</p></div>
+{$newTile}{$hotTile}</div>
+<p class="updated">最終更新 {$ts}　／　8:00〜21:00 の間、5分おきに自動更新</p>
+
 {$sections}
+</div>
+
+<footer>
+<p>このページは自動生成されています。内容は取得時点のもので、実際の募集状況は
+<a href="https://www.ur-net.go.jp/chintai/" target="_blank" rel="noopener">UR賃貸住宅の公式サイト</a>でご確認ください。</p>
+</footer>
+
 </body>
 </html>
 HTML;
