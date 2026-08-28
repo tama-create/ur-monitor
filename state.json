@@ -24,12 +24,12 @@
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000061106",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000120511": {
-            "building": "所沢パークタウン駅前通り",
-            "name": "所沢パークタウン駅前通り 12号棟 511号室",
-            "price": "76,000円",
-            "floor_plan": "2DK / 51㎡ / 5階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000120511",
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102": {
+            "building": "所沢パークタウン駅前プラザ",
+            "name": "所沢パークタウン駅前プラザ 1号棟 102号室",
+            "price": "98,300円（割引前・要問合せ）",
+            "floor_plan": "3DK / 66㎡ / 1階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404": {
@@ -38,14 +38,6 @@
             "price": "80,200円",
             "floor_plan": "2LDK / 58㎡ / 4階",
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
-        },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102": {
-            "building": "所沢パークタウン駅前プラザ",
-            "name": "所沢パークタウン駅前プラザ 1号棟 102号室",
-            "price": "98,300円（割引前・要問合せ）",
-            "floor_plan": "3DK / 66㎡ / 1階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"
         },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1970_room.html?JKSS=000030205": {
@@ -215,16 +207,8 @@
             "floor_plan": "2DK / 50㎡ / 6階",
             "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000010609",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/area/222.html"
-        },
-        "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6771_room.html?JKSS=006010209": {
-            "building": "ひばりが丘パークヒルズ",
-            "name": "ひばりが丘パークヒルズ 6-1号棟 209号室",
-            "price": "118,200円",
-            "floor_plan": "2DK / 50㎡ / 2階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6771_room.html?JKSS=006010209",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/area/222.html"
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-28T14:31:34+09:00"
+    "last_checked": "2026-08-28T14:46:31+09:00"
 }
