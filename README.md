@@ -124,8 +124,6 @@ UR の `robots.txt` に `Crawl-delay` の指定はありません（2026-08-28 �
 ```
 ur_monitor.php        監視スクリプト本体。処理はすべてここにある
 config.json           監視URL・通知条件・セレクター。振る舞いはここで決まる
-state.json            移行前の実行結果。**いまは使っていない**（保管先へ移したあとの残り。
-                      --seed-state で1回だけ読む用）
 composer.json / .lock 依存は chrome-php/chrome のみ
 
 docs/                 ＝ GitHub Pages の公開ディレクトリ。置いたものは全部 Web に出る
@@ -422,6 +420,11 @@ php ur_monitor.php --seed-state     # STORE_URL / STORE_TOKEN が必要
 
 Actions からは、監視ワークフローを手動実行して `seed_state` にチェックを入れる。
 すでに保管先に state があれば上書きせずに止まる。
+
+手元に `state.json` があればその内容を移し、**無ければ空の状態を置く**。
+リポジトリに `state.json` は置いていない（中身が UR から取ったデータそのものなので）ため、
+フォークした直後は後者になる。**その場合、次の実行でいま出ている部屋がすべて新着として
+通知される。**
 
 ### 資料ページから一覧へのリンク
 
