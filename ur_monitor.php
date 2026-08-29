@@ -377,17 +377,22 @@ function wait_for_rooms(object $page, array $selectors, int $timeoutSec = 20): b
 function scrape_url(object $browser, string $url, array $config, bool $headless = true): array
 {
     // 建物レベル・部屋レベルすべてのセレクターを config から取得（未指定は現行サイトのデフォルト）
+    // タグ名を書かず class だけで指定している。UR は同じ情報を、検索結果ページでは
+    // <strong>/<span>、団地ページでは <span>/<td> と別のタグで出す。class は共通なので、
+    // タグ名を外すと1組のセレクターで両方から取れる。タグ名を書き戻さないこと。
     $selectors = array_replace([
-        'room_list'      => '.module_searchs_property',
-        'name'           => 'span.rep_bukken-name',
-        'room_rows'      => 'tbody.rep_bukken-room tr.js-log-item',
-        'room_name_main' => 'span.rep_room-name-main',
-        'room_name_sub'  => 'span.rep_room-name-sub',
-        'price'          => 'strong.rep_room-price',
-        'type'           => 'span.rep_room-type',
-        'space'          => 'span.rep_room-floor',
-        'floor'          => 'td.rep_room-kai',
-        'link'           => 'a.rep_room-link',
+        'room_list'      => '.module_searchs_property',   // 検索結果ページの団地ごとの箱
+        'page_name'      => 'h1',                         // 団地ページの団地名（箱が無いとき）
+        'name'           => '.rep_bukken-name',
+        'room_rows'      => 'tr.js-log-item',
+        'room_name_main' => '.rep_room-name-main',        // 検索結果ページ：号棟
+        'room_name_sub'  => '.rep_room-name-sub',         // 検索結果ページ：号室
+        'room_name'      => '.rep_room-name',             // 団地ページ：号棟と号室がひとかたまり
+        'price'          => '.rep_room-price',
+        'type'           => '.rep_room-type',
+        'space'          => '.rep_room-floor',
+        'floor'          => '.rep_room-kai',
+        'link'           => '.rep_room-link',
     ], $config['selectors'] ?? []);
 
     $parsed = parse_url($url);
@@ -425,13 +430,34 @@ function scrape_url(object $browser, string $url, array $config, bool $headless 
             (() => {
                 const S = {$selJson};
                 const rooms = [];
-                const buildings = Array.from(document.querySelectorAll(S.room_list));
-                buildings.forEach(building => {
-                    const buildingName = (building.querySelector(S.name) || {}).innerText?.trim() || '';
-                    const rows = Array.from(building.querySelectorAll(S.room_rows));
+                // 検索結果ページは団地ごとの箱があるが、団地ページには無い（ページ全体で1団地）。
+                // 箱が見つからなければページ全体を1つの箱として扱い、名前は見出しから取る。
+                let boxes = Array.from(document.querySelectorAll(S.room_list));
+                let fallbackName = '';
+                if (boxes.length === 0) {
+                    boxes = [document];
+                    const h = document.querySelector(S.page_name);
+                    // 見出しは団地名のあとにふりがなが続く。1行目だけが名前。
+                    // この JS は PHP のヒアドキュメントの中にあり、書いたエスケープ列が
+                    // 実際の制御文字に変換されてしまう。だから改行を表す記法は使わず、
+                    // 文字コードから組み立てて切っている。ここに正規表現を書かないこと。
+                    const raw = h ? (h.innerText || '').trim() : '';
+                    const nl  = raw.indexOf(String.fromCharCode(10));
+                    fallbackName = (nl >= 0 ? raw.slice(0, nl) : raw).trim();
+                }
+                boxes.forEach(building => {
+                    const nameEl = building.querySelector(S.name);
+                    const buildingName = (nameEl ? (nameEl.innerText || '').trim() : '') || fallbackName;
+                    // 部屋以外の行（「リノベーションしたお部屋とは？」等の吹き出し）が
+                    // 同数混ざる。リンクを持たないので、ここで落とす。落とさないと
+                    // 件数が倍に見え、急減ガードの判定が甘くなる。
+                    const rows = Array.from(building.querySelectorAll(S.room_rows))
+                        .filter(row => row.querySelector(S.link));
                     rows.forEach(row => {
                         const roomMain  = (row.querySelector(S.room_name_main) || {}).innerText?.trim() || '';
                         const roomSub   = (row.querySelector(S.room_name_sub)  || {}).innerText?.trim() || '';
+                        const roomOne   = (row.querySelector(S.room_name)      || {}).innerText?.trim() || '';
+                        const roomLabel = [roomMain, roomSub].filter(Boolean).join(' ') || roomOne;
                         let price       = (row.querySelector(S.price)          || {}).innerText?.trim() || '';
                         if (!price) {
                             // 割引対象の部屋はサイト側が通常の家賃欄を使わず
@@ -452,7 +478,7 @@ function scrape_url(object $browser, string $url, array $config, bool $headless 
                         const link      = (row.querySelector(S.link)           || {}).href || '';
                         rooms.push({
                             building:   buildingName,
-                            name:       buildingName + (roomMain ? ' ' + roomMain : '') + (roomSub ? ' ' + roomSub : ''),
+                            name:       buildingName + (roomLabel ? ' ' + roomLabel : ''),
                             price,
                             floor_plan: [type, space, floor].filter(Boolean).join(' / '),
                             url:        link,
