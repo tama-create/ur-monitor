@@ -312,7 +312,7 @@
     <li><a href="#a4">怪しい結果を弾く3段構え</a></li>
     <li><a href="#a5">通知するかの判定</a></li>
     <li><a href="#a6">時刻の扱い（UTC と JST）</a></li>
-    <li><a href="#a7">状態はリポジトリにある</a></li>
+    <li><a href="#a7">状態は Cloudflare に預ける</a></li>
     <li><a href="#a8">止まったときに気づく仕組み</a></li>
     <li><a href="#a9">数字のまとめ</a></li>
     <li><a href="#a10">おかしいときにどこを見るか</a></li>
@@ -370,8 +370,8 @@
   <text x="130" y="254" class="t2">読むだけ</text>
   <text x="420" y="232" class="t1">💬 Slack</text>
   <text x="420" y="254" class="t2">条件に合う新着だけ</text>
-  <text x="710" y="232" class="t1">📦 リポジトリ</text>
-  <text x="710" y="254" class="t2">state.json / docs/index.html</text>
+  <text x="710" y="232" class="t1">📦 Cloudflare の KV</text>
+  <text x="710" y="254" class="t2">前回の状態 / 一覧の HTML</text>
   <path d="M710,150 V199" fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m1)"/>
 </svg>
 </figure>
@@ -379,9 +379,9 @@
 <table>
 <thead><tr><th>役割</th><th>やること</th><th>やらないこと</th></tr></thead>
 <tbody>
-<tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く</td><td>UR を見ない。データを持たない</td></tr>
+<tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く</td><td>UR は見ません。データも持ちません</td></tr>
 <tr><td>GitHub Actions</td><td>PHP を動かす箱を用意する</td><td>時刻を守れない（下記 2 章）</td></tr>
-<tr><td>PHP + Chrome</td><td>取得・比較・通知・書き出し</td><td>常駐しない。毎回終了する</td></tr>
+<tr><td>PHP + Chrome</td><td>取得・比較・通知・書き出し</td><td>常駐しません。毎回終了します</td></tr>
 </tbody>
 </table>
 
@@ -433,7 +433,7 @@
     <text x="76" y="117" class="t3" style="text-anchor:end">2秒</text>
     <rect x="120" y="90" width="700" height="44" rx="8" fill="#e8f0fb" stroke="#005bac"/>
     <text x="136" y="108" class="t1" style="text-anchor:start">まっさらな Ubuntu が起動</text>
-    <text x="136" y="126" class="t2" style="text-anchor:start">前回のファイルは何も残っていない。だから状態はリポジトリに置いてある（7章）</text>
+    <text x="136" y="126" class="t2" style="text-anchor:start">前回のファイルは何も残っていません。だから状態は Cloudflare に預けます（7章）</text>
   </g>
 
   <g>
@@ -491,7 +491,7 @@
     <circle cx="96" cy="518" r="7" fill="#005bac"/>
     <text x="76" y="523" class="t3" style="text-anchor:end">62秒</text>
     <rect x="120" y="500" width="700" height="36" rx="8" fill="#e8f0fb" stroke="#005bac"/>
-    <text x="136" y="523" class="t2" style="text-anchor:start">state.json と docs/index.html をコミットして push → 作業場は破棄される</text>
+    <text x="136" y="523" class="t2" style="text-anchor:start">状態と一覧を Cloudflare の保管庫へ預ける → 作業場は破棄されます</text>
   </g>
 </svg>
 </figure>
@@ -653,7 +653,7 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 
   <rect x="20" y="126" width="180" height="64" rx="8" fill="#f6f8fa" stroke="#8c959f"/>
   <text x="110" y="152" class="t1">前回の部屋</text>
-  <text x="110" y="174" class="t2">state.json</text>
+  <text x="110" y="174" class="t2">保管庫から読む</text>
 
   <rect x="260" y="78" width="180" height="64" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
   <text x="350" y="104" class="t1">差を取る</text>
@@ -742,10 +742,16 @@ UR大宮営業センターは 10:00〜18:00、住まいセンターは 9:30〜17
 実際に新着が現れた時間帯は 09:26〜19:28 で、<strong>すべてこの中に収まっていました</strong>。
 上端の 19:28 は営業終了より1時間半あとなので、<strong>「営業時間＋1時間」のような理屈で狭めると取りこぼします</strong>。</p>
 </div>
-<h2 id="a7">状態はリポジトリにある</h2>
+<h2 id="a7">状態は Cloudflare に預ける</h2>
+
+<p>
+実行するたびに作業場はまっさらになるので、前回の状態はどこかに預ける必要があります。
+ただし<strong>GitHub には戻しません。</strong>公開リポジトリに置くと、UR から取った
+物件名・家賃・間取りが誰にでも読める状態になるためです。
+</p>
 
 <figure class="fig">
-<svg viewBox="0 0 840 200" role="img" aria-label="実行環境は毎回消えるので、状態をリポジトリのファイルとして残している図">
+<svg viewBox="0 0 840 210" role="img" aria-label="作業場は毎回消えるので、状態と一覧を Cloudflare の保管庫に預け、閲覧は認証の内側に限る図">
   <defs>
     <marker id="m6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -756,40 +762,57 @@ UR大宮営業センターは 10:00〜18:00、住まいセンターは 9:30〜17
   <text x="130" y="92" class="t2">毎回まっさら</text>
   <text x="130" y="114" class="t2">終わると消える</text>
 
-  <rect x="320" y="40" width="200" height="90" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
-  <text x="420" y="70" class="t1">📦 リポジトリ</text>
-  <text x="420" y="92" class="t2">state.json</text>
-  <text x="420" y="114" class="t2">docs/index.html</text>
+  <rect x="320" y="40" width="200" height="90" rx="8" fill="#fff4e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="420" y="70" class="t1">📦 Cloudflare の KV</text>
+  <text x="420" y="92" class="t2">前回の状態</text>
+  <text x="420" y="114" class="t2">一覧の HTML</text>
 
-  <rect x="610" y="40" width="200" height="90" rx="8" fill="#e8f0fb" stroke="#005bac"/>
-  <text x="710" y="70" class="t1">🌐 GitHub Pages</text>
-  <text x="710" y="92" class="t2">main の /docs を配信</text>
-  <text x="710" y="114" class="t2">push だけで公開が更新</text>
+  <rect x="610" y="40" width="200" height="90" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="710" y="70" class="t1">🔒 あなただけ</text>
+  <text x="710" y="92" class="t2">Basic 認証を通ると</text>
+  <text x="710" y="114" class="t2">一覧が見られます</text>
 
   <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m6)">
     <path d="M230,70 H316"/>
     <path d="M316,100 H234"/>
     <path d="M520,85 H606"/>
   </g>
-  <text x="273" y="60" class="t3">書き出す</text>
+  <text x="273" y="60" class="t3">預ける</text>
   <text x="273" y="122" class="t3">前回を読む</text>
-  <text x="420" y="172" class="t2">実行のたびにコミットが残るので、コミット履歴が「取りこぼしのない全実行記録」になる</text>
+  <text x="420" y="182" class="t2">リポジトリには何も戻しません。UR から取ったデータは公開される場所に置きません</text>
 </svg>
 </figure>
+
+<p>
+UR は「このサイトについて」で、私的使用と引用を除く転載を認めていません。そのうえで
+<strong>「ウェブページに貼り付けることは、運営者が個人であっても私的使用にはなりません」</strong>
+と明示しています。以前は一覧を GitHub Pages で公開していましたが、この線をまたぐため
+やめました。<strong>ここを公開に戻さないでください。</strong>
+</p>
+
+<table>
+<thead><tr><th>置き場所</th><th>置くもの</th></tr></thead>
+<tbody>
+<tr><td>リポジトリ</td><td>コード、<code>config.json</code>、資料ページ</td></tr>
+<tr><td>Cloudflare の KV</td><td><strong>前回の状態と一覧の HTML</strong>（＝UR から取ったデータ）</td></tr>
+<tr><td>Slack</td><td>新着の通知（ワークスペースの中なので公開ではありません）</td></tr>
+</tbody>
+</table>
 
 <table>
 <thead><tr><th>気をつけること</th><th>理由</th></tr></thead>
 <tbody>
-<tr><td>ローカルで <code>--dry-run</code> を付けずに実行しない</td><td>2ファイルが書き換わり、Actions のコミットと衝突する</td></tr>
-<tr><td><code>docs/.nojekyll</code> を消さない</td><td>HTML 内の <code>{{ }}</code> がテンプレート記法と解釈されて壊れる</td></tr>
-<tr><td>監視のコミットに <code>[skip ci]</code> を付けない</td><td>Pages のビルドまで止まる恐れがある</td></tr>
-<tr><td><code>docs/</code> に開発用ファイルを置かない</td><td>置いたものは全部そのまま Web に公開される</td></tr>
+<tr><td>ローカルで <code>--dry-run</code> を付けずに実行しない</td><td>保管先が未設定だと手元にファイルが生成されます。中身は UR のデータなのでコミットしないでください</td></tr>
+<tr><td>一覧を GitHub Pages に戻さない</td><td>UR が転載を認めていません。認証の内側に置くのはそのためです</td></tr>
+<tr><td><code>docs/.nojekyll</code> を消さない</td><td>HTML 内の <code>{{ }}</code> がテンプレート記法と解釈されて壊れます</td></tr>
+<tr><td><code>docs/</code> に開発用ファイルを置かない</td><td>置いたものは全部そのまま Web に公開されます</td></tr>
 </tbody>
 </table>
 
 <div class="stop">
-<p><strong><code>state.json</code> が壊れていたら、処理を中止します（exit 1）。</strong>
+<p><strong>前回の状態が読めなければ、処理を中止します（exit 1）。</strong>
 空とみなして続けると<strong>全部屋が「新着」になり</strong>、条件に合うものがまとめて Slack へ飛ぶためです。
+保管先を作った直後もここで止まります。<code>--seed-state</code> を1回流すと解けます。
 <strong>取得失敗より誤通知のほうが害が大きい</strong>、というのがこのツール全体の判断基準です。</p>
 </div>
 
@@ -900,7 +923,7 @@ robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome �
 <thead><tr><th>Cloudflare のログに出るもの</th><th>意味</th></tr></thead>
 <tbody>
 <tr><td><code>JST 15時: 起動した</code></td><td>成功</td></tr>
-<tr><td><code>起動に失敗: 401 Bad credentials</code></td><td>トークンが認識されていない。作り直して入れ直す</td></tr>
+<tr><td><code>起動に失敗: 401 Bad credentials</code></td><td>トークンが認識されていません。作り直して入れ直してください</td></tr>
 <tr><td><code>起動に失敗: 403 ...</code></td><td>権限不足。Actions を Read and write に</td></tr>
 <tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
 </tbody>
