@@ -81,6 +81,15 @@
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
             "group": "滑り止め"
         },
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000110813": {
+            "building": "所沢パークタウン駅前通り",
+            "name": "所沢パークタウン駅前通り 11号棟 813号室",
+            "price": "79,800円",
+            "floor_plan": "2DK / 51㎡ / 8階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000110813",
+            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
+            "group": "滑り止め"
+        },
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404": {
             "building": "所沢パークタウン駅前通り",
             "name": "所沢パークタウン駅前通り 7号棟 404号室",
@@ -135,21 +144,12 @@
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
             "group": "滑り止め"
         },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090309": {
-            "building": "プラザシティ新所沢　緑町第三",
-            "name": "プラザシティ新所沢　緑町第三 9号棟 309号室",
-            "price": "110,000円",
-            "floor_plan": "1LDK / 58㎡ / 3階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090309",
-            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
-            "group": "滑り止め"
-        },
-        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510": {
-            "building": "プラザシティ新所沢　緑町第三",
-            "name": "プラザシティ新所沢　緑町第三 9号棟 510号室",
-            "price": "136,500円",
-            "floor_plan": "2LDK / 73㎡ / 5階",
-            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510",
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3850_room.html?JKSS=000310604": {
+            "building": "プラザシティ新所沢けやき通り第二",
+            "name": "プラザシティ新所沢けやき通り第二 31号棟 604号室",
+            "price": "142,000円",
+            "floor_plan": "3LDK / 76㎡ / 6階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3850_room.html?JKSS=000310604",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
             "group": "滑り止め"
         },
@@ -159,6 +159,15 @@
             "price": "120,600円",
             "floor_plan": "3DK / 66㎡ / 1階",
             "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_4000_room.html?JKSS=000530102",
+            "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
+            "group": "滑り止め"
+        },
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510": {
+            "building": "プラザシティ新所沢　緑町第三",
+            "name": "プラザシティ新所沢　緑町第三 9号棟 510号室",
+            "price": "136,500円",
+            "floor_plan": "2LDK / 73㎡ / 5階",
+            "url": "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510",
             "source_url": "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
             "group": "滑り止め"
         },
@@ -209,5 +218,5 @@
         }
     },
     "zero_streak": [],
-    "last_checked": "2026-08-29T18:17:07+09:00"
+    "last_checked": "2026-08-29T19:37:08+09:00"
 }
