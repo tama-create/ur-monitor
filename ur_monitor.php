@@ -581,6 +581,19 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
         $sections .= "<div class=\"cards\">\n{$cards}</div>\n</section>\n";
     }
 
+    // 設定エディター（config.html）がここを読んで、建物名を選択式にしたり
+    // 「その条件で今いくつ当たるか」を出したりする。カードの文字列を解析させると
+    // 見た目を変えるたびに壊れるので、機械が読む口を別に用意してある。
+    $roomsJson = htmlspecialchars(
+        json_encode(array_map(fn($r) => [
+            'building' => $r['building']   ?? '',
+            'name'     => $r['name']       ?? '',
+            'plan'     => $r['floor_plan'] ?? '',
+            'price'    => $r['price']      ?? '',
+        ], $rooms), JSON_UNESCAPED_UNICODE),
+        ENT_NOQUOTES
+    );
+
     $hotTile = $hotCount > 0
         ? "  <div class=\"tile tile-hot\"><p class=\"t-num\">{$hotCount}</p><p class=\"t-lbl\">候補の部屋</p></div>\n"
         : '';
@@ -744,6 +757,8 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
 
 {$sections}
 </div>
+
+<script id="ur-rooms" type="application/json">{$roomsJson}</script>
 
 <footer>
 <p>このページは自動生成されています。内容は取得時点のもので、実際の募集状況は

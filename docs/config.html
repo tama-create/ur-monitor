@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ur-monitor 設定エディター</title>
+<!-- 体裁は他の資料ページと同じものを持たせてある。色や余白を変えるときは全部直すこと。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<style>
+  :root {
+    --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
+    --accent: #005bac; --accent-bg: #e8f0fb;
+    --warn-bg: #fff8e5; --warn-line: #d4a72c;
+    --stop-bg: #ffebe9; --stop-line: #cf222e;
+    --ok-bg: #e6f4ea; --ok-line: #1a7f37;
+    --code-bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
+  }
+
+  /* ===== 冒頭のヒーロー ===== */
+  /* 本文の前に置く帯。読み手が用があるのは手順であって表紙ではないので、
+     縦を詰めて1画面に本文が入るようにしている。 */
+  .hero {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      radial-gradient(120% 200% at 84% 30%, #1a6fd0 0%, rgba(26,111,208,0) 62%),
+      linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+    background-size: 20px 20px; opacity: .45;
+  }
+  /* 帯が低いので装飾も小さく。文字に被らないよう右端へ寄せる */
+  .hero-art {
+    position: absolute; top: 50%; right: 26px; transform: translateY(-50%);
+    width: 150px; height: 150px; opacity: .14; pointer-events: none;
+  }
+  .hero-art svg { width: 100%; height: 100%; display: block; }
+  .hero-inner {
+    position: relative; z-index: 2;
+    max-width: 1200px; margin: 0 auto; padding: 20px 24px 18px;
+  }
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
+  .hero-kicker {
+    margin: 0 0 3px; font-size: .8rem; font-weight: 700;
+    letter-spacing: .16em; color: #8fc2f5;
+  }
+  .hero h1 {
+    border: none; padding: 0; margin: 0;
+    font-size: 1.72rem; line-height: 1.3; letter-spacing: .01em; color: #fff;
+  }
+  /* 見出しの下に1行だけ添える情報。区切りは │ で詰めて置く */
+  .hero-meta {
+    margin: 14px 0 0; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,.16);
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  }
+  .hero-meta .sep { color: rgba(255,255,255,.32); }
+  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .hero-meta a:hover { border-bottom-color: #fff; }
+  /* いま見ているページ。リンクにせず「ここにいる」ことだけ示す。
+     並びは2ページで揃えてあるので、順番を変えるときは両方を直すこと。 */
+  .hero-meta .current {
+    color: #fff; font-weight: 700;
+    background: rgba(255,255,255,.16);
+    padding: 2px 10px; border-radius: 999px;
+  }
+  /* 並びは「本体 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
+     いちばん見たい空き部屋一覧を置く。右へ寄せるのはサイトの外へ出る先だけ。
+     狭い画面では折り返すため右寄せを解除する。 */
+  .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .hero-meta > .grp-right { margin-left: auto; }
+
+  /* ===== 追従するメニュー =====
+     スクロールしても常に見えるように固定している。
+     .hero は overflow:hidden を持つため、中に置いたままでは position:sticky が
+     効かない。だからメニューだけ帯の外に出してある。戻さないこと。 */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+    border-bottom: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 2px 10px rgba(0,0,0,.22);
+  }
+  .topbar .hero-meta {
+    max-width: 1200px; margin: 0 auto;
+    padding: 11px 24px; border-top: none;
+  }
+  /* 見出しへ飛んだとき、固定メニューの下に隠れないようにする */
+  [id] { scroll-margin-top: 62px; }
+
+  /* ===== レイアウト ===== */
+  .wrap {
+    display: grid; grid-template-columns: 272px minmax(0, 1fr);
+    gap: 48px; max-width: 1200px; margin: 0 auto; padding: 32px 24px 120px;
+  }
+  main { min-width: 0; counter-reset: h2; }
+
+  /* ===== 左サイドバー目次 ===== */
+  .toc {
+    /* 固定メニューのぶんだけ下げる（メニューの高さ + 24px） */
+    position: sticky; top: 68px; align-self: start;
+    max-height: calc(100vh - 92px); overflow-y: auto;
+    border-right: 1px solid var(--line); padding-right: 20px;
+    font-size: .88rem; line-height: 1.6;
+  }
+  .toc-ttl {
+    font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--sub); margin: 0 0 14px; text-transform: uppercase;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; counter-reset: t2; }
+  .toc ol ol { counter-reset: t3; margin: 4px 0 8px; }
+  .toc > ol > li { margin: 10px 0; }
+  .toc > ol > li > a { font-weight: 700; }
+  .toc > ol > li > a::before {
+    counter-increment: t2; content: counter(t2) ". ";
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .toc ol ol li { margin: 2px 0 2px 14px; }
+  .toc ol ol a { color: var(--sub); font-size: .84rem; }
+  .toc ol ol a::before {
+    counter-increment: t3; content: counter(t2) "." counter(t3) " ";
+    color: #8c959f; font-variant-numeric: tabular-nums;
+  }
+  .toc a {
+    color: var(--ink); text-decoration: none; display: block;
+    padding: 2px 8px; border-left: 3px solid transparent; border-radius: 0 4px 4px 0;
+  }
+  .toc a:hover { background: var(--code-bg); }
+  .toc a.active {
+    background: var(--accent-bg); border-left-color: var(--accent);
+    color: var(--accent); font-weight: 700;
+  }
+  .toc .opt { color: #8c959f; font-weight: 400; font-size: .78rem; }
+
+  /* ===== 見出しの番号（自動採番） ===== */
+  h1 { font-size: 1.65rem; border-bottom: 3px solid var(--accent); padding-bottom: 12px; margin: 0 0 8px; }
+  h2 {
+    counter-increment: h2; counter-reset: h3;
+    font-size: 1.22rem; margin: 60px 0 16px; padding: 11px 16px;
+    background: var(--accent-bg); border-left: 5px solid var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h2::before { content: counter(h2) ". "; font-variant-numeric: tabular-nums; }
+  h3 {
+    counter-increment: h3; counter-reset: h4;
+    font-size: 1.04rem; margin: 34px 0 8px; color: var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h3::before { content: counter(h2) "." counter(h3) " "; font-variant-numeric: tabular-nums; }
+  h4 {
+    counter-increment: h4; font-size: .97rem; margin: 22px 0 6px; color: var(--ink);
+  }
+  h4::before {
+    content: counter(h2) "." counter(h3) "." counter(h4) " ";
+    color: var(--sub); font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== 本文 ===== */
+  p, li { font-size: .97rem; }
+  a { color: var(--accent); }
+  code {
+    background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    font-family: ui-monospace, Consolas, monospace; font-size: .9em;
+    border: 1px solid var(--line); word-break: break-all;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px; overflow-x: auto; font-size: .88rem;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  /* 公式サイトの引用を、地の文と区別して見せる */
+  blockquote {
+    margin: 18px 0; padding: 12px 18px; border-left: 5px solid var(--line);
+    background: var(--code-bg); border-radius: 0 6px 6px 0; color: var(--sub);
+  }
+  blockquote p { margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); white-space: nowrap; }
+  .note, .warn, .stop, .ok {
+    padding: 14px 18px; margin: 18px 0; border-radius: 6px; border-left: 5px solid;
+  }
+  .note { background: var(--code-bg); border-color: var(--line); }
+  .warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  .stop { background: var(--stop-bg); border-color: var(--stop-line); }
+  .ok   { background: var(--ok-bg);   border-color: var(--ok-line); }
+  .note p:first-child, .warn p:first-child, .stop p:first-child, .ok p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .stop p:last-child, .ok p:last-child { margin-bottom: 0; }
+  .lead { color: var(--sub); font-size: 1rem; }
+
+  /* ===== 冒頭の「前提」カード =====
+     費用・所要・プログラミング不要・パソコン不要の4つは、このツールが何を
+     約束しているかであってナビゲーションではない。以前はヒーローのメタ行に
+     並べていたが、読む前に一番知りたいことなので本文の先頭へ出した。 */
+  .promise {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px; margin: 22px 0 16px;
+  }
+  .promise-item {
+    padding: 16px 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--code-bg);
+  }
+  .promise-mark { font-size: 1.3rem; line-height: 1; display: block; margin-bottom: 8px; }
+  .promise-ttl { margin: 0 0 6px; font-size: .98rem; font-weight: 700; color: var(--ink); line-height: 1.5; }
+  .promise-sub { margin: 0; font-size: .8rem; color: var(--sub); line-height: 1.7; }
+  .promise-note { margin: 0 0 26px; font-size: .88rem; color: var(--sub); }
+
+  .step-time { color: var(--sub); font-size: .82rem; font-weight: normal; }
+
+  /* ===== 図 ===== */
+  .fig { margin: 24px 0; padding: 0; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig .t1 { font-size: 14px; font-weight: 700; text-anchor: middle; fill: #24292f; }
+  .fig .t2 { font-size: 11.5px; text-anchor: middle; fill: #57606a; }
+  .fig .t3 { font-size: 12px; text-anchor: middle; fill: #57606a; }
+  .fig .t4 { font-size: 12.5px; font-weight: 700; fill: #57606a; }
+  .fig .tn { font-size: 11px; font-weight: 700; text-anchor: middle; fill: #005bac; letter-spacing: .04em; }
+  @media (prefers-reduced-motion: reduce) { .fig animateMotion { display: none; } }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--sub); font-size: .88rem; }
+  /* 作者クレジット。名前を主役にしたいので、肩の「作」は小さく添える程度にする */
+  .author {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 22px; padding: 16px 18px;
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .author-updated {
+    margin-left: auto; text-align: right; flex: none;
+  }
+  .author-updated .lbl {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-updated .val {
+    margin: 0; font-size: .92rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  .author-mark { flex: none; }
+  .author-mark svg { width: 40px; height: 40px; display: block; border-radius: 10px; }
+  .author-by {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-name {
+    margin: 0; font-size: 1.16rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .12em;
+  }
+  .author-name a { color: inherit; text-decoration: none; }
+  .author-name a:hover { color: var(--accent); }
+
+  /* ===== 狭い画面 ===== */
+  @media (max-width: 900px) {
+    .hero-inner { padding: 16px 18px 14px; }
+    .hero h1 { font-size: 1.3rem; }
+    .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
+    .hero-meta { font-size: .76rem; margin-top: 12px; padding-top: 10px; }
+    /* 右寄せを解くと2つの群が地続きに見えるので、行を分けて区別を保つ */
+    .hero-meta > .grp-right { margin-left: 0; flex-basis: 100%; }
+    .topbar .hero-meta { padding: 9px 18px; }
+    /* 狭い画面ではメニューが2段になるぶん、飛び先の余白も広げる */
+    [id] { scroll-margin-top: 88px; }
+    /* 装飾は本文の可読性より優先しない。狭い画面では消す */
+    .hero-art { display: none; }
+    .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
+    .toc {
+      position: static; max-height: none; overflow: visible;
+      border-right: none; border: 1px solid var(--line);
+      border-radius: 8px; padding: 16px 18px; background: var(--code-bg);
+    }
+    .toc ol ol { display: none; }
+    h2 { margin-top: 44px; }
+    /* 4枚を横並びにすると1枚が狭くなりすぎるので2列に折る */
+    .promise { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 520px) {
+    .promise { grid-template-columns: 1fr; }
+  }
+</style>
+<style>
+  /* 設定エディターだけで使う部品 */
+  textarea {
+    width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .84rem; line-height: 1.6; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); color: var(--ink);
+  }
+  .row { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row-2 input { flex: 1 1 200px; }
+  .row input {
+    flex: 1 1 320px; min-width: 0; padding: 9px 12px; font-size: .9rem;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+  }
+  .row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row-warn, .row-hint { flex-basis: 100%; margin: 0; font-size: .8rem; }
+  .row-warn { color: var(--stop-line); }
+  .row-hint { color: var(--sub); }
+  .btn {
+    display: inline-block; padding: 8px 16px; font-size: .86rem; font-weight: 700;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+    cursor: pointer; text-decoration: none; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-main { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-main:hover { background: #00458a; color: #fff; }
+  .del { padding: 7px 12px; font-size: .8rem; border: 1px solid var(--line); border-radius: 8px;
+         background: #fff; color: var(--sub); cursor: pointer; font-family: inherit; }
+  .del:hover { border-color: var(--stop-line); color: var(--stop-line); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 26px; }
+  .msg { font-size: .82rem; }
+  .msg-ok { color: var(--ok-line); }
+  .msg-ng { color: var(--stop-line); }
+  .check { display: flex; align-items: center; gap: 10px; font-size: .94rem; }
+  .hint { margin: 6px 0 0; font-size: .82rem; color: var(--sub); }
+  .c-sub { color: var(--sub); font-size: .84rem; }
+  #out { display: block; white-space: pre; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-art"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><circle cx="41" cy="39" r="13" fill="none" stroke="#fff" stroke-width="6"/><path d="M50 48L59 57" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg></div>
+  <div class="hero-inner">
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>設定エディター</h1>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="topbar" aria-label="ページ切り替え">
+    <p class="hero-meta">
+      <span class="grp">
+        <a href="index.html">空き部屋一覧</a>
+        <span class="sep">│</span>
+        <span class="current" aria-current="page">設定エディター</span>
+        <span class="sep">│</span>
+        <a href="guide.html">使い方ガイド</a>
+        <span class="sep">│</span>
+        <a href="setup.html">セットアップ手順書</a>
+        <span class="sep">│</span>
+        <a href="architecture.html">仕組みの技術資料</a>
+      </span>
+      <span class="grp grp-right">
+        <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+      </span>
+    </p>
+</nav>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="目次">
+  <p class="toc-ttl">目次</p>
+  <ol>
+    <li><a href="#c1">いまの設定を読み込む</a></li>
+    <li><a href="#c2">監視するページ</a></li>
+    <li><a href="#c3">通知する条件</a></li>
+    <li><a href="#c4">一覧で目立たせる物件</a></li>
+    <li><a href="#c5">すべての新着を通知する</a></li>
+    <li><a href="#c6">書き出して貼り付ける</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<p class="lead">
+<code>config.json</code> を画面から作るための道具です。書き上がったものをコピーして、
+GitHub の編集画面に貼れば設定が変わります。<strong>ここでは保存できません</strong>
+（GitHub Pages は静的なページを配るだけで、書き込みを受け付ける先がないため）。
+</p>
+
+<div class="note">
+<p><strong>安全装置にあたる項目は、この画面には出していません。</strong>
+<code>zero_streak_limit</code> や <code>monitoring_hours</code> は実行間隔と対で決まっていて、
+単独で動かすと誤通知や誤警告の原因になります。読み込んだ値をそのまま持ち越します。
+変える必要があるときは<a href="architecture.html">技術資料</a>を読んでから直接編集してください。</p>
+</div>
+
+<h2 id="c1">1. いまの設定を読み込む</h2>
+
+<p>
+自分のリポジトリの <code>config.json</code> を開いて、中身をすべて貼り付けてください。
+<strong>初めての方は「ゼロから作る」を押せば、空の状態から始められます。</strong>
+</p>
+
+<textarea id="src" rows="6" placeholder='ここに config.json の中身を貼り付け'></textarea>
+<p class="btn-row">
+  <button type="button" id="load" class="btn btn-main">読み込む</button>
+  <button type="button" id="scratch" class="btn">ゼロから作る</button>
+  <span id="load-msg" class="msg"></span>
+</p>
+
+<div id="editor" hidden>
+
+<h2 id="c2">2. 監視するページ</h2>
+
+<p>
+UR のサイトで条件を絞り込んだ<strong>検索結果ページ</strong>の URL を入れます。
+ここに出てくる部屋だけが監視の対象になります。
+</p>
+
+<div id="urls"></div>
+<p class="btn-row"><button type="button" class="btn" data-add="url">＋ URL を追加</button></p>
+
+<h2 id="c3">3. 通知する条件</h2>
+
+<p>
+ここに合う部屋が<strong>新しく出たときだけ</strong> Slack に通知します。
+建物名は<strong>部分一致</strong>、空欄は「その条件は問わない」の意味です。
+</p>
+
+<div id="watch"></div>
+<p class="btn-row"><button type="button" class="btn" data-add="watch">＋ 条件を追加</button></p>
+
+<div class="ok" id="preview"></div>
+
+<h2 id="c4">4. 一覧で目立たせる物件</h2>
+
+<p>
+空き部屋一覧のページで<strong>赤枠</strong>にする建物名です。通知の条件とは別で、見た目だけに効きます。
+</p>
+
+<div id="hl"></div>
+<p class="btn-row"><button type="button" class="btn" data-add="hl">＋ 追加</button></p>
+
+<h2 id="c5">5. すべての新着を通知する</h2>
+
+<label class="check">
+  <input type="checkbox" id="all"> 条件に関係なく、すべての新着を通知する
+</label>
+<p class="hint">既定はオフです。オンにすると監視URLに出る<strong>すべての</strong>新着が飛ぶため、通知の数が一気に増えます。</p>
+
+<h2 id="c6">6. 書き出して貼り付ける</h2>
+
+<pre><code id="out"></code></pre>
+<p class="btn-row">
+  <button type="button" id="copy" class="btn btn-main">コピーする</button>
+  <a class="btn" id="ghedit" href="#" target="_blank" rel="noopener">GitHub の編集画面を開く</a>
+  <span id="copy-msg" class="msg"></span>
+</p>
+
+<div class="warn">
+<p><strong>貼り付けるときは、中身をすべて選んで置き換えてください。</strong>
+一部だけ書き換えると JSON が壊れ、次の実行で読み込めなくなります。</p>
+</div>
+
+</div>
+
+<footer>
+<div class="author">
+  <span class="author-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+  <div>
+    <p class="author-by">Created by</p>
+    <p class="author-name"><a href="https://github.com/tama-create">たましもん</a></p>
+  </div>
+  <div class="author-updated">
+    <p class="lbl">Last updated</p>
+    <p class="val"><time datetime="2026-08-28">2026年8月28日</time></p>
+  </div>
+</div>
+<p>
+入れ方は<a href="setup.html">セットアップ手順書</a>、各項目の意味は
+<a href="https://github.com/tama-create/ur-monitor#readme" target="_blank" rel="noopener">README</a>、
+安全装置の考え方は<a href="architecture.html">技術資料</a>にあります。
+</p>
+<p>
+リポジトリ: <a href="https://github.com/tama-create/ur-monitor">github.com/tama-create/ur-monitor</a>
+</p>
+</footer>
+</main>
+
+<datalist id="bl"></datalist>
+<datalist id="ml">
+  <option value="1K"><option value="1DK"><option value="1LDK">
+  <option value="2K"><option value="2DK"><option value="2LDK">
+  <option value="3K"><option value="3DK"><option value="3LDK"><option value="4DK">
+</datalist>
+
+</div>
+<script>
+(function () {
+  'use strict';
+
+  // 触らせない項目の既定値。読み込んだ設定にあればそちらを優先し、
+  // 無ければこれを使う。画面には出さず、書き出しにだけ現れる。
+  var KEEP_DEFAULT = {
+    jitter_max_seconds: 40,
+    zero_streak_limit: 18,
+    shrink_guard_ratio: 0.7,
+    stale_warning_hours: 3,
+    monitoring_hours: [8, 21]
+  };
+  var KEEP_KEYS = ['jitter_max_seconds','zero_streak_limit','shrink_guard_ratio',
+                   'stale_warning_hours','monitoring_hours','selectors'];
+
+  // robots.txt が拒否しているパターン。踏むと黙って飛ばされるので先に知らせる
+  var DISALLOW = ['?skcs=', '?line=', '?station=', '?station_nm='];
+
+  var state = { search_urls: [], watch: [], highlight_keywords: [], notify_all_new: false, keep: {} };
+  var rooms = [];      // 一覧ページから読んだ実データ
+  var buildings = [];  // その建物名（重複なし）
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); };
+
+  // ── 一覧ページから建物名を読む ───────────────────────────
+  fetch('index.html').then(function (r) { return r.text(); }).then(function (html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var el = doc.getElementById('ur-rooms');
+    if (!el) return;
+    rooms = JSON.parse(el.textContent);
+    buildings = rooms.map(function (r) { return r.building; })
+                     .filter(function (v, i, a) { return v && a.indexOf(v) === i; })
+                     .sort();
+    render();
+  }).catch(function () { /* 取れなくても手入力で使える */ });
+
+  // ── 行の描画 ─────────────────────────────────────────
+  function rowUrl(v, i) {
+    var warn = '';
+    if (v) {
+      if (v.indexOf('https://www.ur-net.go.jp/') !== 0) {
+        warn = '<p class="row-warn">UR のページではないようです</p>';
+      } else if (/_room\.html/.test(v)) {
+        warn = '<p class="row-warn">これは<strong>1部屋のページ</strong>です。検索結果のページを入れてください</p>';
+      } else {
+        for (var d = 0; d < DISALLOW.length; d++) {
+          if (v.indexOf(DISALLOW[d]) >= 0) {
+            warn = '<p class="row-warn">この形式の URL は UR の robots.txt が拒否しています。' +
+                   '<strong>設定しても飛ばされます</strong></p>';
+            break;
+          }
+        }
+      }
+    }
+    return '<div class="row"><input type="url" data-k="search_urls" data-i="' + i +
+           '" value="' + esc(v) + '" placeholder="https://www.ur-net.go.jp/chintai/...">' +
+           '<button type="button" class="del" data-del="search_urls" data-i="' + i + '">削除</button>' +
+           warn + '</div>';
+  }
+
+  function rowWatch(w, i) {
+    var warn = '';
+    if (w.building && buildings.length && buildings.indexOf(w.building) < 0) {
+      var near = buildings.filter(function (b) {
+        return b.replace(/[ 　]/g, '') === w.building.replace(/[ 　]/g, '');
+      });
+      warn = near.length
+        ? '<p class="row-warn">空白の種類が違うようです。正しくは <strong>' + esc(near[0]) +
+          '</strong>（全角スペース）</p>'
+        : '<p class="row-hint">いまの一覧にこの建物はありません。まだ空きが無いだけなら問題ありません</p>';
+    }
+    return '<div class="row row-2"><input list="bl" data-k="watch" data-f="building" data-i="' + i +
+           '" value="' + esc(w.building || '') + '" placeholder="建物名（空欄なら問わない）">' +
+           '<input list="ml" data-k="watch" data-f="madori" data-i="' + i +
+           '" value="' + esc(w.madori || '') + '" placeholder="間取り（空欄なら問わない）">' +
+           '<button type="button" class="del" data-del="watch" data-i="' + i + '">削除</button>' +
+           warn + '</div>';
+  }
+
+  function rowHl(v, i) {
+    return '<div class="row"><input list="bl" data-k="highlight_keywords" data-i="' + i +
+           '" value="' + esc(v) + '" placeholder="建物名">' +
+           '<button type="button" class="del" data-del="highlight_keywords" data-i="' + i + '">削除</button></div>';
+  }
+
+  // ── いまの条件で何件当たるか ─────────────────────────────
+  function preview() {
+    var box = $('preview');
+    if (!rooms.length) {
+      box.innerHTML = '<p>一覧のデータを読めなかったため、該当件数は出せません。' +
+                      '<strong>このページは自分のサイト上で開くと、いまの空き部屋で判定できます。</strong></p>';
+      return;
+    }
+    var real = state.watch.filter(function (w) { return w.building || w.madori; });
+    if (!real.length) {
+      box.innerHTML = '<p>条件を1つ以上入れると、<strong>いまの空き部屋のうち何件が当たるか</strong>をここに出します。</p>';
+      return;
+    }
+    var hit = rooms.filter(function (r) {
+      return real.some(function (w) {
+        return (!w.building || r.name.indexOf(w.building) >= 0) &&
+               (!w.madori   || r.plan.indexOf(w.madori)   >= 0);
+      });
+    });
+    var h = '<p>いまの空き部屋 <strong>' + rooms.length + ' 件</strong>のうち、' +
+            '<strong>' + hit.length + ' 件</strong>が条件に当たります。</p>';
+    if (hit.length) {
+      h += '<ul>' + hit.slice(0, 8).map(function (r) {
+        return '<li>' + esc(r.name) + '　<span class="c-sub">' + esc(r.plan) + '／' + esc(r.price) + '</span></li>';
+      }).join('') + '</ul>';
+      if (hit.length > 8) { h += '<p class="c-sub">ほか ' + (hit.length - 8) + ' 件</p>'; }
+    } else {
+      h += '<p><strong>0 件です。</strong>条件が厳しすぎるか、建物名の書き方が違うかもしれません。' +
+           'いま空きが無いだけの可能性もあります。</p>';
+    }
+    box.innerHTML = h;
+  }
+
+  function render() {
+    $('urls').innerHTML  = state.search_urls.map(rowUrl).join('') ||
+      '<p class="c-sub">まだありません。下のボタンで追加してください。</p>';
+    $('watch').innerHTML = state.watch.map(rowWatch).join('') ||
+      '<p class="c-sub">まだありません。条件を入れないと通知は飛びません。</p>';
+    $('hl').innerHTML    = state.highlight_keywords.map(rowHl).join('') ||
+      '<p class="c-sub">まだありません（無くても動きます）。</p>';
+    $('all').checked = !!state.notify_all_new;
+    $('bl').innerHTML = buildings.map(function (b) { return '<option value="' + esc(b) + '">'; }).join('');
+    preview();
+    output();
+  }
+
+  // ── 書き出し ────────────────────────────────────────
+  function output() {
+    // キーの順は既存の config.json に合わせる。差分を読みやすくするため
+    var o = {};
+    o.search_urls    = state.search_urls.filter(Boolean);
+    o.notify_all_new = !!state.notify_all_new;
+    o.watch          = state.watch.filter(function (w) { return w.building || w.madori; })
+                        .map(function (w) { return { building: w.building || '', madori: w.madori || '' }; });
+    KEEP_KEYS.forEach(function (k) {
+      if (k === 'selectors') return;
+      o[k] = (k in state.keep) ? state.keep[k] : KEEP_DEFAULT[k];
+    });
+    o.highlight_keywords = state.highlight_keywords.filter(Boolean);
+    if (state.keep.selectors) { o.selectors = state.keep.selectors; }
+    $('out').textContent = JSON.stringify(o, null, 2);
+  }
+
+  // ── 入力の受け取り ───────────────────────────────────
+  document.addEventListener('input', function (e) {
+    var t = e.target, k = t.getAttribute('data-k');
+    if (!k) return;
+    var i = +t.getAttribute('data-i');
+    if (k === 'watch') { state.watch[i][t.getAttribute('data-f')] = t.value; }
+    else { state[k][i] = t.value; }
+    preview(); output();
+  });
+
+  document.addEventListener('click', function (e) {
+    var add = e.target.getAttribute && e.target.getAttribute('data-add');
+    if (add) {
+      if (add === 'url')   { state.search_urls.push(''); }
+      if (add === 'watch') { state.watch.push({ building: '', madori: '' }); }
+      if (add === 'hl')    { state.highlight_keywords.push(''); }
+      render();
+      return;
+    }
+    var del = e.target.getAttribute && e.target.getAttribute('data-del');
+    if (del) { state[del].splice(+e.target.getAttribute('data-i'), 1); render(); }
+  });
+
+  $('all').addEventListener('change', function () { state.notify_all_new = this.checked; output(); });
+
+  // 入力の途中で消えると困るので、行の追加・削除のたびに描き直しても値は state に残す
+  $('load').addEventListener('click', function () {
+    var msg = $('load-msg');
+    var raw = $('src').value.trim();
+    if (!raw) { msg.className = 'msg msg-ng'; msg.textContent = '中身が空です'; return; }
+    var d;
+    try { d = JSON.parse(raw); }
+    catch (err) { msg.className = 'msg msg-ng'; msg.textContent = 'JSON として読めません: ' + err.message; return; }
+    state.search_urls        = Array.isArray(d.search_urls) ? d.search_urls.slice() : [];
+    state.watch              = Array.isArray(d.watch) ? d.watch.map(function (w) {
+                                 return { building: w.building || '', madori: w.madori || '' }; }) : [];
+    state.highlight_keywords = Array.isArray(d.highlight_keywords) ? d.highlight_keywords.slice() : [];
+    state.notify_all_new     = !!d.notify_all_new;
+    state.keep = {};
+    KEEP_KEYS.forEach(function (k) { if (k in d) { state.keep[k] = d[k]; } });
+    msg.className = 'msg msg-ok';
+    msg.textContent = '読み込みました（触らない項目は ' + Object.keys(state.keep).length + ' 件そのまま持ち越します）';
+    $('editor').hidden = false;
+    render();
+  });
+
+  $('scratch').addEventListener('click', function () {
+    state = { search_urls: [''], watch: [{ building: '', madori: '' }],
+              highlight_keywords: [], notify_all_new: false, keep: {} };
+    var msg = $('load-msg');
+    msg.className = 'msg msg-ok';
+    msg.textContent = 'ゼロから作ります（selectors は書き出されないので、既存の設定に足してください）';
+    $('editor').hidden = false;
+    render();
+  });
+
+  $('copy').addEventListener('click', function () {
+    var msg = $('copy-msg');
+    navigator.clipboard.writeText($('out').textContent).then(function () {
+      msg.className = 'msg msg-ok'; msg.textContent = 'コピーしました';
+    }).catch(function () {
+      msg.className = 'msg msg-ng'; msg.textContent = 'コピーできませんでした。手で選んでください';
+    });
+  });
+
+  // 自分のリポジトリの編集画面へ。<ユーザー名>.github.io/<リポジトリ名>/ から組み立てる
+  (function () {
+    var m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    var repo = location.pathname.split('/').filter(Boolean)[0];
+    var a = $('ghedit');
+    if (m && repo) { a.href = 'https://github.com/' + m[1] + '/' + repo + '/edit/main/config.json'; }
+    else { a.href = 'https://github.com/tama-create/ur-monitor/edit/main/config.json'; }
+  })();
+})();
+</script>
+
+</body>
+</html>
