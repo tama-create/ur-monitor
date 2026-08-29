@@ -79,8 +79,9 @@
     background: rgba(255,255,255,.16);
     padding: 2px 10px; border-radius: 999px;
   }
-  /* 並びは「本体 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
-     いちばん見たい空き部屋一覧を置く。右へ寄せるのはサイトの外へ出る先だけ。
+  /* 並びは「使い方 → 入れ方 → 中身 → ソース」の順。空き部屋一覧はここに置かない。
+     Basic 認証の内側へ移したうえ、URL が人それぞれになるため、公開資料からは案内できない。
+     右へ寄せるのはサイトの外へ出る先だけ。
      狭い画面では折り返すため右寄せを解除する。 */
   .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
   .hero-meta > .grp-right { margin-left: auto; }
@@ -314,8 +315,6 @@
 <nav class="topbar" aria-label="ページ切り替え">
     <p class="hero-meta">
       <span class="grp">
-        <a href="index.html">空き部屋一覧</a>
-        <span class="sep">│</span>
         <a href="guide.html">使い方ガイド</a>
         <span class="sep">│</span>
         <span class="current" aria-current="page">セットアップ手順書</span>
@@ -398,11 +397,13 @@
         <li><a href="#s8b-5">動いているか確かめる</a></li>
       </ol>
     </li>
-    <li><a href="#s10">空き部屋一覧を Web で見る <span class="opt">（任意）</span></a>
+    <li><a href="#s10">空き部屋一覧を自分だけ見られるようにする <span class="opt">（任意）</span></a>
       <ol>
-        <li><a href="#s10-0">実際にできるページ（見本）</a></li>
-        <li><a href="#s10-1">GitHub Pages を有効にする</a></li>
-        <li><a href="#s10-2">反映のタイミング</a></li>
+        <li><a href="#s10-1">保管庫（KV）を作る</a></li>
+        <li><a href="#s10-2">合言葉を3つ決めて Worker に預ける</a></li>
+        <li><a href="#s10-3">Worker を保存し直す</a></li>
+        <li><a href="#s10-4">GitHub 側に2つ登録する</a></li>
+        <li><a href="#s10-5">いまの状態を保管庫へ移す（1回だけ）</a></li>
       </ol>
     </li>
     <li><a href="#s11">うまくいかないとき</a>
@@ -636,7 +637,7 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
   <text x="267" y="362" class="tn">第 10 章</text>
   <text x="267" y="384" class="t1">Web に公開</text>
   <path d="M267,262 V336" fill="none" stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
-  <text x="590" y="376" class="t2">GitHub Pages で、空き部屋一覧をスマホからも見られるようにする</text>
+  <text x="590" y="376" class="t2">Cloudflare に置いて、空き部屋一覧を自分だけ見られるようにする</text>
 </svg>
 </figure>
 
@@ -671,9 +672,10 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
 
 <table>
   <tr><th>項目</th><th>公開（Public）</th><th>非公開（Private）</th></tr>
-  <tr><td>自動実行の費用</td><td>無制限に無料</td><td>月2,000分まで無料（この設定なら月およそ1,200分）</td></tr>
-  <tr><td>空き部屋一覧の Web 公開</td><td>できる</td><td><strong>できない</strong>（GitHub Free の場合）</td></tr>
-  <tr><td>設定と結果が他人に見えるか</td><td>見える</td><td>見えない</td></tr>
+  <tr><td>自動実行の費用</td><td>無制限に無料</td><td>月2,000分まで無料。<strong>この設定（5分おき）だと月およそ5,000分</strong>で超過します</td></tr>
+  <tr><td>空き部屋一覧を自分だけ見る</td><td colspan="2">どちらでもできる（Cloudflare に置くため）</td></tr>
+  <tr><td>資料ページの公開</td><td>できる</td><td><strong>できない</strong>（GitHub Free の場合）</td></tr>
+  <tr><td>設定（監視URLと通知条件）が他人に見えるか</td><td>見える</td><td>見えない</td></tr>
   <tr><td>Slack 通知</td><td colspan="2">どちらでも同じように届く</td></tr>
 </table>
 
@@ -1172,82 +1174,129 @@ GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完�
 以降は 8:00〜21:00 の間、5分おきに自動で動き続けます。もう何もしなくて構いません。</p>
 </div>
 
-<h2 id="s10">空き部屋一覧を Web で見る <span class="step-time">（任意・3分）</span></h2>
+<h2 id="s10">空き部屋一覧を自分だけ見られるようにする <span class="step-time">（任意・15分）</span></h2>
 
 <p>
-空き部屋の一覧を、スマホからも見られる Web ページとして公開できます。
+空き部屋の一覧を、スマホからも見られる Web ページとして持てます。
 <strong>この章はやらなくても Slack 通知は動きます。</strong>不要なら飛ばしてください。
 </p>
 
-<h3 id="s10-0">実際にできるページ（見本）</h3>
-
-<p>
-作者が実際に運用しているページです。<strong>開いてみると、この章で作るものが分かります。</strong>
-</p>
-
-<div class="ok">
-<p><a href="https://tama-create.github.io/ur-monitor/" target="_blank" rel="noopener"><strong>https://tama-create.github.io/ur-monitor/</strong></a></p>
-<p>見どころは次のとおりです。</p>
-<ul>
-  <li>上に<strong>空き部屋・新着・候補の件数</strong>が並びます。開いてまず見るところです</li>
-  <li>その下に<strong>最終更新の時刻</strong>。いつ時点の情報かがひと目で分かります</li>
-  <li><strong>グループごとに区切られて</strong>、それぞれ何件空いているかが出ます</li>
-  <li><strong>黄色いカードに NEW</strong> が付いているのが、前回の確認から新しく出てきた部屋です</li>
-  <li><strong>赤枠のカード</strong>が、通知の条件に合った部屋（＝狙っている物件）です</li>
-  <li><strong>カードを押すと</strong>、UR の物件ページへ直接飛べます。スマホでは1列に折り返します</li>
-</ul>
+<div class="warn">
+<p><strong>この一覧は、誰でも見られる場所には置きません。</strong></p>
+<p>UR は「このサイトについて」で、私的使用と引用を除く転載を認めていません。しかも
+<strong>「ウェブページに貼り付けることは、運営者が個人であっても私的使用にはならない」</strong>
+と明示しています。物件名や家賃を公開ページに並べるのは、この線をまたぎます。</p>
+<p>そのため一覧は Cloudflare に置き、<strong>ID とパスワードを知っている人だけ</strong>が
+見られるようにします。以前は GitHub Pages で公開していましたが、いまはやめています。</p>
 </div>
 
-<div class="note">
-<p>このページは<strong>実際に動いているもの</strong>なので、開くタイミングによって件数も中身も変わります。
-「0 件」と表示されていても壊れているわけではありません。</p>
-</div>
+<figure class="fig">
+<svg viewBox="0 0 840 210" role="img" aria-label="監視ジョブが一覧をCloudflareの保管庫へ置き、閲覧はパスワードを通った人だけに返す流れ">
+  <defs>
+    <marker id="km1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+  <rect x="15" y="30" width="200" height="70" rx="10" fill="#f6f8fa" stroke="#8c959f" stroke-width="2"/>
+  <text x="115" y="60" text-anchor="middle" font-size="14" font-weight="700" fill="#24292f">GitHub Actions</text>
+  <text x="115" y="82" text-anchor="middle" font-size="13" fill="#57606a">一覧を作る</text>
 
-<div class="ok">
-<p><strong>外部サービスもトークンも要りません。</strong>
-GitHub の設定を1つ切り替えるだけです。</p>
-</div>
+  <line x1="215" y1="65" x2="300" y2="65" stroke="#8c959f" stroke-width="2" marker-end="url(#km1)"/>
 
-<h3 id="s10-1">GitHub Pages を有効にする</h3>
+  <rect x="305" y="30" width="215" height="70" rx="10" fill="#fff4e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="412" y="60" text-anchor="middle" font-size="14" font-weight="700" fill="#24292f">Cloudflare の保管庫</text>
+  <text x="412" y="82" text-anchor="middle" font-size="13" fill="#57606a">KV に置いておく</text>
+
+  <line x1="520" y1="65" x2="605" y2="65" stroke="#8c959f" stroke-width="2" marker-end="url(#km1)"/>
+
+  <rect x="610" y="30" width="215" height="70" rx="10" fill="#ddf4e4" stroke="#2da44e" stroke-width="2"/>
+  <text x="717" y="60" text-anchor="middle" font-size="14" font-weight="700" fill="#1a7f37">あなたのブラウザ</text>
+  <text x="717" y="82" text-anchor="middle" font-size="13" fill="#57606a">ID とパスワードで開く</text>
+
+  <rect x="15" y="130" width="810" height="60" rx="10" fill="#f6f8fa" stroke="#d0d7de" stroke-width="2"/>
+  <text x="35" y="157" style="text-anchor:start" font-size="14" font-weight="700" fill="#24292f">リポジトリには何も残りません</text>
+  <text x="35" y="179" style="text-anchor:start" font-size="13" fill="#57606a">物件名も家賃も GitHub には置かないので、公開リポジトリから読まれることがありません</text>
+</svg>
+<figcaption>作るのは Actions、置くのは Cloudflare、開けるのは自分だけ</figcaption>
+</figure>
+
+<h3 id="s10-1">保管庫（KV）を作る</h3>
 
 <ol>
-  <li>自分のリポジトリで <strong>Settings</strong> タブを開く</li>
-  <li>左メニューの <strong>Pages</strong> をクリック</li>
-  <li><strong>Build and deployment</strong> を次のように設定して <strong>Save</strong></li>
+  <li>Cloudflare の画面で <strong>Storage &amp; Databases</strong> → <strong>KV</strong> を開く</li>
+  <li><strong>Create a namespace</strong> を押し、名前を <code>ur-monitor</code> にして作成</li>
+  <li>第9章で作った Worker を開き、<strong>Settings</strong> → <strong>Bindings</strong> を開く</li>
+  <li><strong>KV Namespace</strong> を追加し、次のように設定して保存</li>
 </ol>
 
 <table>
   <tr><th>項目</th><th>値</th></tr>
-  <tr><td>Source</td><td>Deploy from a branch</td></tr>
-  <tr><td>Branch</td><td><code>main</code></td></tr>
-  <tr><td>Folder</td><td><code>/docs</code></td></tr>
+  <tr><td>Variable name</td><td><code>STORE</code></td></tr>
+  <tr><td>KV namespace</td><td>いま作った <code>ur-monitor</code></td></tr>
 </table>
 
-<p>公開 URL はこうなります。</p>
+<div class="warn">
+<p><strong>Variable name は <code>STORE</code> ちょうどにしてください。</strong>
+Worker のコードがこの名前で保管庫を探します。違う名前だと「KV が結び付いていません」と表示されます。</p>
+</div>
 
-<pre><code>https://&lt;あなたのユーザー名&gt;.github.io/ur-monitor/</code></pre>
+<h3 id="s10-2">合言葉を3つ決めて Worker に預ける</h3>
+
+<p>Worker の <strong>Settings</strong> → <strong>Variables and Secrets</strong> で、次の3つを追加します。</p>
+
+<table>
+  <tr><th>名前</th><th>中身</th></tr>
+  <tr><td><code>VIEW_USER</code></td><td>一覧を開くときの ID。好きな英数字（例：<code>me</code>）</td></tr>
+  <tr><td><code>VIEW_PASSWORD</code></td><td>一覧を開くときのパスワード。<strong>英数字で20文字以上</strong>を推奨</td></tr>
+  <tr><td><code>API_TOKEN</code></td><td>監視ジョブが書き込むときの合言葉。<strong>英数字で40文字以上</strong>を推奨</td></tr>
+</table>
 
 <div class="warn">
-<p><strong>GitHub Free ではこの機能は公開リポジトリでのみ使えます。</strong>
-フォークしたリポジトリを private にしている場合は使えません。</p>
+<p><strong>必ず種別を Secret にしてください。</strong>Text を選ぶと、画面を開いた人に中身が見えてしまいます。
+第9章のトークンと同じ注意です。</p>
+<p><strong>パスワードは英数字にしてください。</strong>日本語や記号を混ぜると、ブラウザによって
+文字コードの扱いが変わり、正しく入力しても弾かれることがあります。</p>
 </div>
 
-<h3 id="s10-2">反映のタイミング</h3>
+<h3 id="s10-3">Worker を保存し直す</h3>
 
 <p>
-監視が動いて一覧が更新されると、その内容がリポジトリにコミットされ、
-<strong>自動で Web ページに反映されます</strong>。ビルドは30秒ほどで終わります。
+第9章で貼った <code>worker.js</code> には、一覧を預かって見せる部分が入っています。
+すでに最新のコードを貼っていれば、そのまま <strong>Deploy</strong> を押すだけです。
+古いコードのままなら、<a href="https://github.com/tama-create/ur-monitor/blob/main/trigger/worker.js">worker.js</a>
+をもう一度コピーして貼り直してください。
 </p>
 
-<p>
-つまり<strong>やることは最初の設定1回だけ</strong>で、あとは何もしなくても最新に保たれます。
-</p>
+<p>Worker の URL（第9章で確認したもの）をブラウザで開くと、<strong>ID とパスワードの入力欄</strong>が出れば成功です。</p>
 
-<div class="note">
-<p>ページには <code>noindex</code> を入れてあるので検索エンジンには載りません。
-ただし<strong>URL を知っている人は誰でも見られます。</strong>
-狙っている物件を人に知られたくない場合は、この章を飛ばして Slack 通知だけを使ってください。</p>
+<h3 id="s10-4">GitHub 側に2つ登録する</h3>
+
+<p>監視ジョブが保管庫へ書き込めるように、リポジトリの <strong>Settings</strong> →
+<strong>Secrets and variables</strong> → <strong>Actions</strong> で2つ追加します。</p>
+
+<table>
+  <tr><th>名前</th><th>中身</th></tr>
+  <tr><td><code>STORE_URL</code></td><td>Worker の URL（末尾の <code>/</code> は付けない）</td></tr>
+  <tr><td><code>STORE_TOKEN</code></td><td>さきほどの <code>API_TOKEN</code> と<strong>同じ文字列</strong></td></tr>
+</table>
+
+<h3 id="s10-5">いまの状態を保管庫へ移す（1回だけ）</h3>
+
+<div class="warn">
+<p><strong>この手順を飛ばすと、いま出ている部屋がすべて「新着」として通知されます。</strong>
+保管庫が空だと「前回は0件だった」ことになるためです。</p>
+<p>（安全のため、監視スクリプトは保管庫が空のときは通知せずに止まるようにしてあります。
+下の手順を踏むまで動きません。）</p>
 </div>
+
+<ol>
+  <li>リポジトリの <strong>Actions</strong> タブ → <strong>UR賃貸監視</strong> を開く</li>
+  <li><strong>Run workflow</strong> を押す</li>
+  <li><strong>保管先へ state.json を移す</strong> にチェックを入れて実行</li>
+  <li>緑のチェックが付いたら完了。以降は自動で動きます</li>
+</ol>
+
+<p>Worker の URL を開いて、一覧が出れば成功です。<strong>スマホのホーム画面に追加しておくと便利です。</strong></p>
 
 <h2 id="s11">うまくいかないとき</h2>
 

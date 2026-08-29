@@ -23,3 +23,21 @@ compatibility_date = "2026-08-28"
 # あれは時間ではなく回数なので、間隔を詰めると我慢できる時間が同じ割合で縮む。
 [triggers]
 crons = ["*/5 0-12,23 * * *"]
+
+# 空き部屋一覧と state の保管庫。Cloudflare の画面で KV を作り、この名前で結び付ける。
+# 一覧を GitHub にコミットしないのは、公開リポジトリに UR のデータを残さないため
+# （UR は私的使用と引用を除く転載を認めておらず、ウェブページへの掲載は個人でも
+# 私的使用にあたらないと明示している）。閲覧は worker.js の Basic 認証の内側。
+#
+# ダッシュボードから貼って使う場合、この行は効かない。画面の
+# Settings → Bindings で Variable name を STORE にして手で結び付けること。
+[[kv_namespaces]]
+binding = "STORE"
+id = "ここに KV の ID を入れる"
+
+# Secret（wrangler では設定しない。画面の Settings → Variables and Secrets で
+# **必ず Secret 種別で**入れる。Text にすると画面を開いた人に中身が見える）
+#   GITHUB_TOKEN   … workflow_dispatch を叩くためのトークン
+#   API_TOKEN      … 監視ジョブが一覧と state を書き込むときの合言葉
+#   VIEW_USER      … 一覧を開くときの ID
+#   VIEW_PASSWORD  … 一覧を開くときのパスワード（英数字にすること）

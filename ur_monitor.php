@@ -6,8 +6,9 @@
  * OS 固有の処理は置かず、Chrome の場所だけ detect_chrome_path() で吸収している。
  *
  * 使い方:
- *   php ur_monitor.php              # 通常監視実行（結果を docs/index.html に出力）
- *   php ur_monitor.php --dry-run    # 開発用。Slack 送信と state.json / docs/index.html 更新をしない
+ *   php ur_monitor.php              # 通常監視実行（結果は保管先の Worker へ出力）
+ *   php ur_monitor.php --dry-run    # 開発用。Slack 送信と state / 一覧の更新をしない
+ *   php ur_monitor.php --seed-state # 保管先を用意した直後に1回だけ。state.json を移す
  *   php ur_monitor.php --setup      # セレクター確認用（ブラウザ表示 + スクリーンショット保存）
  *   php ur_monitor.php --check-robots  # robots.txt 確認のみ
  */
@@ -57,16 +58,82 @@ function load_config(): array
     return $config;
 }
 
+// ──────────────────────────────────────────
+// 実行結果の保管先
+// ──────────────────────────────────────────
+//
+// state と一覧 HTML は Cloudflare Worker の KV に置く。**リポジトリに戻さない。**
+// 公開リポジトリにコミットすると、UR から取った物件名・家賃・間取りが誰にでも
+// 読める状態になる。UR は「このサイトについて」で私的使用と引用を除く転載を認めて
+// おらず、しかも「ウェブページに貼り付けることは、運営者が個人であっても私的使用に
+// はならない」と明示している。ここを GitHub Pages に戻さないこと。
+//
+// STORE_URL / STORE_TOKEN が無ければ従来どおりローカルのファイルを使う。
+// 開発中の --dry-run が秘密情報なしでそのまま動くようにするため。
+function store_conf(): array
+{
+    $url   = (string)(getenv('STORE_URL')   ?: '');
+    $token = (string)(getenv('STORE_TOKEN') ?: '');
+    return ($url !== '' && $token !== '') ? [rtrim($url, '/'), $token] : ['', ''];
+}
+
+// 保管先への1往復。戻り値は [HTTPステータス, 本文]。
+// 通信自体が失敗したらステータスは 0 を返す（呼び出し側が「読めなかった」と扱えるように）。
+function store_request(string $method, string $path, ?string $body = null): array
+{
+    [$base, $token] = store_conf();
+    $headers = "Authorization: Bearer {$token}\r\n";
+    if ($body !== null) {
+        $headers .= "Content-Type: application/json; charset=utf-8\r\n";
+    }
+    $ctx = stream_context_create(['http' => [
+        'method'        => $method,
+        'header'        => $headers,
+        'content'       => $body ?? '',
+        'timeout'       => 15,
+        // 4xx/5xx でも本文を受け取りたい。false のままだと警告だけ出て中身が取れない
+        'ignore_errors' => true,
+    ]]);
+    $res = @file_get_contents($base . $path, false, $ctx);
+    if ($res === false) {
+        return [0, ''];
+    }
+    $status = 0;
+    foreach ($http_response_header ?? [] as $h) {
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) {
+            $status = (int)$m[1];   // リダイレクトがあれば最後のものが残る
+        }
+    }
+    return [$status, $res];
+}
+
 function load_state(): array
 {
-    if (!file_exists(STATE_FILE)) {
-        return ['rooms' => []];  // 初回実行。全部屋が新着として扱われる
-    }
-
-    $raw = file_get_contents(STATE_FILE);
-    if ($raw === false) {
-        log_msg('ERROR', 'state.json を読めませんでした。前回状態が分からないため中止します');
-        exit(1);
+    [$base] = store_conf();
+    if ($base !== '') {
+        [$status, $raw] = store_request('GET', '/state');
+        // 「まだ無い」を初回とみなして続けると、全部屋が新着になってまとめて Slack に飛ぶ。
+        // 保管先を用意した直後は必ずここを通るので、黙って続けず手順を示して止める。
+        if ($status === 404) {
+            log_msg('ERROR', '保管先に state がありません。全部屋を新着として通知して'
+                . 'しまうため中止します。初回は監視ワークフローを seed_state を有効にして'
+                . '手動実行し、いまの state.json を保管先へ移してください');
+            exit(1);
+        }
+        if ($status !== 200) {
+            log_msg('ERROR', "保管先から state を読めませんでした（HTTP {$status}）。"
+                . '前回状態が分からないため中止します');
+            exit(1);
+        }
+    } else {
+        if (!file_exists(STATE_FILE)) {
+            return ['rooms' => []];  // 初回実行。全部屋が新着として扱われる
+        }
+        $raw = file_get_contents(STATE_FILE);
+        if ($raw === false) {
+            log_msg('ERROR', 'state.json を読めませんでした。前回状態が分からないため中止します');
+            exit(1);
+        }
     }
 
     $decoded = json_decode($raw, true);
@@ -84,10 +151,20 @@ function load_state(): array
 
 function save_state(array $state): void
 {
-    $ok = file_put_contents(
-        STATE_FILE,
-        json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    );
+    $json = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    [$base] = store_conf();
+    if ($base !== '') {
+        [$status] = store_request('PUT', '/state', $json);
+        // 書けていないと次回が古い state で動き、消えたはずの部屋がまた新着になる
+        if ($status !== 200) {
+            log_msg('ERROR', "保管先へ state を書けませんでした（HTTP {$status}）");
+            exit(1);
+        }
+        return;
+    }
+
+    $ok = file_put_contents(STATE_FILE, $json);
     // 書けていないと次回の差分計算が狂うため、成功したことにして進まない
     if ($ok === false) {
         log_msg('ERROR', 'state.json の書き込みに失敗しました: ' . STATE_FILE);
@@ -436,12 +513,22 @@ function scrape_url(object $browser, string $url, array $config, bool $headless 
                 let fallbackName = '';
                 if (boxes.length === 0) {
                     boxes = [document];
-                    const h = document.querySelector(S.page_name);
-                    // 見出しは団地名のあとにふりがなが続く。1行目だけが名前。
+                    // 見出しにはふりがな（rt）と所在地（item_sub）が同居している。
+                    // そのまま読むと「けやき通り ぷらざしてぃ… (埼玉県所沢市の賃貸物件)」に
+                    // なるので、名前でないものを落としてから読む。元の DOM は壊さないよう複製する。
+                    const h0 = document.querySelector(S.page_name);
+                    let h = null;
+                    if (h0) {
+                        h = h0.cloneNode(true);
+                        if (S.page_name_ignore) {
+                            h.querySelectorAll(S.page_name_ignore).forEach(el => el.remove());
+                        }
+                    }
+                    // 切り離した要素は innerText が空になることがあるため textContent も見る。
                     // この JS は PHP のヒアドキュメントの中にあり、書いたエスケープ列が
                     // 実際の制御文字に変換されてしまう。だから改行を表す記法は使わず、
                     // 文字コードから組み立てて切っている。ここに正規表現を書かないこと。
-                    const raw = h ? (h.innerText || '').trim() : '';
+                    const raw = h ? ((h.innerText || h.textContent || '').trim()) : '';
                     const nl  = raw.indexOf(String.fromCharCode(10));
                     fallbackName = (nl >= 0 ? raw.slice(0, nl) : raw).trim();
                 }
@@ -640,14 +727,29 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
         : '';
     $newTile = "  <div class=\"tile" . ($newCount > 0 ? ' tile-new' : '') . "\"><p class=\"t-num\">{$newCount}</p><p class=\"t-lbl\">新着</p></div>\n";
 
+    // 資料ページへのリンク。この一覧は GitHub Pages ではなく Worker から配るので、
+    // 相対パスだと Worker 側の存在しない URL を指してしまう。行き先が分かるとき
+    // （config.json の docs_base_url）だけ絶対 URL で出し、無ければリンク自体を出さない。
+    $docsBase = rtrim((string)($config['docs_base_url'] ?? ''), '/');
+    $docNav   = '';
+    if ($docsBase !== '') {
+        $b = htmlspecialchars($docsBase, ENT_QUOTES, 'UTF-8');
+        foreach ([['guide.html', '使い方ガイド'],
+                  ['setup.html', 'セットアップ手順書'],
+                  ['architecture.html', '仕組みの技術資料']] as [$file, $label]) {
+            $docNav .= "      <span class=\"sep\">│</span>\n"
+                     . "      <a href=\"{$b}/{$file}\">{$label}</a>\n";
+        }
+    }
+
     $html = <<<HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- 公開先（GitHub Pages）で検索エンジンに拾われないようにする。
-     狙っている物件が highlight_keywords から読み取れるため。 -->
+<!-- Basic 認証の内側に置くので本来は不要だが、取り違えて公開したときの保険。
+     狙っている物件がグループ名と見出しから読み取れるため。 -->
 <meta name="robots" content="noindex, nofollow">
 <title>UR賃貸 空き部屋一覧</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
@@ -780,13 +882,7 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
   <p class="nav">
     <span class="grp">
       <span class="current" aria-current="page">空き部屋一覧</span>
-      <span class="sep">│</span>
-      <a href="guide.html">使い方ガイド</a>
-      <span class="sep">│</span>
-      <a href="setup.html">セットアップ手順書</a>
-      <span class="sep">│</span>
-      <a href="architecture.html">仕組みの技術資料</a>
-    </span>
+{$docNav}    </span>
     <span class="grp grp-right">
       <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
     </span>
@@ -812,14 +908,27 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
 </html>
 HTML;
 
-    // 出力先は GitHub Pages の公開ディレクトリ。フォーク直後などで無い場合に備えて作る
+    // 本番の出力先は Cloudflare Worker の KV。Basic 認証の内側に置くため、
+    // リポジトリにも GitHub Pages にも UR のデータが残らない。
+    // ここで state だけ進むと、一覧が古いまま次回の差分がゼロになって更新されなくなる。
+    // 呼び出し元は直後に save_state するため、書けなかったら state ごと進めない。
+    [$base] = store_conf();
+    if ($base !== '') {
+        [$status] = store_request('PUT', '/list', $html);
+        if ($status !== 200) {
+            log_msg('ERROR', "保管先へ一覧を書けませんでした（HTTP {$status}）");
+            exit(1);
+        }
+        log_msg('INFO', '一覧を保管先へ出力（' . strlen($html) . ' バイト）');
+        return;
+    }
+
+    // 保管先が未設定のときはローカルに書く。開発中に見た目を確かめるための逃げ道で、
+    // docs/ は Pages の公開ディレクトリなので **この出力をコミットしないこと。**
     $dir = dirname(RESULTS_FILE);
     if (!is_dir($dir)) {
         @mkdir($dir, 0777, true);
     }
-
-    // ここで state だけ進むと、HTML が古いまま次回の差分がゼロになって更新されなくなる。
-    // 呼び出し元は直後に save_state するため、書けなかったら state ごと進めない。
     if (file_put_contents(RESULTS_FILE, $html) === false) {
         log_msg('ERROR', 'HTML の書き込みに失敗しました: ' . RESULTS_FILE);
         exit(1);
@@ -1286,6 +1395,49 @@ function run_monitor(array $config, bool $dryRun = false): void
     ]);
 }
 
+// いまの state.json を保管先へ1回だけ移す（保管先を用意した直後に使う）。
+//
+// これをやらずに本番を回すと、保管先が空のまま「前回の部屋がゼロ」になり、
+// **いま出ている部屋がすべて新着として Slack に飛ぶ。** load_state は 404 で
+// 止まるようにしてあるが、その止まった状態を解くのがこの処理。
+function run_seed_state(): void
+{
+    [$base] = store_conf();
+    if ($base === '') {
+        log_msg('ERROR', 'STORE_URL / STORE_TOKEN が設定されていません');
+        exit(1);
+    }
+    if (!file_exists(STATE_FILE)) {
+        log_msg('ERROR', 'state.json が見つかりません: ' . STATE_FILE);
+        exit(1);
+    }
+    $raw     = (string)file_get_contents(STATE_FILE);
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || !isset($decoded['rooms'])) {
+        log_msg('ERROR', 'state.json を解釈できませんでした。移送を中止します');
+        exit(1);
+    }
+
+    // 二度流し込んで、動いている状態を古い内容で上書きしないようにする
+    [$status] = store_request('GET', '/state');
+    if ($status === 200) {
+        log_msg('ERROR', '保管先にはすでに state があります。上書きしないため中止します');
+        exit(1);
+    }
+    if ($status !== 404) {
+        log_msg('ERROR', "保管先の状態を確認できませんでした（HTTP {$status}）");
+        exit(1);
+    }
+
+    [$put] = store_request('PUT', '/state', $raw);
+    if ($put !== 200) {
+        log_msg('ERROR', "保管先へ書けませんでした（HTTP {$put}）");
+        exit(1);
+    }
+    log_msg('INFO', '保管先へ state を移しました（' . count($decoded['rooms']) . ' 件）。'
+        . 'リポジトリの state.json はもう使われません');
+}
+
 function run_setup(array $config): void
 {
     $searchUrls = array_keys(group_url_map(normalize_groups($config)));
@@ -1322,6 +1474,8 @@ try {
 
     if (in_array('--setup', $args)) {
         run_setup($config);
+    } elseif (in_array('--seed-state', $args)) {
+        run_seed_state();
     } elseif (in_array('--check-robots', $args)) {
         // 1件でも拒否があれば終了コードで分かるようにする（CI や手動確認で拾えるように）
         $urls = array_keys(group_url_map(normalize_groups($config)));

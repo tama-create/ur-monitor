@@ -2,26 +2,31 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- 公開先（GitHub Pages）で検索エンジンに拾われないようにする。
-     狙っている物件が highlight_keywords から読み取れるため。 -->
 <meta name="robots" content="noindex, nofollow">
-<title>UR賃貸 空き部屋一覧</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UR賃貸 空き部屋 監視ツール</title>
+<!-- 体裁は setup.html / architecture.html と同じものを持たせてある。
+     片方だけ直すと見た目がずれるので、色や余白を変えるときは3ファイルとも直すこと。 -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 <style>
   :root {
     --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
     --accent: #005bac; --accent-bg: #e8f0fb;
-    --hot: #cf222e; --hot-bg: #ffebe9;
-    --new: #bf8700; --new-bg: #fff8e5;
+    --warn-bg: #fff8e5; --warn-line: #d4a72c;
+    --stop-bg: #ffebe9; --stop-line: #cf222e;
+    --ok-bg: #e6f4ea; --ok-line: #1a7f37;
     --code-bg: #f6f8fa;
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
     font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
-    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.8;
+    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
   }
 
+  /* ===== 冒頭のヒーロー ===== */
+  /* 本文の前に置く帯。読み手が用があるのは手順であって表紙ではないので、
+     縦を詰めて1画面に本文が入るようにしている。 */
   .hero {
     position: relative; overflow: hidden; color: #fff;
     background:
@@ -33,267 +38,347 @@
     background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
     background-size: 20px 20px; opacity: .45;
   }
-  .hero-inner { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 20px 24px 18px; }
-  .hero-kicker { margin: 0 0 3px; font-size: .8rem; font-weight: 700; letter-spacing: .16em; color: #8fc2f5; }
-  .hero h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; color: #fff; }
+  /* 帯が低いので装飾も小さく。文字に被らないよう右端へ寄せる */
+  .hero-art {
+    position: absolute; top: 50%; right: 26px; transform: translateY(-50%);
+    width: 150px; height: 150px; opacity: .14; pointer-events: none;
+  }
+  .hero-art svg { width: 100%; height: 100%; display: block; }
+  .hero-inner {
+    position: relative; z-index: 2;
+    max-width: 1200px; margin: 0 auto; padding: 20px 24px 18px;
+  }
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
+  .hero-kicker {
+    margin: 0 0 3px; font-size: .8rem; font-weight: 700;
+    letter-spacing: .16em; color: #8fc2f5;
+  }
+  .hero h1 {
+    border: none; padding: 0; margin: 0;
+    font-size: 1.72rem; line-height: 1.3; letter-spacing: .01em; color: #fff;
+  }
+  /* 見出しの下に1行だけ添える情報。区切りは │ で詰めて置く */
+  .hero-meta {
+    margin: 14px 0 0; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,.16);
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  }
+  .hero-meta .sep { color: rgba(255,255,255,.32); }
+  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .hero-meta a:hover { border-bottom-color: #fff; }
+  /* いま見ているページ。リンクにせず「ここにいる」ことだけ示す。
+     並びは2ページで揃えてあるので、順番を変えるときは両方を直すこと。 */
+  .hero-meta .current {
+    color: #fff; font-weight: 700;
+    background: rgba(255,255,255,.16);
+    padding: 2px 10px; border-radius: 999px;
+  }
+  /* 並びは「使い方 → 入れ方 → 中身 → ソース」の順。空き部屋一覧はここに置かない。
+     Basic 認証の内側へ移したうえ、URL が人それぞれになるため、公開資料からは案内できない。
+     右へ寄せるのはサイトの外へ出る先だけ。
+     狭い画面では折り返すため右寄せを解除する。 */
+  .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .hero-meta > .grp-right { margin-left: auto; }
 
-  /* 資料ページと同じ、追従するメニュー。.hero は overflow:hidden なので外に置く */
+  /* ===== 追従するメニュー =====
+     スクロールしても常に見えるように固定している。
+     .hero は overflow:hidden を持つため、中に置いたままでは position:sticky が
+     効かない。だからメニューだけ帯の外に出してある。戻さないこと。 */
   .topbar {
     position: sticky; top: 0; z-index: 50;
     background: linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
     border-bottom: 1px solid rgba(255,255,255,.16);
     box-shadow: 0 2px 10px rgba(0,0,0,.22);
   }
-  .nav {
-    max-width: 1100px; margin: 0 auto; padding: 11px 24px;
-    font-size: .82rem; color: #cfe2f7;
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  .topbar .hero-meta {
+    max-width: 1200px; margin: 0 auto;
+    padding: 11px 24px; border-top: none;
   }
-  .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-  /* 右に置くのはサイトの外へ出る先だけ。本体（空き部屋一覧）は左端に置く */
-  .nav > .grp-right { margin-left: auto; }
-  .nav .sep { color: rgba(255,255,255,.32); }
-  .nav a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
-  .nav a:hover { border-bottom-color: #fff; }
-  .nav .current { color: #fff; font-weight: 700; background: rgba(255,255,255,.16); padding: 2px 10px; border-radius: 999px; }
+  /* 見出しへ飛んだとき、固定メニューの下に隠れないようにする */
+  [id] { scroll-margin-top: 62px; }
 
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 24px 90px; }
-
-  /* 上段の数字。開いてまず見るのはここ */
-  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin: 0 0 10px; }
-  .tile { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--code-bg); }
-  .tile-new { border-color: var(--new); background: var(--new-bg); }
-  .tile-hot { border-color: var(--hot); background: var(--hot-bg); }
-  .t-num { margin: 0; font-size: 1.6rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
-  .tile-new .t-num { color: var(--new); }
-  .tile-hot .t-num { color: var(--hot); }
-  .t-lbl { margin: 0; font-size: .78rem; color: var(--sub); letter-spacing: .04em; }
-  .updated { margin: 0 0 30px; font-size: .8rem; color: var(--sub); }
-
-  .area { margin: 0 0 34px; }
-  .area-head {
-    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px;
-    border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 14px;
+  /* ===== レイアウト ===== */
+  .wrap {
+    display: grid; grid-template-columns: 272px minmax(0, 1fr);
+    gap: 48px; max-width: 1200px; margin: 0 auto; padding: 32px 24px 120px;
   }
-  .area h2 { margin: 0; font-size: 1.08rem; letter-spacing: .02em; }
-  .area-count { margin-left: 10px; font-size: .82rem; font-weight: 400; color: var(--sub); }
-  .area-quiet {
-    margin-left: 10px; font-size: .7rem; font-weight: 400; color: var(--sub);
-    border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; vertical-align: middle;
+  main { min-width: 0; counter-reset: h2; }
+
+  /* ===== 左サイドバー目次 ===== */
+  .toc {
+    /* 固定メニューのぶんだけ下げる（メニューの高さ + 24px） */
+    position: sticky; top: 68px; align-self: start;
+    max-height: calc(100vh - 92px); overflow-y: auto;
+    border-right: 1px solid var(--line); padding-right: 20px;
+    font-size: .88rem; line-height: 1.6;
   }
-  .area-src { margin-left: auto; font-size: .78rem; color: var(--accent); text-decoration: none; }
-  .area-src:hover { text-decoration: underline; }
-  .empty { color: var(--sub); font-size: .9rem; margin: 0; }
-
-  /* カード。通知から来てそのまま指で押せる大きさにしてある */
-  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px; }
-  .card {
-    display: block; text-decoration: none; color: inherit;
-    border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 12px;
-    background: #fff; transition: box-shadow .15s, transform .15s, border-color .15s;
+  .toc-ttl {
+    font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--sub); margin: 0 0 14px; text-transform: uppercase;
   }
-  .card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.10); transform: translateY(-1px); border-color: var(--accent); }
-  .card.is-new { background: var(--new-bg); border-color: var(--new); }
-  .card.is-hot { border-color: var(--hot); border-width: 2px; }
-  .card.is-hot.is-new { background: var(--hot-bg); }
-  .tags { margin: 0 0 6px; display: flex; gap: 6px; }
-  .tag { font-size: .68rem; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; color: #fff; }
-  .tag-new { background: var(--new); }
-  .tag-hot { background: var(--hot); }
-  .c-name { margin: 0 0 4px; font-size: .98rem; font-weight: 700; line-height: 1.55; }
-  .card.is-hot .c-name { color: var(--hot); }
-  .c-plan { margin: 0 0 10px; font-size: .82rem; color: var(--sub); }
-  .c-foot { margin: 0; display: flex; align-items: baseline; gap: 10px; }
-  .c-price { font-size: 1.06rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .go { margin-left: auto; font-size: .78rem; color: var(--accent); font-weight: 700; }
+  .toc ol { list-style: none; margin: 0; padding: 0; counter-reset: t2; }
+  .toc ol ol { counter-reset: t3; margin: 4px 0 8px; }
+  .toc > ol > li { margin: 10px 0; }
+  .toc > ol > li > a { font-weight: 700; }
+  .toc > ol > li > a::before {
+    counter-increment: t2; content: counter(t2) ". ";
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .toc ol ol li { margin: 2px 0 2px 14px; }
+  .toc ol ol a { color: var(--sub); font-size: .84rem; }
+  .toc ol ol a::before {
+    counter-increment: t3; content: counter(t2) "." counter(t3) " ";
+    color: #8c959f; font-variant-numeric: tabular-nums;
+  }
+  .toc a {
+    color: var(--ink); text-decoration: none; display: block;
+    padding: 2px 8px; border-left: 3px solid transparent; border-radius: 0 4px 4px 0;
+  }
+  .toc a:hover { background: var(--code-bg); }
+  .toc a.active {
+    background: var(--accent-bg); border-left-color: var(--accent);
+    color: var(--accent); font-weight: 700;
+  }
+  .toc .opt { color: #8c959f; font-weight: 400; font-size: .78rem; }
 
-  footer { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; color: var(--sub); font-size: .82rem; }
-  footer a { color: var(--accent); }
+  /* ===== 見出しの番号（自動採番） ===== */
+  h1 { font-size: 1.65rem; border-bottom: 3px solid var(--accent); padding-bottom: 12px; margin: 0 0 8px; }
+  h2 {
+    counter-increment: h2; counter-reset: h3;
+    font-size: 1.22rem; margin: 60px 0 16px; padding: 11px 16px;
+    background: var(--accent-bg); border-left: 5px solid var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h2::before { content: counter(h2) ". "; font-variant-numeric: tabular-nums; }
+  h3 {
+    counter-increment: h3; counter-reset: h4;
+    font-size: 1.04rem; margin: 34px 0 8px; color: var(--accent);
+    scroll-margin-top: 20px;
+  }
+  h3::before { content: counter(h2) "." counter(h3) " "; font-variant-numeric: tabular-nums; }
+  h4 {
+    counter-increment: h4; font-size: .97rem; margin: 22px 0 6px; color: var(--ink);
+  }
+  h4::before {
+    content: counter(h2) "." counter(h3) "." counter(h4) " ";
+    color: var(--sub); font-variant-numeric: tabular-nums;
+  }
 
-  @media (max-width: 720px) {
+  /* ===== 本文 ===== */
+  p, li { font-size: .97rem; }
+  a { color: var(--accent); }
+  code {
+    background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    font-family: ui-monospace, Consolas, monospace; font-size: .9em;
+    border: 1px solid var(--line); word-break: break-all;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px; overflow-x: auto; font-size: .88rem;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  /* 公式サイトの引用を、地の文と区別して見せる */
+  blockquote {
+    margin: 18px 0; padding: 12px 18px; border-left: 5px solid var(--line);
+    background: var(--code-bg); border-radius: 0 6px 6px 0; color: var(--sub);
+  }
+  blockquote p { margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); white-space: nowrap; }
+  .note, .warn, .stop, .ok {
+    padding: 14px 18px; margin: 18px 0; border-radius: 6px; border-left: 5px solid;
+  }
+  .note { background: var(--code-bg); border-color: var(--line); }
+  .warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  .stop { background: var(--stop-bg); border-color: var(--stop-line); }
+  .ok   { background: var(--ok-bg);   border-color: var(--ok-line); }
+  .note p:first-child, .warn p:first-child, .stop p:first-child, .ok p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .stop p:last-child, .ok p:last-child { margin-bottom: 0; }
+  .lead { color: var(--sub); font-size: 1rem; }
+
+  /* ===== 冒頭の「前提」カード =====
+     費用・所要・プログラミング不要・パソコン不要の4つは、このツールが何を
+     約束しているかであってナビゲーションではない。以前はヒーローのメタ行に
+     並べていたが、読む前に一番知りたいことなので本文の先頭へ出した。 */
+  .promise {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px; margin: 22px 0 16px;
+  }
+  .promise-item {
+    padding: 16px 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--code-bg);
+  }
+  .promise-mark { font-size: 1.3rem; line-height: 1; display: block; margin-bottom: 8px; }
+  .promise-ttl { margin: 0 0 6px; font-size: .98rem; font-weight: 700; color: var(--ink); line-height: 1.5; }
+  .promise-sub { margin: 0; font-size: .8rem; color: var(--sub); line-height: 1.7; }
+  .promise-note { margin: 0 0 26px; font-size: .88rem; color: var(--sub); }
+
+  .step-time { color: var(--sub); font-size: .82rem; font-weight: normal; }
+
+  /* ===== 図 ===== */
+  .fig { margin: 24px 0; padding: 0; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig .t1 { font-size: 14px; font-weight: 700; text-anchor: middle; fill: #24292f; }
+  .fig .t2 { font-size: 11.5px; text-anchor: middle; fill: #57606a; }
+  .fig .t3 { font-size: 12px; text-anchor: middle; fill: #57606a; }
+  .fig .t4 { font-size: 12.5px; font-weight: 700; fill: #57606a; }
+  .fig .tn { font-size: 11px; font-weight: 700; text-anchor: middle; fill: #005bac; letter-spacing: .04em; }
+  @media (prefers-reduced-motion: reduce) { .fig animateMotion { display: none; } }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--sub); font-size: .88rem; }
+  /* 作者クレジット。名前を主役にしたいので、肩の「作」は小さく添える程度にする */
+  .author {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 22px; padding: 16px 18px;
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .author-updated {
+    margin-left: auto; text-align: right; flex: none;
+  }
+  .author-updated .lbl {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-updated .val {
+    margin: 0; font-size: .92rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  .author-mark { flex: none; }
+  .author-mark svg { width: 40px; height: 40px; display: block; border-radius: 10px; }
+  .author-by {
+    margin: 0 0 3px; font-size: .68rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub);
+  }
+  .author-name {
+    margin: 0; font-size: 1.16rem; font-weight: 700; color: var(--ink);
+    letter-spacing: .12em;
+  }
+  .author-name a { color: inherit; text-decoration: none; }
+  .author-name a:hover { color: var(--accent); }
+
+  /* ===== 狭い画面 ===== */
+  @media (max-width: 900px) {
     .hero-inner { padding: 16px 18px 14px; }
     .hero h1 { font-size: 1.3rem; }
-    .nav { padding: 9px 18px; font-size: .76rem; }
-    .nav > .grp-right { margin-left: 0; flex-basis: 100%; }
-    .wrap { padding: 20px 18px 70px; }
-    .tiles { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-    .tile { padding: 10px 12px; }
-    .t-num { font-size: 1.3rem; }
-    .cards { grid-template-columns: 1fr; }
-    .area-src { margin-left: 0; flex-basis: 100%; }
+    .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
+    .hero-meta { font-size: .76rem; margin-top: 12px; padding-top: 10px; }
+    /* 右寄せを解くと2つの群が地続きに見えるので、行を分けて区別を保つ */
+    .hero-meta > .grp-right { margin-left: 0; flex-basis: 100%; }
+    .topbar .hero-meta { padding: 9px 18px; }
+    /* 狭い画面ではメニューが2段になるぶん、飛び先の余白も広げる */
+    [id] { scroll-margin-top: 88px; }
+    /* 装飾は本文の可読性より優先しない。狭い画面では消す */
+    .hero-art { display: none; }
+    .wrap { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 80px; }
+    .toc {
+      position: static; max-height: none; overflow: visible;
+      border-right: none; border: 1px solid var(--line);
+      border-radius: 8px; padding: 16px 18px; background: var(--code-bg);
+    }
+    .toc ol ol { display: none; }
+    h2 { margin-top: 44px; }
+    /* 4枚を横並びにすると1枚が狭くなりすぎるので2列に折る */
+    .promise { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 520px) {
+    .promise { grid-template-columns: 1fr; }
   }
 </style>
-</head>
-<body>
-
+</head><body>
 <header class="hero">
+  <div class="hero-art"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><circle cx="41" cy="39" r="13" fill="none" stroke="#fff" stroke-width="6"/><path d="M50 48L59 57" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg></div>
   <div class="hero-inner">
-    <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
-    <h1>空き部屋一覧</h1>
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>UR賃貸 空き部屋 監視ツール</h1>
+      </div>
+    </div>
   </div>
 </header>
 
 <nav class="topbar" aria-label="ページ切り替え">
-  <p class="nav">
-    <span class="grp">
-      <span class="current" aria-current="page">空き部屋一覧</span>
-      <span class="sep">│</span>
-      <a href="guide.html">使い方ガイド</a>
-      <span class="sep">│</span>
-      <a href="setup.html">セットアップ手順書</a>
-      <span class="sep">│</span>
-      <a href="architecture.html">仕組みの技術資料</a>
-    </span>
-    <span class="grp grp-right">
-      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
-    </span>
-  </p>
+    <p class="hero-meta">
+      <span class="grp">
+        <a href="guide.html">使い方ガイド</a>
+        <span class="sep">│</span>
+        <a href="setup.html">セットアップ手順書</a>
+        <span class="sep">│</span>
+        <a href="architecture.html">仕組みの技術資料</a>
+      </span>
+      <span class="grp grp-right">
+        <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+      </span>
+    </p>
 </nav>
 
-<div class="wrap">
+<div class="wrap" style="grid-template-columns: 1fr;">
+<main>
 
-<div class="tiles">
-  <div class="tile"><p class="t-num">23</p><p class="t-lbl">空き部屋</p></div>
-  <div class="tile"><p class="t-num">0</p><p class="t-lbl">新着</p></div>
-  <div class="tile tile-hot"><p class="t-num">5</p><p class="t-lbl">候補の部屋</p></div>
-</div>
-<p class="updated">最終更新 2026-08-29 16:57　／　8:00〜21:00 の間、5分おきに自動更新</p>
+<p>
+UR賃貸の空き部屋を <strong>5分おきに自動で見に行き</strong>、条件に合う新着が出たら
+<strong>Slack に通知する</strong>道具です。UR は空室が出ても知らせてくれず、
+しかも約70万戸のほとんどが<strong>抽選なしの先着順</strong>。見張る作業を機械に任せるために作りました。
+</p>
 
-<section class="area">
-<div class="area-head">
-  <h2>監視対象<span class="area-count">23 件</span></h2>
-  <a class="area-src" href="https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html" target="_blank" rel="noopener">UR のページで見る →</a>
+<div class="note">
+<p><strong>空き部屋の一覧は、ここでは公開していません。</strong>
+UR は自社サイトの内容について、私的使用と引用を除く転載を認めていません。
+一覧は各自の Cloudflare に置き、<strong>パスワードを知っている人だけ</strong>が見られるようにしています。
+作り方は<a href="setup.html#s10">セットアップ手順書の第10章</a>にあります。</p>
 </div>
-<div class="cards">
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000040102" target="_blank" rel="noopener">
-<p class="c-name">所沢パークタウン並木通り 4号棟 102号室</p>
-<p class="c-plan">2DK / 48㎡ / 1階</p>
-<p class="c-foot"><span class="c-price">67,700円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000050803" target="_blank" rel="noopener">
-<p class="c-name">所沢パークタウン並木通り 5号棟 803号室</p>
-<p class="c-plan">2DK / 48㎡ / 8階</p>
-<p class="c-foot"><span class="c-price">69,800円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_1980_room.html?JKSS=000061106" target="_blank" rel="noopener">
-<p class="c-name">所沢パークタウン並木通り 6号棟 1106号室</p>
-<p class="c-plan">3DK / 65㎡ / 11階</p>
-<p class="c-foot"><span class="c-price">95,300円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_2130_room.html?JKSS=000010102" target="_blank" rel="noopener">
-<p class="c-name">所沢パークタウン駅前プラザ 1号棟 102号室</p>
-<p class="c-plan">3DK / 66㎡ / 1階</p>
-<p class="c-foot"><span class="c-price">98,300円（割引前・要問合せ）</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_1910_room.html?JKSS=000070404" target="_blank" rel="noopener">
-<p class="c-name">所沢パークタウン駅前通り 7号棟 404号室</p>
-<p class="c-plan">2LDK / 58㎡ / 4階</p>
-<p class="c-foot"><span class="c-price">80,200円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_1970_room.html?JKSS=000030205" target="_blank" rel="noopener">
-<p class="c-name">所沢パークタウン公園通り 3号棟 205号室</p>
-<p class="c-plan">1LDK / 50㎡ / 2階</p>
-<p class="c-foot"><span class="c-price">89,000円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3850_room.html?JKSS=000440404" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢けやき通り第二 44号棟 404号室</p>
-<p class="c-plan">2LDK / 57㎡ / 4階</p>
-<p class="c-foot"><span class="c-price">102,800円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3850_room.html?JKSS=000400104" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢けやき通り第二 40号棟 104号室</p>
-<p class="c-plan">2LDK / 64㎡ / 1階</p>
-<p class="c-foot"><span class="c-price">116,600円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3850_room.html?JKSS=000340705" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢けやき通り第二 34号棟 705号室</p>
-<p class="c-plan">2LDK / 55㎡ / 7階</p>
-<p class="c-foot"><span class="c-price">116,900円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3850_room.html?JKSS=000340807" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢けやき通り第二 34号棟 807号室</p>
-<p class="c-plan">2LDK / 59㎡ / 8階</p>
-<p class="c-foot"><span class="c-price">118,000円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card is-hot" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000030404" target="_blank" rel="noopener">
-<p class="tags"><span class="tag tag-hot">候補</span></p>
-<p class="c-name">プラザシティ新所沢　けやき通り 3号棟 404号室</p>
-<p class="c-plan">2DK / 51㎡ / 4階</p>
-<p class="c-foot"><span class="c-price">104,000円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card is-hot" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000030703" target="_blank" rel="noopener">
-<p class="tags"><span class="tag tag-hot">候補</span></p>
-<p class="c-name">プラザシティ新所沢　けやき通り 3号棟 703号室</p>
-<p class="c-plan">2DK / 51㎡ / 7階</p>
-<p class="c-foot"><span class="c-price">106,900円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card is-hot" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000170703" target="_blank" rel="noopener">
-<p class="tags"><span class="tag tag-hot">候補</span></p>
-<p class="c-name">プラザシティ新所沢　けやき通り 17号棟 703号室</p>
-<p class="c-plan">2DK / 51㎡ / 7階</p>
-<p class="c-foot"><span class="c-price">108,900円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card is-hot" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000130508" target="_blank" rel="noopener">
-<p class="tags"><span class="tag tag-hot">候補</span></p>
-<p class="c-name">プラザシティ新所沢　けやき通り 13号棟 508号室</p>
-<p class="c-plan">1LDK / 56㎡ / 5階</p>
-<p class="c-foot"><span class="c-price">109,700円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card is-hot" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030_room.html?JKSS=000160501" target="_blank" rel="noopener">
-<p class="tags"><span class="tag tag-hot">候補</span></p>
-<p class="c-name">プラザシティ新所沢　けやき通り 16号棟 501号室</p>
-<p class="c-plan">4DK / 76㎡ / 5階</p>
-<p class="c-foot"><span class="c-price">145,900円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090309" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢　緑町第三 9号棟 309号室</p>
-<p class="c-plan">1LDK / 58㎡ / 3階</p>
-<p class="c-foot"><span class="c-price">110,000円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_3950_room.html?JKSS=000090510" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢　緑町第三 9号棟 510号室</p>
-<p class="c-plan">2LDK / 73㎡ / 5階</p>
-<p class="c-foot"><span class="c-price">136,500円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/saitama/50_4000_room.html?JKSS=000530102" target="_blank" rel="noopener">
-<p class="c-name">プラザシティ新所沢けやき通り第三 53号棟 102号室</p>
-<p class="c-plan">3DK / 66㎡ / 1階</p>
-<p class="c-foot"><span class="c-price">120,600円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000050107" target="_blank" rel="noopener">
-<p class="c-name">グリーンヒルズ東久留米 5号棟 107号室</p>
-<p class="c-plan">1DK / 44㎡ / 1階</p>
-<p class="c-foot"><span class="c-price">95,700円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000040104" target="_blank" rel="noopener">
-<p class="c-name">グリーンヒルズ東久留米 4号棟 104号室</p>
-<p class="c-plan">1DK / 44㎡ / 1階</p>
-<p class="c-foot"><span class="c-price">97,200円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000040207" target="_blank" rel="noopener">
-<p class="c-name">グリーンヒルズ東久留米 4号棟 207号室</p>
-<p class="c-plan">2DK / 50㎡ / 2階</p>
-<p class="c-foot"><span class="c-price">103,800円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000030303" target="_blank" rel="noopener">
-<p class="c-name">グリーンヒルズ東久留米 3号棟 303号室</p>
-<p class="c-plan">2DK / 50㎡ / 3階</p>
-<p class="c-foot"><span class="c-price">105,900円</span><span class="go">詳細 →</span></p>
-</a>
-<a class="card" href="https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000010609" target="_blank" rel="noopener">
-<p class="c-name">グリーンヒルズ東久留米 1号棟 609号室</p>
-<p class="c-plan">2DK / 50㎡ / 6階</p>
-<p class="c-foot"><span class="c-price">107,300円</span><span class="go">詳細 →</span></p>
-</a>
-</div>
-</section>
 
+<h2 id="docs">資料</h2>
+
+<ol>
+  <li>
+    <a href="guide.html"><strong>使い方ガイド</strong></a> —
+    なぜ空き部屋探しが速さ勝負になるのか。通知が来たらどう動くのか。
+    UR は「押さえてから内覧する」順番なので、入居を決めてから動くのでは遅い。
+    <strong>道具を入れる前に読むと、何を急ぐのかが分かります。</strong>
+  </li>
+  <li>
+    <a href="setup.html"><strong>セットアップ手順書</strong></a> —
+    GitHub アカウントの用意から順に、図を交えて説明しています。
+    <strong>はじめての方はこちら。</strong>
+  </li>
+  <li>
+    <a href="architecture.html"><strong>仕組みの技術資料</strong></a> —
+    叩かれてから Slack に届くまで、内部で何が起きているか。
+    実行の時系列、取得に失敗したときの粘り方、UTC と JST の扱いなど。
+    <strong>コードを触る前に読むと早い。</strong>
+  </li>
+</ol>
+
+<h2 id="cost">かかるもの</h2>
+
+<table>
+  <tr><th>項目</th><th>内容</th></tr>
+  <tr><td>費用</td><td><strong>0円</strong>（公開リポジトリなら GitHub Actions は無制限に無料。Cloudflare も無料枠内）</td></tr>
+  <tr><td>用意するもの</td><td>GitHub アカウント、Slack、Cloudflare アカウント</td></tr>
+  <tr><td>セットアップ</td><td>30〜60分</td></tr>
+  <tr><td>その後の手間</td><td><strong>なし</strong>（放っておけば動き続けます）</td></tr>
+</table>
+
+<div class="warn">
+<p><strong>個人的に作って個人的に使っている道具を、そのまま公開しています。</strong>
+同じことをしたい方はご自由にどうぞ。ただし<strong>セットアップはご自身で</strong>お願いします
+（個別のサポートは行っていません）。動作を保証するものではありません（<a href="https://github.com/tama-create/ur-monitor/blob/main/LICENSE">MIT License</a>）。</p>
 </div>
 
 <footer>
-<p>このページは自動生成されています。内容は取得時点のもので、実際の募集状況は
-<a href="https://www.ur-net.go.jp/chintai/" target="_blank" rel="noopener">UR賃貸住宅の公式サイト</a>でご確認ください。</p>
+  <p>UR賃貸 空き部屋 監視ツール — <a href="https://github.com/tama-create/ur-monitor">GitHub</a></p>
 </footer>
+
+</main>
+</div>
 
 </body>
 </html>
