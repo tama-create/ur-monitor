@@ -50,6 +50,7 @@
     display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
   }
   .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  /* 右に置くのはサイトの外へ出る先だけ。本体（空き部屋一覧）は左端に置く */
   .nav > .grp-right { margin-left: auto; }
   .nav .sep { color: rgba(255,255,255,.32); }
   .nav a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
@@ -131,6 +132,8 @@
 <nav class="topbar" aria-label="ページ切り替え">
   <p class="nav">
     <span class="grp">
+      <span class="current" aria-current="page">空き部屋一覧</span>
+      <span class="sep">│</span>
       <a href="guide.html">使い方ガイド</a>
       <span class="sep">│</span>
       <a href="setup.html">セットアップ手順書</a>
@@ -138,8 +141,6 @@
       <a href="architecture.html">仕組みの技術資料</a>
     </span>
     <span class="grp grp-right">
-      <span class="current" aria-current="page">空き部屋一覧</span>
-      <span class="sep">│</span>
       <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
     </span>
   </p>
@@ -152,7 +153,7 @@
   <div class="tile"><p class="t-num">0</p><p class="t-lbl">新着</p></div>
   <div class="tile tile-hot"><p class="t-num">5</p><p class="t-lbl">候補の部屋</p></div>
 </div>
-<p class="updated">最終更新 2026-08-29 09:07　／　8:00〜21:00 の間、5分おきに自動更新</p>
+<p class="updated">最終更新 2026-08-29 09:11　／　8:00〜21:00 の間、5分おきに自動更新</p>
 
 <section class="area">
 <div class="area-head">
