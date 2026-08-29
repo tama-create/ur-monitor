@@ -639,6 +639,7 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
     display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
   }
   .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  /* 右に置くのはサイトの外へ出る先だけ。本体（空き部屋一覧）は左端に置く */
   .nav > .grp-right { margin-left: auto; }
   .nav .sep { color: rgba(255,255,255,.32); }
   .nav a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
@@ -720,6 +721,8 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
 <nav class="topbar" aria-label="ページ切り替え">
   <p class="nav">
     <span class="grp">
+      <span class="current" aria-current="page">空き部屋一覧</span>
+      <span class="sep">│</span>
       <a href="guide.html">使い方ガイド</a>
       <span class="sep">│</span>
       <a href="setup.html">セットアップ手順書</a>
@@ -727,8 +730,6 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
       <a href="architecture.html">仕組みの技術資料</a>
     </span>
     <span class="grp grp-right">
-      <span class="current" aria-current="page">空き部屋一覧</span>
-      <span class="sep">│</span>
       <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
     </span>
   </p>
