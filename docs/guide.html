@@ -76,8 +76,9 @@
     background: rgba(255,255,255,.16);
     padding: 2px 10px; border-radius: 999px;
   }
-  /* 左＝このサイトの資料3つ、右＝資料ではないもの（一覧・リポジトリ）。
-     性質が違うので離す。狭い画面では折り返すため右寄せを解除する。 */
+  /* 並びは「本体 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
+     いちばん見たい空き部屋一覧を置く。右へ寄せるのはサイトの外へ出る先だけ。
+     狭い画面では折り返すため右寄せを解除する。 */
   .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
   .hero-meta > .grp-right { margin-left: auto; }
 
@@ -307,6 +308,8 @@
 <nav class="topbar" aria-label="ページ切り替え">
     <p class="hero-meta">
       <span class="grp">
+        <a href="index.html">空き部屋一覧</a>
+        <span class="sep">│</span>
         <span class="current" aria-current="page">使い方ガイド</span>
         <span class="sep">│</span>
         <a href="setup.html">セットアップ手順書</a>
@@ -314,8 +317,6 @@
         <a href="architecture.html">仕組みの技術資料</a>
       </span>
       <span class="grp grp-right">
-        <a href="index.html">空き部屋一覧</a>
-        <span class="sep">│</span>
         <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
       </span>
     </p>
