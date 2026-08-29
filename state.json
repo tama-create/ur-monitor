@@ -217,8 +217,6 @@
             "group": "監視対象"
         }
     },
-    "zero_streak": {
-        "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html": 1
-    },
-    "last_checked": "2026-08-29T10:33:51+09:00"
+    "zero_streak": [],
+    "last_checked": "2026-08-29T10:36:48+09:00"
 }
