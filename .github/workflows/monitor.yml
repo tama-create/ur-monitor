@@ -17,14 +17,22 @@ on:
     - cron: '0 8 * * *'   # 17:00 JST
     - cron: '0 12 * * *'  # 21:00 JST
   # 手動実行用（動作確認に使う）
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      seed_state:
+        description: '保管先へ state.json を移す（保管先を用意した直後に1回だけ）'
+        type: boolean
+        default: false
 
+# 実行結果はリポジトリに戻さなくなったので書き込み権限は要らない。
+# 公開リポジトリに UR のデータを残さないため、state と一覧は Cloudflare の
+# 保管先（Worker + KV）へ置き、閲覧は Basic 認証の内側に限っている。
 permissions:
-  contents: write  # state.json / docs/index.html をコミットし直すため
+  contents: read
 
 concurrency:
   group: ur-monitor
-  cancel-in-progress: false  # 前回実行が state.json を書き込み中なら待つ
+  cancel-in-progress: false  # 前回実行が保管先へ書き込み中なら待つ
 
 jobs:
   monitor:
@@ -46,45 +54,20 @@ jobs:
       - name: Chrome の場所を確認
         run: which google-chrome-stable || which google-chrome || which chromium-browser
 
+      # 保管先を用意した直後の1回だけ。手動実行で seed_state にチェックを入れると走る。
+      # これをやらずに本番を回すと保管先が空のままで、監視スクリプトが
+      # 「全部屋が新着になる」のを避けて中止する（誤通知よりは止まるほうがまし）。
+      - name: 保管先へ state を移す（初回のみ）
+        if: inputs.seed_state
+        env:
+          STORE_URL: ${{ secrets.STORE_URL }}
+          STORE_TOKEN: ${{ secrets.STORE_TOKEN }}
+        run: php ur_monitor.php --seed-state
+
       - name: 監視スクリプトを実行
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # 未設定ならローカルのファイルに書く動作に落ちる。本番では必ず入れること
+          STORE_URL: ${{ secrets.STORE_URL }}
+          STORE_TOKEN: ${{ secrets.STORE_TOKEN }}
         run: php ur_monitor.php
-
-      - name: 実行結果をコミット
-        # ランナーは毎回まっさらでファイルが残らないため、結果はリポジトリに戻して永続化する。
-        # docs/index.html を push すると GitHub Pages が自動で再ビルドし、公開ページが最新になる。
-        # [skip ci] は付けない。このワークフローに push トリガーが無いので自己ループは起きず、
-        # 逆に付けると Pages のビルドまで止めてしまう恐れがあるため。
-        #
-        # push が弾かれたら main を取り込んで再試行する。実行中に誰かが main へ push すると
-        # （PR のマージなど）その回が丸ごと失敗して結果が捨てられるため。実際に起きた:
-        # PR マージの5秒後に始まった回が ! [rejected] main -> main (fetch first) で落ちた。
-        #
-        # 衝突時は -X theirs でこちらの結果を採る。state.json と docs/index.html は毎回
-        # まるごと生成し直すものなので、新しく取得したこちらが常に正しい。
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state.json docs/index.html
-          if git diff --cached --quiet; then
-            echo "変更なし。コミットしません"
-            exit 0
-          fi
-          git commit -m "chore: 監視結果を更新"
-
-          for attempt in 1 2 3; do
-            if git push; then
-              echo "push 成功（試行 ${attempt} 回目）"
-              exit 0
-            fi
-            echo "push が弾かれました。main を取り込んで再試行します（試行 ${attempt} 回目）"
-            git fetch origin main
-            if ! git rebase -X theirs origin/main; then
-              git rebase --abort || true
-              echo "::error::main の取り込みに失敗しました"
-              exit 1
-            fi
-          done
-          echo "::error::3 回試しても push できませんでした"
-          exit 1

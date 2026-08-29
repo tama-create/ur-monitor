@@ -16,8 +16,9 @@ php -l ur_monitor.php          # 構文チェック
 
 | コマンド | 用途 |
 |---|---|
-| `php ur_monitor.php --dry-run` | スクレイピングのみ。Slack 通知も `state.json` / `docs/index.html` の更新もしない |
-| `php ur_monitor.php` | 本番と同じ動作。**ローカルでは基本実行しない**（下記「状態はリポジトリにある」参照） |
+| `php ur_monitor.php --dry-run` | スクレイピングのみ。Slack 通知も state / 一覧の更新もしない |
+| `php ur_monitor.php` | 本番と同じ動作。**ローカルでは基本実行しない**（下記「状態はリポジトリに無い」参照） |
+| `php ur_monitor.php --seed-state` | 保管先を用意した直後に1回だけ。`state.json` を保管先へ移す |
 | `php ur_monitor.php --setup` | ブラウザを表示し `debug_page.html` と `debug_*.png` を保存。セレクター調整用 |
 | `php ur_monitor.php --check-robots` | robots.txt の確認のみ |
 
@@ -47,7 +48,7 @@ config.json ──> run_monitor()
                   ↓
              前回 state との差分 ──> watch 条件に合致 ──> Slack
                   ↓
-             state.json / docs/index.html を書き出し
+             state と一覧 HTML を保管先（Worker + KV）へ PUT
 ```
 
 依存は `chrome-php/chrome`（Chrome DevTools Protocol）のみ。`composer.lock` は追跡している。
@@ -55,11 +56,20 @@ PR で走る CI が無いため、これを外すと依存の更新が本番実�
 
 ## 触る前に知っておくこと
 
-### 状態はリポジトリにある
+### 状態はリポジトリに無い
 
-`state.json` と `docs/index.html` は毎回の実行結果で、**Actions が実行のたびにコミットしている**
-（ランナーは毎回まっさらでファイルが残らないため）。`--dry-run` を付けずにローカル実行すると
-この2ファイルが書き換わり、Actions 側のコミットと衝突する。開発中は必ず `--dry-run` を使う。
+前回状態と一覧 HTML は **Cloudflare Worker の KV** に置く。ランナーは毎回まっさらなので
+どこかに預ける必要はあるが、**GitHub には戻さない**。公開リポジトリにコミットすると、
+UR から取った物件名・家賃・間取りが誰にでも読める状態になるため（理由は下記
+「一覧をリポジトリに置かない」）。
+
+`STORE_URL` / `STORE_TOKEN` が無ければローカルのファイル（`state.json` /
+`docs/index.html`）に落ちる。**開発中に秘密情報なしで動かせるようにするための逃げ道**で、
+本番の経路ではない。`--dry-run` を付けずにローカル実行するとこの2ファイルが書き換わるので、
+開発中は必ず `--dry-run` を使う。**その出力をコミットしないこと。**
+
+保管先が空のとき `load_state()` は **exit(1) で中止する**。「前回0件」とみなして進むと
+いま出ている部屋が全部 Slack に飛ぶため。解くには `--seed-state` を1回流す。
 
 ### 「0件」も「急に減った」も失敗の可能性が高く、成功として扱ってはいけない
 
@@ -172,7 +182,7 @@ Slack の Webhook URL は `SLACK_WEBHOOK_URL` 環境変数から渡す。`config
 private に戻す場合に効いてくる話。ただし **private に戻すと GitHub Pages が使えなくなる**
 （GitHub Free では公開リポジトリのみ）。一覧の公開をやめるか、有料プランにするかの選択になる。
 
-`docs/index.html` は生成時刻を埋め込むため、**部屋に変化が無くても毎回内容が変わる**。
+一覧 HTML は生成時刻を埋め込むため、**部屋に変化が無くても毎回内容が変わる**。
 「変わったときだけ処理する」といった分岐を書くときは、この点を踏まえること。
 
 ### 実行間隔は設定どおりにならない
@@ -182,9 +192,10 @@ private に戻す場合に効いてくる話。ただし **private に戻すと 
 `schedule` は負荷で遅延し、発火自体が破棄されることもある。30分間隔だった頃の実測は
 46〜64分で、**9時間で18回動くはずが12回**しか動いていなかった（約3分の1が欠落）。
 
-`docs/index.html` は生成時刻を埋め込むため実行のたびに必ずコミットが残る。つまり
-**コミット履歴が取りこぼしのない全実行記録**になっていて、上の数字はそこから数えたもの。
-実行頻度を疑うときはここを見れば分かる。
+上の数字は当時のコミット履歴から数えたもので、実行のたびに `docs/index.html` を
+コミットしていたため履歴がそのまま全実行記録になっていた。**一覧を Cloudflare へ
+移してコミットをやめたので、いまは履歴から追えない。** 実行頻度を疑うときは
+Actions タブの実行一覧を見ること（保持期間はあるが、当面はこちらで足りる）。
 
 試行を増やす程度ではどうにもならず、15分間隔に詰めても数日後に**1日2回**まで落ちた
 （2026-08-27〜28）。そのため**発火は Cloudflare Workers から `workflow_dispatch` で与える**
@@ -236,15 +247,34 @@ Cloudflare 側であって GitHub 側ではない。Cloudflare 移行後の実�
 **この90分という耐性を変えないまま間隔だけ動かす**のが基本。
 `trigger/wrangler.toml` の cron と対で管理すること。片方だけ変えると静かに壊れる。
 
-### 公開は GitHub Pages 一本
+### 一覧をリポジトリに置かない
 
-一覧は `docs/index.html` に書き出し、実行のたびにコミットする。GitHub Pages が `main` の
-`/docs` を配信しているため、**push されれば自動で公開ページが最新になる**。
-外部サービスもトークンも使わない。
+一覧と state は Worker の KV に置き、閲覧は **Basic 認証**の内側に限る。以前は
+`docs/index.html` に書いて GitHub Pages で公開していたが、やめた。
+
+UR は「このサイトについて」で私的使用と引用を除く転載を認めておらず、そのうえ
+**「ウェブページに貼り付けることは、運営者が個人であっても私的使用にはならない」**と
+明示している。事実の羅列に著作物性が及ぶかは議論の余地があるが、**UR 自身がそう書いて
+いる以上、白いほうを選ぶ**という判断。**ここを Pages に戻さないこと。**
+
+| 場所 | 置くもの |
+|---|---|
+| リポジトリ | コード、`config.json`、資料ページ |
+| Worker の KV | 前回状態と一覧 HTML（＝UR から取ったデータ） |
+| Slack | 新着通知 |
+
+Worker は cron（`scheduled`）と保管（`fetch`）の二役を持つ。書き込みは `API_TOKEN` の
+Bearer、閲覧は `VIEW_USER` / `VIEW_PASSWORD` の Basic。**片方だけ合っていても通さない
+書き方（早期 return を作らない）にしてある**ので、比較を短絡させないこと。
+
+生成する一覧の上部メニューは `config.json` の `docs_base_url` を見て**絶対 URL**で出す。
+一覧は Pages ではなく Worker から配られるため、**相対パスにすると行き先が消える**。
+
+### 公開しているのは資料だけ
 
 | URL | 中身 |
 |---|---|
-| `https://<ユーザー名>.github.io/ur-monitor/` | 空き部屋一覧（`docs/index.html`） |
+| `https://<ユーザー名>.github.io/ur-monitor/` | 入口（資料への案内） |
 | `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
 
 **`docs/` は GitHub Pages の公開ディレクトリそのもの**で、ここに置いたファイルは
@@ -255,11 +285,11 @@ Cloudflare 側であって GitHub 側ではない。Cloudflare 移行後の実�
 `docs/.nojekyll` は Jekyll の変換を止めるための空ファイル。**消さないこと。**
 これが無いと HTML 内の `{{ }}` や `{% %}` がテンプレート記法として解釈されて壊れる。
 
-**監視のコミットに `[skip ci]` を付けないこと。** このワークフローには `push` トリガーが
-無いので自己ループは起きず、逆に付けると Pages のビルドまで止めてしまう恐れがある。
+監視ワークフローは**もう何もコミットしない**（`permissions: contents: read`）。
+Pages が再ビルドされるのは資料を手で変えたときだけ。
 
-生成 HTML には `noindex, nofollow` を入れている。狙っている物件が
-`highlight_keywords` から読み取れるため、検索エンジンに載せない意図。外すときはその点を承知の上で。
+生成する一覧にも `noindex, nofollow` を入れている。Basic 認証の内側なので本来は不要だが、
+取り違えて公開したときの保険。**外さないこと。**
 
 以前は Cloudflare Pages の Direct Upload を使っていたが、GitHub Pages で足りるため廃止した。
 API トークンと Account ID の Secrets、wrangler の実行手順、`deploy/_headers`、

@@ -3,7 +3,10 @@
     {
       "name": "第一志望",
       "notify": true,
-      "madori": ["1LDK", "2DK"],
+      "madori": [
+        "1LDK",
+        "2DK"
+      ],
       "urls": [
         "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030.html"
       ]
@@ -19,6 +22,7 @@
       ]
     }
   ],
+  "docs_base_url": "https://tama-create.github.io/ur-monitor",
   "jitter_max_seconds": 40,
   "zero_streak_limit": 18,
   "shrink_guard_ratio": 0.7,
