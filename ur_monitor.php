@@ -377,17 +377,22 @@ function wait_for_rooms(object $page, array $selectors, int $timeoutSec = 20): b
 function scrape_url(object $browser, string $url, array $config, bool $headless = true): array
 {
     // 建物レベル・部屋レベルすべてのセレクターを config から取得（未指定は現行サイトのデフォルト）
+    // タグ名を書かず class だけで指定している。UR は同じ情報を、検索結果ページでは
+    // <strong>/<span>、団地ページでは <span>/<td> と別のタグで出す。class は共通なので、
+    // タグ名を外すと1組のセレクターで両方から取れる。タグ名を書き戻さないこと。
     $selectors = array_replace([
-        'room_list'      => '.module_searchs_property',
-        'name'           => 'span.rep_bukken-name',
-        'room_rows'      => 'tbody.rep_bukken-room tr.js-log-item',
-        'room_name_main' => 'span.rep_room-name-main',
-        'room_name_sub'  => 'span.rep_room-name-sub',
-        'price'          => 'strong.rep_room-price',
-        'type'           => 'span.rep_room-type',
-        'space'          => 'span.rep_room-floor',
-        'floor'          => 'td.rep_room-kai',
-        'link'           => 'a.rep_room-link',
+        'room_list'      => '.module_searchs_property',   // 検索結果ページの団地ごとの箱
+        'page_name'      => 'h1',                         // 団地ページの団地名（箱が無いとき）
+        'name'           => '.rep_bukken-name',
+        'room_rows'      => 'tr.js-log-item',
+        'room_name_main' => '.rep_room-name-main',        // 検索結果ページ：号棟
+        'room_name_sub'  => '.rep_room-name-sub',         // 検索結果ページ：号室
+        'room_name'      => '.rep_room-name',             // 団地ページ：号棟と号室がひとかたまり
+        'price'          => '.rep_room-price',
+        'type'           => '.rep_room-type',
+        'space'          => '.rep_room-floor',
+        'floor'          => '.rep_room-kai',
+        'link'           => '.rep_room-link',
     ], $config['selectors'] ?? []);
 
     $parsed = parse_url($url);
@@ -425,13 +430,34 @@ function scrape_url(object $browser, string $url, array $config, bool $headless 
             (() => {
                 const S = {$selJson};
                 const rooms = [];
-                const buildings = Array.from(document.querySelectorAll(S.room_list));
-                buildings.forEach(building => {
-                    const buildingName = (building.querySelector(S.name) || {}).innerText?.trim() || '';
-                    const rows = Array.from(building.querySelectorAll(S.room_rows));
+                // 検索結果ページは団地ごとの箱があるが、団地ページには無い（ページ全体で1団地）。
+                // 箱が見つからなければページ全体を1つの箱として扱い、名前は見出しから取る。
+                let boxes = Array.from(document.querySelectorAll(S.room_list));
+                let fallbackName = '';
+                if (boxes.length === 0) {
+                    boxes = [document];
+                    const h = document.querySelector(S.page_name);
+                    // 見出しは団地名のあとにふりがなが続く。1行目だけが名前。
+                    // この JS は PHP のヒアドキュメントの中にあり、書いたエスケープ列が
+                    // 実際の制御文字に変換されてしまう。だから改行を表す記法は使わず、
+                    // 文字コードから組み立てて切っている。ここに正規表現を書かないこと。
+                    const raw = h ? (h.innerText || '').trim() : '';
+                    const nl  = raw.indexOf(String.fromCharCode(10));
+                    fallbackName = (nl >= 0 ? raw.slice(0, nl) : raw).trim();
+                }
+                boxes.forEach(building => {
+                    const nameEl = building.querySelector(S.name);
+                    const buildingName = (nameEl ? (nameEl.innerText || '').trim() : '') || fallbackName;
+                    // 部屋以外の行（「リノベーションしたお部屋とは？」等の吹き出し）が
+                    // 同数混ざる。リンクを持たないので、ここで落とす。落とさないと
+                    // 件数が倍に見え、急減ガードの判定が甘くなる。
+                    const rows = Array.from(building.querySelectorAll(S.room_rows))
+                        .filter(row => row.querySelector(S.link));
                     rows.forEach(row => {
                         const roomMain  = (row.querySelector(S.room_name_main) || {}).innerText?.trim() || '';
                         const roomSub   = (row.querySelector(S.room_name_sub)  || {}).innerText?.trim() || '';
+                        const roomOne   = (row.querySelector(S.room_name)      || {}).innerText?.trim() || '';
+                        const roomLabel = [roomMain, roomSub].filter(Boolean).join(' ') || roomOne;
                         let price       = (row.querySelector(S.price)          || {}).innerText?.trim() || '';
                         if (!price) {
                             // 割引対象の部屋はサイト側が通常の家賃欄を使わず
@@ -452,7 +478,7 @@ function scrape_url(object $browser, string $url, array $config, bool $headless 
                         const link      = (row.querySelector(S.link)           || {}).href || '';
                         rooms.push({
                             building:   buildingName,
-                            name:       buildingName + (roomMain ? ' ' + roomMain : '') + (roomSub ? ' ' + roomSub : ''),
+                            name:       buildingName + (roomLabel ? ' ' + roomLabel : ''),
                             price,
                             floor_plan: [type, space, floor].filter(Boolean).join(' / '),
                             url:        link,
@@ -505,40 +531,71 @@ function scrape_rooms(array $config, bool $headless = true): array
 // HTML 出力
 // ──────────────────────────────────────────
 
-function save_html(array $rooms, array $newUrls, array $searchUrls, array $highlightKeywords = []): void
+function save_html(array $rooms, array $newUrls, array $groups, array $config = []): void
 {
     $ts       = date('Y-m-d H:i');
     $count    = count($rooms);
     $newCount = count($newUrls);
+    $highlightKeywords = $config['highlight_keywords'] ?? [];
 
-    // 狙っている物件（highlight_keywords に一致）の件数も出す。
-    // 一覧を開いたとき、まずここを見れば用が足りることが多いため。
+    // 「候補」の件数。志望順位のグループが通知対象なら、そこにある部屋が候補。
+    // 旧形式のときだけ、従来どおり highlight_keywords との一致を見る。
+    $legacy   = !empty($groups[0]['legacy']);
+    $notifyOf = [];
+    foreach ($groups as $g) {
+        $notifyOf[$g['name']] = !empty($g['notify']);
+    }
+    $isHotRoom = function (array $r) use ($legacy, $notifyOf, $highlightKeywords, $groups, $config): bool {
+        if ($legacy) {
+            foreach ($highlightKeywords as $kw) {
+                if ($kw !== '' && str_contains($r['name'], $kw)) { return true; }
+            }
+            return false;
+        }
+        if (empty($notifyOf[$r['group'] ?? ''])) {
+            return false;
+        }
+        // 通知するグループでも、間取りで絞っていれば外れる部屋がある
+        foreach ($groups as $g) {
+            if ($g['name'] === ($r['group'] ?? '')) {
+                return room_notifies($r, $g, $config);
+            }
+        }
+        return false;
+    };
+
     $hotCount = 0;
     foreach ($rooms as $r) {
-        foreach ($highlightKeywords as $kw) {
-            if ($kw !== '' && str_contains($r['name'], $kw)) { $hotCount++; break; }
-        }
+        if ($isHotRoom($r)) { $hotCount++; }
     }
 
-    // search_url ごとにグループ化（順序を search_urls の定義順に揃える）
-    $grouped = array_fill_keys($searchUrls, []);
+    // 志望順位のグループごとにまとめる（config の並び順のまま）
+    $grouped = [];
+    foreach ($groups as $g) {
+        $grouped[$g['name']] = [];
+    }
     foreach ($rooms as $r) {
-        $src = $r['source_url'] ?? '';
-        if (isset($grouped[$src])) {
-            $grouped[$src][] = $r;
+        $key = $r['group'] ?? '';
+        if (!isset($grouped[$key])) {
+            $key = array_key_first($grouped);  // 旧 state から読んだ、グループ名の無い部屋
         }
+        $grouped[$key][] = $r;
     }
 
     $sections = '';
-    foreach ($grouped as $srcUrl => $areaRooms) {
-        $aCount = count($areaRooms);
-        $urlEsc = htmlspecialchars($srcUrl);
-        $no     = array_search($srcUrl, $searchUrls) + 1;
+    foreach ($groups as $g) {
+        $areaRooms = $grouped[$g['name']] ?? [];
+        $aCount    = count($areaRooms);
+        $nameEsc   = htmlspecialchars($g['name']);
+        $urlEsc    = htmlspecialchars($g['urls'][0] ?? '');
+        $quiet     = empty($g['notify']) ? ' <span class="area-quiet">通知しない</span>' : '';
 
         $sections .= "<section class=\"area\">\n";
         $sections .= "<div class=\"area-head\">\n";
-        $sections .= "  <h2>エリア {$no}<span class=\"area-count\">{$aCount} 件</span></h2>\n";
-        $sections .= "  <a class=\"area-src\" href=\"{$urlEsc}\" target=\"_blank\" rel=\"noopener\">UR のページで見る →</a>\n";
+        $sections .= "  <h2>{$nameEsc}<span class=\"area-count\">{$aCount} 件</span>{$quiet}</h2>\n";
+        if ($urlEsc !== '') {
+            $sections .= "  <a class=\"area-src\" href=\"{$urlEsc}\" target=\"_blank\" rel=\"noopener\">UR のページで見る →</a>\n";
+        }
         $sections .= "</div>\n";
 
         if ($aCount === 0) {
@@ -550,10 +607,7 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
         foreach ($areaRooms as $r) {
             $isNew = in_array($r['url'], $newUrls, true);
 
-            $isHot = false;
-            foreach ($highlightKeywords as $kw) {
-                if ($kw !== '' && str_contains($r['name'], $kw)) { $isHot = true; break; }
-            }
+            $isHot = $isHotRoom($r);
 
             $cls = 'card';
             if ($isNew) { $cls .= ' is-new'; }
@@ -666,6 +720,10 @@ function save_html(array $rooms, array $newUrls, array $searchUrls, array $highl
   }
   .area h2 { margin: 0; font-size: 1.08rem; letter-spacing: .02em; }
   .area-count { margin-left: 10px; font-size: .82rem; font-weight: 400; color: var(--sub); }
+  .area-quiet {
+    margin-left: 10px; font-size: .7rem; font-weight: 400; color: var(--sub);
+    border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; vertical-align: middle;
+  }
   .area-src { margin-left: auto; font-size: .78rem; color: var(--accent); text-decoration: none; }
   .area-src:hover { text-decoration: underline; }
   .empty { color: var(--sub); font-size: .9rem; margin: 0; }
@@ -814,15 +872,30 @@ function notify_watch(string $webhookUrl, array $matched): void
         return;
     }
     $lines = [":rotating_light: *【空き速報】新着 " . count($matched) . "件*", ""];
+    // 志望順位ごとにまとめる。第一志望に出たのか滑り止めに出たのかで動き方が
+    // 変わるので、通知を見た時点で分かるようにする。
+    $byGroup = [];
     foreach ($matched as $r) {
-        $name  = $r['name']       ?? '';
-        $fp    = $r['floor_plan'] ?? '';
-        $price = $r['price']      ?? '';
-        $url   = $r['url']        ?? '';
-        // "物件名　間取り/㎡/階　家賃　詳細を見る（クリッカブル）" の1行フォーマット
-        $link  = $url ? "<{$url}|詳細を見る>" : '';
-        $parts = array_filter([$name, $fp, $price, $link], fn($v) => $v !== '');
-        $lines[] = implode('　', $parts);
+        $byGroup[$r['group'] ?? ''][] = $r;
+    }
+    foreach ($byGroup as $groupName => $rooms) {
+        if ($groupName !== '' && count($byGroup) > 1) {
+            $lines[] = "*{$groupName}*";
+        } elseif ($groupName !== '') {
+            $lines[] = "*{$groupName}* に新着";
+            $lines[] = "";
+        }
+        foreach ($rooms as $r) {
+            $name  = $r['name']       ?? '';
+            $fp    = $r['floor_plan'] ?? '';
+            $price = $r['price']      ?? '';
+            $url   = $r['url']        ?? '';
+            // "物件名　間取り/㎡/階　家賃　詳細を見る（クリッカブル）" の1行フォーマット
+            $link  = $url ? "<{$url}|詳細を見る>" : '';
+            $parts = array_filter([$name, $fp, $price, $link], fn($v) => $v !== '');
+            $lines[] = implode('　', $parts);
+        }
+        $lines[] = "";
     }
     slack_send($webhookUrl, implode("\n", $lines));
 }
@@ -932,17 +1005,100 @@ function untrusted_result_reason(array $rooms, array $prevForUrl, float $ratio):
     return null;
 }
 
+// 設定を「志望順位ごとのグループ」に正規化する。
+//
+// 大学受験の第一志望・滑り止めと同じ考え方で、入居したい団地ほど上に置き、
+// 相場を知りたいだけの地域は下に置いて通知を切る。グループの名前がそのまま
+// 一覧ページの見出しになるので、「エリア 1」のような無意味な見出しが消える。
+//
+// 旧形式（search_urls + watch）の設定もそのまま動く。フォークした人の設定が
+// ある日いきなり壊れないようにするため、当面は両方を読む。
+function normalize_groups(array $config): array
+{
+    if (!empty($config['groups']) && is_array($config['groups'])) {
+        $groups = [];
+        foreach ($config['groups'] as $i => $g) {
+            if (!is_array($g)) {
+                continue;
+            }
+            $urls = array_values(array_filter((array)($g['urls'] ?? []), 'is_string'));
+            if ($urls === []) {
+                continue;  // URL の無いグループは存在しないのと同じ
+            }
+            $groups[] = [
+                'name'   => (string)($g['name'] ?? ('グループ ' . ($i + 1))),
+                // 既定は通知する。「一覧に出すだけ」は明示的に false を書いてもらう
+                'notify' => !array_key_exists('notify', $g) || (bool)$g['notify'],
+                'madori' => array_values(array_filter(
+                    (array)($g['madori'] ?? []),
+                    fn($v) => is_string($v) && $v !== ''
+                )),
+                'urls'   => $urls,
+                'legacy' => false,
+            ];
+        }
+        return $groups;
+    }
+
+    // 旧形式。search_urls をひとまとめにし、通知の判定は従来どおり watch に任せる
+    $urls = array_values(array_filter((array)($config['search_urls'] ?? []), 'is_string'));
+    if ($urls === []) {
+        return [];
+    }
+    return [[
+        'name'   => '監視対象',
+        'notify' => true,
+        'madori' => [],
+        'urls'   => $urls,
+        'legacy' => true,
+    ]];
+}
+
+// この部屋を通知すべきか。グループの志望順位と間取りで決める。
+// 旧形式のときだけ、従来どおり watch と notify_all_new を見る。
+function room_notifies(array $room, array $group, array $config): bool
+{
+    if (!empty($group['legacy'])) {
+        if (!empty($config['notify_all_new'])) {
+            return true;
+        }
+        return room_matches_watch($room, $config['watch'] ?? []);
+    }
+    if (empty($group['notify'])) {
+        return false;   // 一覧に出すだけのグループ（相場を見るためのもの）
+    }
+    if ($group['madori'] === []) {
+        return true;    // 間取りを問わない
+    }
+    foreach ($group['madori'] as $m) {
+        if (str_contains($room['floor_plan'] ?? '', $m)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // $dryRun: 開発（Windows / macOS）用。スクレイプはするが Slack 送信と
 // state.json / docs/index.html の書き込みを行わない。本番の状態を壊さずに動作確認できる。
 function run_monitor(array $config, bool $dryRun = false): void
 {
-    $searchUrls = $config['search_urls'] ?? [];
+    $groups     = normalize_groups($config);
     $webhookUrl = $config['slack_webhook_url'] ?? '';
 
-    if (empty($searchUrls)) {
-        log_msg('ERROR', "config.json の search_urls を設定してください");
+    if ($groups === []) {
+        log_msg('ERROR', "config.json の groups（または search_urls）を設定してください");
         exit(1);
     }
+
+    // URL とグループの対応。取得ループとロボット確認の両方で使う
+    $urlGroup = [];
+    foreach ($groups as $g) {
+        foreach ($g['urls'] as $u) {
+            // 同じ URL が複数のグループにあるときは、上のグループ（志望順位が高いほう）を採る
+            $urlGroup[$u] ??= $g;
+        }
+    }
+    $searchUrls = array_keys($urlGroup);
 
     if ($dryRun) {
         log_msg('INFO', "dry-run: Slack 通知と state.json / docs/index.html の更新は行いません");
@@ -991,7 +1147,8 @@ function run_monitor(array $config, bool $dryRun = false): void
             if ($i > 0) {
                 sleep(3); // 連続アクセスを避けるため URL 間に 3 秒待機
             }
-            log_msg('INFO', "検索URL " . ($i + 1) . "/" . count($searchUrls) . " を処理中");
+            $group = $urlGroup[$searchUrl];
+            log_msg('INFO', sprintf('URL %d/%d を処理中（%s）', $i + 1, count($searchUrls), $group['name']));
 
             // 前回 state のうち、この検索URL 由来の分だけ取り出しておく（失敗時の引き継ぎ用）
             $prevForUrl = [];
@@ -1044,10 +1201,18 @@ function run_monitor(array $config, bool $dryRun = false): void
             $scrapedOk = true;
 
             foreach ($rooms as $r) {
-                if (!empty($r['url'])) {
-                    $r['source_url'] = $searchUrl;
-                    $currentMap[$r['url']] = $r;
+                if (empty($r['url'])) {
+                    continue;
                 }
+                // 同じ部屋が複数の URL に出ることがある（団地ページと地域ページなど）。
+                // 先に入ったものを残す。URL は志望順位の高いグループから並べてあるので、
+                // 結果として高いほうのグループに属する扱いになる。
+                if (isset($currentMap[$r['url']])) {
+                    continue;
+                }
+                $r['source_url'] = $searchUrl;
+                $r['group']      = $group['name'];
+                $currentMap[$r['url']] = $r;
             }
         }
     } finally {
@@ -1075,21 +1240,21 @@ function run_monitor(array $config, bool $dryRun = false): void
         log_msg('INFO', "新着 " . count($newUrls) . " 件");
         $newRooms = array_values(array_intersect_key($currentMap, array_flip($newUrls)));
 
-        // 狙っている条件（watch）に合致する新着を最優先で通知
-        $watch   = $config['watch'] ?? [];
-        $matched = array_values(array_filter($newRooms, fn($r) => room_matches_watch($r, $watch)));
+        // 通知するかはグループごとに決まる。志望順位の高いグループは通知し、
+        // 相場を見るためだけのグループは一覧に出すだけで黙っている。
+        $matched = array_values(array_filter(
+            $newRooms,
+            fn($r) => room_notifies($r, $urlGroup[$r['source_url'] ?? ''] ?? $groups[0], $config)
+        ));
         if (!empty($matched)) {
             if ($dryRun) {
-                log_msg('INFO', "dry-run: 条件に合致する新着 " . count($matched) . " 件（通知は送りません）");
+                log_msg('INFO', "dry-run: 通知対象の新着 " . count($matched) . " 件（通知は送りません）");
             } else {
-                log_msg('INFO', "狙っている条件に合致する新着 " . count($matched) . " 件 → Slack 通知");
+                log_msg('INFO', "通知対象の新着 " . count($matched) . " 件 → Slack 通知");
                 notify_watch($webhookUrl, $matched);
             }
-        }
-
-        // 全新着の通知は既定オフ（notify_all_new=true で有効化）。スパム防止のため。
-        if (!empty($config['notify_all_new']) && !$dryRun) {
-            notify_slack($webhookUrl, $newRooms, implode(', ', $searchUrls));
+        } else {
+            log_msg('INFO', "新着はあるが、通知対象のグループには無し");
         }
     } else {
         log_msg('INFO', "新着なし");
@@ -1104,7 +1269,7 @@ function run_monitor(array $config, bool $dryRun = false): void
         return;
     }
 
-    save_html(array_values($currentMap), array_values($newUrls), $searchUrls, $config['highlight_keywords'] ?? []);
+    save_html(array_values($currentMap), array_values($newUrls), $groups, $config);
 
     save_state([
         'rooms'        => $currentMap,
