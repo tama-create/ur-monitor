@@ -18,7 +18,7 @@ php -l ur_monitor.php          # 構文チェック
 |---|---|
 | `php ur_monitor.php --dry-run` | スクレイピングのみ。Slack 通知も state / 一覧の更新もしない |
 | `php ur_monitor.php` | 本番と同じ動作。**ローカルでは基本実行しない**（下記「状態はリポジトリに無い」参照） |
-| `php ur_monitor.php --seed-state` | 保管先を用意した直後に1回だけ。`state.json` を保管先へ移す |
+| `php ur_monitor.php --seed-state` | 保管先を作った直後に1回だけ。手元の `state.json`（無ければ空）を保管先へ置く |
 | `php ur_monitor.php --setup` | ブラウザを表示し `debug_page.html` と `debug_*.png` を保存。セレクター調整用 |
 | `php ur_monitor.php --check-robots` | robots.txt の確認のみ |
 
@@ -133,7 +133,7 @@ UR のページは物件情報を HTML と一緒に返さず、描画後に JS �
 許可されるが、**「確認しているが結果は無視する」状態に戻さないこと**（README で
 robots.txt を尊重すると書いている以上、実装がそれを裏切ってはいけない）。
 
-### state.json が壊れていたら止める
+### 前回状態が読めなければ止める
 
 `load_state()` は JSON を解釈できなければ **exit(1) で中止する**。空とみなして続けると
 全部屋が「新着」になり、条件に合うものがまとめて Slack へ飛ぶ。取得失敗より誤通知の

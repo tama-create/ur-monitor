@@ -1416,15 +1416,22 @@ function run_seed_state(): void
         log_msg('ERROR', 'STORE_URL / STORE_TOKEN が設定されていません');
         exit(1);
     }
-    if (!file_exists(STATE_FILE)) {
-        log_msg('ERROR', 'state.json が見つかりません: ' . STATE_FILE);
-        exit(1);
-    }
-    $raw     = (string)file_get_contents(STATE_FILE);
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded) || !isset($decoded['rooms'])) {
-        log_msg('ERROR', 'state.json を解釈できませんでした。移送を中止します');
-        exit(1);
+    // 引き継ぐ state がある場合（保管先へ移す途中）と、まっさらから始める場合の両方を扱う。
+    // リポジトリに state.json は置いていないので、フォークした直後はこちらの経路になる。
+    if (file_exists(STATE_FILE)) {
+        $raw     = (string)file_get_contents(STATE_FILE);
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || !isset($decoded['rooms'])) {
+            log_msg('ERROR', 'state.json を解釈できませんでした。移送を中止します');
+            exit(1);
+        }
+    } else {
+        // 空から始めると、次の実行で「前回は0件」になり、いま出ている部屋が
+        // すべて新着として扱われる。初回だけは通知がまとめて来るということ。
+        $decoded = ['rooms' => []];
+        $raw     = json_encode($decoded, JSON_UNESCAPED_SLASHES);
+        log_msg('WARNING', 'state.json が無いので空の状態から始めます。'
+            . '次の実行では、いま出ている部屋がすべて新着として通知されます');
     }
 
     // 二度流し込んで、動いている状態を古い内容で上書きしないようにする
@@ -1443,8 +1450,7 @@ function run_seed_state(): void
         log_msg('ERROR', "保管先へ書けませんでした（HTTP {$put}）");
         exit(1);
     }
-    log_msg('INFO', '保管先へ state を移しました（' . count($decoded['rooms']) . ' 件）。'
-        . 'リポジトリの state.json はもう使われません');
+    log_msg('INFO', '保管先へ state を置きました（' . count($decoded['rooms']) . ' 件）');
 }
 
 function run_setup(array $config): void

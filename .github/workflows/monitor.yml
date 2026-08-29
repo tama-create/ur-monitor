@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       seed_state:
-        description: '保管先へ state.json を移す（保管先を用意した直後に1回だけ）'
+        description: '保管先の状態を用意する（保管先を作った直後に1回だけ）'
         type: boolean
         default: false
 
