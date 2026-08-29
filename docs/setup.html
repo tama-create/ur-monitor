@@ -364,7 +364,7 @@
         <li><a href="#s5-1">監視したいページの URL を調べる</a></li>
         <li><a href="#s5-2">config.json を編集する</a></li>
         <li><a href="#s5-3">設定項目の意味</a></li>
-        <li><a href="#s5-4">建物名の書き方</a></li>
+        <li><a href="#s5-4">間取りの書き方</a></li>
       </ol>
     </li>
     <li><a href="#s6">Slack の通知先を用意する</a>
@@ -453,8 +453,8 @@ UR賃貸の空き部屋を自動で監視し、条件に合う新着が出たら
 <h2 id="s1">このツールは何をするのか</h2>
 
 <p>
-UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あなたが指定した条件
-（建物名・間取り）に合う部屋が新しく出たら、<strong>Slack に通知</strong>します。
+UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あなたが選んだページに
+条件（間取り）に合う部屋が新しく出たら、<strong>Slack に通知</strong>します。
 </p>
 
 <h3 id="s1-1">全体の流れ</h3>
@@ -734,14 +734,30 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
 
 <h3 id="s5-1">監視したいページの URL を調べる</h3>
 
+<p>
+<strong>UR のサイトで自分が見ているページの URL を、そのままコピーするだけです。</strong>
+建物名を打ち込む必要はありません。次の 2 種類のどちらでも動きます。
+</p>
+
+<table>
+  <tr><th>種類</th><th>どんなページか</th><th>向いている使い方</th></tr>
+  <tr>
+    <td><strong>団地のページ</strong></td>
+    <td>ひとつの団地の空室が並ぶページ<br><code>50_3030.html</code> のような形</td>
+    <td><strong>入りたい物件が決まっている</strong>とき。名前を書かないので打ち間違いが起きません</td>
+  </tr>
+  <tr>
+    <td><strong>検索結果のページ</strong></td>
+    <td>エリアや駅で絞り込んだ一覧<br><code>area/208.html</code> のような形</td>
+    <td>「この辺で何か出たら見たい」と<strong>広く探す</strong>とき</td>
+  </tr>
+</table>
+
 <ol>
   <li><a href="https://www.ur-net.go.jp/chintai/">UR賃貸住宅のサイト</a> を開く</li>
-  <li>住みたいエリアや駅で検索する</li>
-  <li><strong>検索結果が一覧で出ている状態のページ</strong>の URL をコピーする</li>
+  <li>住みたい団地のページ、または住みたいエリア・駅の検索結果を開く</li>
+  <li><strong>ブラウザのアドレス欄の URL をそのままコピーする</strong></li>
 </ol>
-
-<p>たとえばこういう URL です。</p>
-<pre><code>https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html</code></pre>
 
 <h3 id="s5-2">config.json を編集する</h3>
 
@@ -754,41 +770,82 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
 
 <h3 id="s5-3">設定項目の意味</h3>
 
+<p>
+監視対象は <code>groups</code> にまとめて書きます。<strong>大学受験の第一志望・滑り止めと
+同じ考え方</strong>で、入りたい物件ほど上に置いてください。
+</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 250" role="img" aria-label="第一志望のグループは通知あり、滑り止めのグループは一覧に出すだけという住み分けの図">
+  <rect x="20" y="20" width="380" height="95" rx="10" fill="#ddf4e4" stroke="#2da44e" stroke-width="2"/>
+  <text x="40" y="50" style="text-anchor:start" font-size="17" font-weight="700" fill="#1a7f37">第一志望</text>
+  <text x="40" y="74" style="text-anchor:start" font-size="14" fill="#24292f">入りたい団地のページ</text>
+  <text x="40" y="97" style="text-anchor:start" font-size="14" fill="#24292f">空きが出たら <tspan font-weight="700">Slack で知らせる</tspan></text>
+
+  <rect x="440" y="20" width="380" height="95" rx="10" fill="#f6f8fa" stroke="#8c959f" stroke-width="2"/>
+  <text x="460" y="50" style="text-anchor:start" font-size="17" font-weight="700" fill="#57606a">滑り止め</text>
+  <text x="460" y="74" style="text-anchor:start" font-size="14" fill="#24292f">周辺エリアの検索結果</text>
+  <text x="460" y="97" style="text-anchor:start" font-size="14" fill="#24292f">一覧に出すだけで <tspan font-weight="700">通知はしない</tspan></text>
+
+  <rect x="20" y="150" width="800" height="80" rx="10" fill="#fff8c5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="40" y="182" style="text-anchor:start" font-size="15" font-weight="700" fill="#24292f">同じ部屋が両方に出てきたら、上のグループが勝ちます</text>
+  <text x="40" y="209" style="text-anchor:start" font-size="14" fill="#24292f">本命の団地ページと、その団地を含むエリアのページを両方書いても、通知は「第一志望」として届きます</text>
+</svg>
+<figcaption>グループごとに「鳴らす／黙って一覧に出す」を分けられる</figcaption>
+</figure>
+
 <table>
   <tr><th>項目</th><th>意味</th></tr>
   <tr>
-    <td><code>search_urls</code></td>
+    <td><code>name</code></td>
+    <td>グループの名前。<strong>そのまま通知と一覧ページの見出しになります</strong>。自分に分かる言葉で構いません</td>
+  </tr>
+  <tr>
+    <td><code>notify</code></td>
+    <td><code>true</code> なら通知する。<code>false</code> なら<strong>一覧に出すだけで通知しません</strong></td>
+  </tr>
+  <tr>
+    <td><code>madori</code></td>
+    <td>通知したい間取り。<strong>どれか1つに合えば通知</strong>。<code>[]</code> と書くと間取りを問いません</td>
+  </tr>
+  <tr>
+    <td><code>urls</code></td>
     <td>巡回するページの URL。<strong>ここに出てくる物件だけが監視対象</strong>になります。複数書けます</td>
-  </tr>
-  <tr>
-    <td><code>watch</code></td>
-    <td>通知する条件。<code>building</code>（建物名）と <code>madori</code>（間取り）の組。<strong>どれか1つに合えば通知</strong></td>
-  </tr>
-  <tr>
-    <td><code>highlight_keywords</code></td>
-    <td>Web ページ上で赤く目立たせる文字列。<strong>通知には影響しません</strong></td>
-  </tr>
-  <tr>
-    <td><code>notify_all_new</code></td>
-    <td><code>true</code> にすると条件に関係なく全部の新着を通知。通知が多くなるので既定は <code>false</code></td>
   </tr>
 </table>
 
 <p>書き方の例：</p>
-<pre><code>"watch": [
-  { "building": "○○ハイツ", "madori": "1LDK" },
-  { "building": "○○ハイツ", "madori": "2DK" }
+<pre><code>"groups": [
+  {
+    "name": "第一志望",
+    "notify": true,
+    "madori": ["1LDK", "2DK"],
+    "urls": ["https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030.html"]
+  },
+  {
+    "name": "滑り止め",
+    "notify": false,
+    "madori": [],
+    "urls": ["https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html"]
+  }
 ]</code></pre>
 
-<p>これは「○○ハイツの 1LDK <strong>または</strong> 2DK」という意味です。間取り違いは行を分けて書きます。</p>
+<p>
+これは「第一志望の団地に <strong>1LDK または 2DK</strong> が出たら通知する。滑り止めのエリアは
+一覧で眺めるだけで通知はしない」という意味です。
+</p>
 
-<h3 id="s5-4">建物名の書き方</h3>
+<h3 id="s5-4">間取りの書き方</h3>
 
 <div class="warn">
-<p><strong>建物名は「一部でも一致すれば OK」の判定です。</strong>短く書きすぎると、似た名前の別の建物まで通知されます。</p>
-<p>たとえば <code>"さくら通り"</code> と書くと、「さくら通り第二」「さくら通り第三」にも反応します。
-建物名は<strong>UR のサイトに表示されているとおり、正確に</strong>書いてください。全角スペースの有無まで一致させます。</p>
-<p>逆に、<code>"madori": ""</code> のように空にすると「その条件は問わない」という意味になります。</p>
+<p><strong>間取りは「一部でも一致すれば OK」の判定です。</strong>
+<code>"2DK"</code> と書くと <code>2DK / 51㎡ / 4階</code> に一致します。
+<code>2LDK</code> は別物なので、両方ほしいときは <code>["2DK", "2LDK"]</code> と並べてください。</p>
+<p><strong>間取りを問わないときは <code>[]</code> にします。</strong>
+その団地に何が出ても知りたい、という場合はこちらです。</p>
+<p><strong>建物名を書く欄はありません。</strong>入りたい団地が決まっているなら、
+その団地のページの URL を <code>urls</code> に入れてください。名前の打ち間違いで
+取りこぼす心配が無くなります。</p>
 </div>
 
 <h2 id="s6">Slack の通知先を用意する <span class="step-time">（15分）</span></h2>
@@ -1134,9 +1191,9 @@ GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完�
 <ul>
   <li>上に<strong>空き部屋・新着・候補の件数</strong>が並びます。開いてまず見るところです</li>
   <li>その下に<strong>最終更新の時刻</strong>。いつ時点の情報かがひと目で分かります</li>
-  <li>監視している<strong>検索URLごとに区切られて</strong>、それぞれ何件空いているかが出ます</li>
+  <li><strong>グループごとに区切られて</strong>、それぞれ何件空いているかが出ます</li>
   <li><strong>黄色いカードに NEW</strong> が付いているのが、前回の確認から新しく出てきた部屋です</li>
-  <li><strong>赤枠のカード</strong>が、狙っている物件（設定した <code>highlight_keywords</code> に一致したもの）です</li>
+  <li><strong>赤枠のカード</strong>が、通知の条件に合った部屋（＝狙っている物件）です</li>
   <li><strong>カードを押すと</strong>、UR の物件ページへ直接飛べます。スマホでは1列に折り返します</li>
 </ul>
 </div>
@@ -1207,8 +1264,9 @@ GitHub の設定を1つ切り替えるだけです。</p>
     <td>ログに「新着なし」と出ていれば正常です。空きが出るまで通知は来ません</td>
   </tr>
   <tr>
-    <td>建物名が正確か</td>
-    <td>UR のサイトの表記と、スペースまで一致しているか確認してください</td>
+    <td>間取りの指定が合っているか</td>
+    <td><code>madori</code> が UR の表記と一致しているか（<code>2DK</code> と <code>2LDK</code> は別物）。
+    何でも通知したいときは <code>[]</code> にしてください</td>
   </tr>
 </table>
 

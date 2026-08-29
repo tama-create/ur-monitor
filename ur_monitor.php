@@ -1054,6 +1054,20 @@ function normalize_groups(array $config): array
     ]];
 }
 
+// URL からグループを引く表。同じ URL が複数のグループにあるときは、
+// 上のグループ（志望順位が高いほう）を採る。取得ループ・robots 確認・
+// セットアップの3か所が同じ URL 一覧を見るようにするための共通化。
+function group_url_map(array $groups): array
+{
+    $map = [];
+    foreach ($groups as $g) {
+        foreach ($g['urls'] as $u) {
+            $map[$u] ??= $g;
+        }
+    }
+    return $map;
+}
+
 // この部屋を通知すべきか。グループの志望順位と間取りで決める。
 // 旧形式のときだけ、従来どおり watch と notify_all_new を見る。
 function room_notifies(array $room, array $group, array $config): bool
@@ -1091,13 +1105,7 @@ function run_monitor(array $config, bool $dryRun = false): void
     }
 
     // URL とグループの対応。取得ループとロボット確認の両方で使う
-    $urlGroup = [];
-    foreach ($groups as $g) {
-        foreach ($g['urls'] as $u) {
-            // 同じ URL が複数のグループにあるときは、上のグループ（志望順位が高いほう）を採る
-            $urlGroup[$u] ??= $g;
-        }
-    }
+    $urlGroup   = group_url_map($groups);
     $searchUrls = array_keys($urlGroup);
 
     if ($dryRun) {
@@ -1280,9 +1288,9 @@ function run_monitor(array $config, bool $dryRun = false): void
 
 function run_setup(array $config): void
 {
-    $searchUrls = $config['search_urls'] ?? [];
+    $searchUrls = array_keys(group_url_map(normalize_groups($config)));
     if (empty($searchUrls)) {
-        log_msg('ERROR', "config.json の search_urls を設定してください");
+        log_msg('ERROR', "config.json の groups（または search_urls）を設定してください");
         exit(1);
     }
 
@@ -1316,8 +1324,13 @@ try {
         run_setup($config);
     } elseif (in_array('--check-robots', $args)) {
         // 1件でも拒否があれば終了コードで分かるようにする（CI や手動確認で拾えるように）
+        $urls = array_keys(group_url_map(normalize_groups($config)));
+        if (empty($urls)) {
+            log_msg('ERROR', "config.json の groups（または search_urls）を設定してください");
+            exit(1);
+        }
         $allowed = true;
-        foreach ($config['search_urls'] ?? [] as $url) {
+        foreach ($urls as $url) {
             $allowed = check_robots_txt($url) && $allowed;
         }
         if (!$allowed) {
