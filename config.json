@@ -1,18 +1,22 @@
 {
-  "search_urls": [
-    "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
-    "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html",
-    "https://www.ur-net.go.jp/chintai/kanto/tokyo/area/222.html"
-  ],
-  "notify_all_new": false,
-  "watch": [
+  "groups": [
     {
-      "building": "プラザシティ新所沢　けやき通り",
-      "madori": "1LDK"
+      "name": "第一志望",
+      "notify": true,
+      "madori": ["1LDK", "2DK"],
+      "urls": [
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/50_3030.html"
+      ]
     },
     {
-      "building": "プラザシティ新所沢　けやき通り",
-      "madori": "2DK"
+      "name": "滑り止め",
+      "notify": false,
+      "madori": [],
+      "urls": [
+        "https://www.ur-net.go.jp/chintai/kanto/saitama/area/208.html",
+        "https://www.ur-net.go.jp/chintai/kanto/tokyo/eki/1989.html",
+        "https://www.ur-net.go.jp/chintai/kanto/tokyo/area/222.html"
+      ]
     }
   ],
   "jitter_max_seconds": 40,
@@ -22,9 +26,6 @@
   "monitoring_hours": [
     8,
     21
-  ],
-  "highlight_keywords": [
-    "プラザシティ新所沢　けやき通り"
   ],
   "selectors": {
     "room_list": ".module_searchs_property",

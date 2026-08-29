@@ -131,8 +131,17 @@ robots.txt を尊重すると書いている以上、実装がそれを裏切っ
 
 ### 通知
 
-`watch` の照合は `room_matches_watch()` の**部分一致**（`str_contains`）。`building` / `madori` は
-空文字なら「その条件は問わない」の意味になる。全新着の通知（`notify_all_new`）はスパム防止で既定オフ。
+通知するかは `room_notifies()` がグループ単位で決める。`notify: false` のグループは一覧に出すだけで
+黙り、`madori` は**部分一致**（`str_contains`）で、空配列なら「間取りを問わない」の意味になる。
+
+**同じ部屋が複数のグループに出たときは、先に処理したグループが勝つ**（`normalize_groups()` の
+並び順＝志望順位の高いほう）。団地ページを第一志望に、それを含む地域ページを滑り止めに置く
+という書き方が成立しているのはこのため。ここを「後勝ち」にすると、本命の部屋が
+滑り止め扱いになって**通知が黙る**。
+
+旧形式（`search_urls` + `watch`）も読める。そちらの照合は `room_matches_watch()` の部分一致で、
+`building` / `madori` は空文字なら「その条件は問わない」。全新着の通知（`notify_all_new`）と
+`highlight_keywords` は**旧形式のときだけ効く**。
 
 Slack の Webhook URL は `SLACK_WEBHOOK_URL` 環境変数から渡す。`config.json` にも書けるが、
 **実際の値を書いてコミットしないこと**。
