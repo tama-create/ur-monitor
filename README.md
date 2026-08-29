@@ -425,6 +425,19 @@ php ur_monitor.php --seed-state     # STORE_URL / STORE_TOKEN が必要
 Actions からは、監視ワークフローを手動実行して `seed_state` にチェックを入れる。
 すでに保管先に state があれば上書きせずに止まる。
 
+### 資料ページから一覧へのリンク
+
+資料ページ（`docs/*.html`）の上部メニュー左端に「空き部屋一覧」を置いてある。行き先は
+**自分の Worker の URL**（Basic 認証の内側）。資料は生成物ではなく手で書いた HTML なので、
+`config.json` の値は使えず、**4ファイルに直接書いてある**。
+
+```
+docs/index.html  docs/guide.html  docs/setup.html  docs/architecture.html
+```
+
+フォークしたら `ur-monitor-trigger.<自分>.workers.dev` に置き換えること。書き換えなくても
+**中身は守られる**（作者の Basic 認証に弾かれるだけ）が、行き先としては正しくない。
+
 ### 公開しているのは資料だけ
 
 | URL | 中身 |
