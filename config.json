@@ -1,7 +1,7 @@
 {
   "groups": [
     {
-      "name": "第一志望",
+      "name": "第一希望",
       "notify": true,
       "madori": [
         "1LDK",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "name": "滑り止め",
+      "name": "参考",
       "notify": false,
       "madori": [],
       "urls": [

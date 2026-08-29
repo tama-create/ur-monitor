@@ -625,7 +625,7 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
     $newCount = count($newUrls);
     $highlightKeywords = $config['highlight_keywords'] ?? [];
 
-    // 「候補」の件数。志望順位のグループが通知対象なら、そこにある部屋が候補。
+    // 「候補」の件数。希望順位のグループが通知対象なら、そこにある部屋が候補。
     // 旧形式のときだけ、従来どおり highlight_keywords との一致を見る。
     $legacy   = !empty($groups[0]['legacy']);
     $notifyOf = [];
@@ -656,7 +656,7 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
         if ($isHotRoom($r)) { $hotCount++; }
     }
 
-    // 志望順位のグループごとにまとめる（config の並び順のまま）
+    // 希望順位のグループごとにまとめる（config の並び順のまま）
     $grouped = [];
     foreach ($groups as $g) {
         $grouped[$g['name']] = [];
@@ -779,6 +779,9 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
     background-size: 20px 20px; opacity: .45;
   }
   .hero-inner { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 20px 24px 18px; }
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
   .hero-kicker { margin: 0 0 3px; font-size: .8rem; font-weight: 700; letter-spacing: .16em; color: #8fc2f5; }
   .hero h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; color: #fff; }
 
@@ -857,6 +860,7 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
 
   @media (max-width: 720px) {
     .hero-inner { padding: 16px 18px 14px; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
     .hero h1 { font-size: 1.3rem; }
     .nav { padding: 9px 18px; font-size: .76rem; }
     .nav > .grp-right { margin-left: 0; flex-basis: 100%; }
@@ -873,8 +877,13 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
 
 <header class="hero">
   <div class="hero-inner">
-    <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
-    <h1>空き部屋一覧</h1>
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>空き部屋一覧</h1>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -981,7 +990,7 @@ function notify_watch(string $webhookUrl, array $matched): void
         return;
     }
     $lines = [":rotating_light: *【空き速報】新着 " . count($matched) . "件*", ""];
-    // 志望順位ごとにまとめる。第一志望に出たのか滑り止めに出たのかで動き方が
+    // 希望順位ごとにまとめる。第一希望に出たのか参考に出たのかで動き方が
     // 変わるので、通知を見た時点で分かるようにする。
     $byGroup = [];
     foreach ($matched as $r) {
@@ -1114,11 +1123,11 @@ function untrusted_result_reason(array $rooms, array $prevForUrl, float $ratio):
     return null;
 }
 
-// 設定を「志望順位ごとのグループ」に正規化する。
+// 設定を「希望順位ごとのグループ」に正規化する。
 //
-// 大学受験の第一志望・滑り止めと同じ考え方で、入居したい団地ほど上に置き、
-// 相場を知りたいだけの地域は下に置いて通知を切る。グループの名前がそのまま
-// 一覧ページの見出しになるので、「エリア 1」のような無意味な見出しが消える。
+// 入居したい団地ほど上に置き、相場を知りたいだけの地域は下に置いて通知を切る。
+// グループの名前がそのまま一覧ページの見出しになるので、「エリア 1」のような
+// 無意味な見出しが消える。
 //
 // 旧形式（search_urls + watch）の設定もそのまま動く。フォークした人の設定が
 // ある日いきなり壊れないようにするため、当面は両方を読む。
@@ -1164,7 +1173,7 @@ function normalize_groups(array $config): array
 }
 
 // URL からグループを引く表。同じ URL が複数のグループにあるときは、
-// 上のグループ（志望順位が高いほう）を採る。取得ループ・robots 確認・
+// 上のグループ（希望順位が高いほう）を採る。取得ループ・robots 確認・
 // セットアップの3か所が同じ URL 一覧を見るようにするための共通化。
 function group_url_map(array $groups): array
 {
@@ -1177,7 +1186,7 @@ function group_url_map(array $groups): array
     return $map;
 }
 
-// この部屋を通知すべきか。グループの志望順位と間取りで決める。
+// この部屋を通知すべきか。グループの希望順位と間取りで決める。
 // 旧形式のときだけ、従来どおり watch と notify_all_new を見る。
 function room_notifies(array $room, array $group, array $config): bool
 {
@@ -1322,7 +1331,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                     continue;
                 }
                 // 同じ部屋が複数の URL に出ることがある（団地ページと地域ページなど）。
-                // 先に入ったものを残す。URL は志望順位の高いグループから並べてあるので、
+                // 先に入ったものを残す。URL は希望順位の高いグループから並べてあるので、
                 // 結果として高いほうのグループに属する扱いになる。
                 if (isset($currentMap[$r['url']])) {
                     continue;
@@ -1357,7 +1366,7 @@ function run_monitor(array $config, bool $dryRun = false): void
         log_msg('INFO', "新着 " . count($newUrls) . " 件");
         $newRooms = array_values(array_intersect_key($currentMap, array_flip($newUrls)));
 
-        // 通知するかはグループごとに決まる。志望順位の高いグループは通知し、
+        // 通知するかはグループごとに決まる。希望順位の高いグループは通知し、
         // 相場を見るためだけのグループは一覧に出すだけで黙っている。
         $matched = array_values(array_filter(
             $newRooms,
