@@ -1,0 +1,705 @@
+#!/usr/bin/env node
+// ur-monitor セットアップウィザード本体。
+//
+// 【使い方】直接は起動しません。OS ごとの呼び水から呼ばれます。
+//   Windows : powershell -ExecutionPolicy Bypass -File tools\setup.ps1
+//   Mac     : bash tools/setup.sh
+//
+// 【なぜ Node で書いてあるか】
+// Cloudflare の wrangler が Node を要求するため、このツールを使う人の環境には
+// Node が必ず入ります。そこに本体を置けば、対話も検証も API 呼び出しも
+// Windows と Mac で1つのコードのまま動きます。PowerShell と bash に
+// 本体ごと書き分けると、テストが無いこのリポジトリでは片方の修正漏れに
+// 気づけるのが本番実行時になるため、OS 差は呼び水の数十行に閉じ込めています。
+//
+// 【設計方針】
+// - 各段階の終わりに必ず検証を入れる。「登録したつもり」で先へ進ませない
+// - 途中で失敗しても再開できる（.setup-state.json に済んだ段階を残す）
+// - 秘密情報は画面にもファイルにもシェル履歴にも残さない（後述の run_secret）
+
+import { spawn } from 'node:child_process';
+import { randomInt } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
+
+const ROOT        = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const TRIGGER_DIR = path.join(ROOT, 'trigger');
+const STATE_FILE  = path.join(ROOT, 'tools', '.setup-state.json');
+const LOCAL_TOML  = path.join(TRIGGER_DIR, 'wrangler.local.toml');
+const UPSTREAM    = 'tama-create/ur-monitor';
+
+// 資料ページに直書きしてある一覧へのリンク。フォークした人の Worker に差し替える。
+const DOC_FILES   = ['index.html', 'guide.html', 'setup.html', 'architecture.html'];
+const DOC_URL_RE  = /https:\/\/ur-monitor-trigger\.[a-z0-9-]+\.workers\.dev\/?/g;
+
+// ── 画面表示 ─────────────────────────────────────────────
+
+const C = process.stdout.isTTY
+  ? { g: '\x1b[32m', y: '\x1b[33m', r: '\x1b[31m', b: '\x1b[36m', d: '\x1b[2m', B: '\x1b[1m', x: '\x1b[0m' }
+  : { g: '', y: '', r: '', b: '', d: '', B: '', x: '' };
+
+const say  = (s = '') => console.log(s);
+const ok   = (s) => say(`  ${C.g}✓${C.x} ${s}`);
+const warn = (s) => say(`  ${C.y}!${C.x} ${s}`);
+const bad  = (s) => say(`  ${C.r}✗${C.x} ${s}`);
+const note = (s) => say(`  ${C.d}${s}${C.x}`);
+
+function heading(n, total, title) {
+  say();
+  say(`${C.B}${C.b}[${n}/${total}] ${title}${C.x}`);
+  say(`${C.d}${'─'.repeat(56)}${C.x}`);
+}
+
+// 利用者にブラウザ作業をお願いする箇所の枠。何をすれば良いかを外さないよう、
+// 「開く URL」と「やること」と「戻ってきて入力するもの」を必ず並べて出す。
+function guide(lines) {
+  say();
+  for (const l of lines) say(`  ${l}`);
+  say();
+}
+
+// ── 入力 ─────────────────────────────────────────────────
+
+function ask(query, { allowEmpty = true } = {}) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const go = () => rl.question(`  ${query}`, (v) => {
+      const t = v.trim();
+      if (!t && !allowEmpty) { say(`  ${C.r}入力してください。${C.x}`); return go(); }
+      rl.close();
+      resolve(t);
+    });
+    go();
+  });
+}
+
+async function askYesNo(query, def = true) {
+  const a = (await ask(`${query} ${def ? '[Y/n]' : '[y/N]'} `)).toLowerCase();
+  if (!a) return def;
+  return a === 'y' || a === 'yes';
+}
+
+// 秘密情報の入力。打った文字を画面に出さない。
+// 肩越しに見られる事故と、ターミナルのスクロールバックに残る事故の両方を防ぐ。
+function askSecret(query) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    let muted = false;
+    rl._writeToOutput = function (s) {
+      if (!muted) rl.output.write(s);
+    };
+    rl.question(`  ${query}`, (v) => {
+      rl.close();
+      process.stdout.write('\n');
+      resolve(v.trim());
+    });
+    muted = true;
+  });
+}
+
+// ── コマンド実行 ─────────────────────────────────────────
+
+function run(cmd, args, { cwd = ROOT, input = null, quiet = true } = {}) {
+  return new Promise((resolve) => {
+    const p = spawn(cmd, args, {
+      cwd,
+      shell: process.platform === 'win32', // Windows では gh/wrangler が .cmd のため
+      stdio: [input === null ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    });
+    let out = '', err = '';
+    p.stdout.on('data', (d) => { out += d; if (!quiet) process.stdout.write(d); });
+    p.stderr.on('data', (d) => { err += d; if (!quiet) process.stderr.write(d); });
+    p.on('error', (e) => resolve({ code: -1, out, err: String(e.message) }));
+    p.on('close', (code) => resolve({ code, out, err }));
+    if (input !== null) { p.stdin.write(input); p.stdin.end(); }
+  });
+}
+
+// 秘密情報を渡す実行。値は必ず標準入力から流し込み、引数には決して置かない。
+// 引数に置くと、シェルの履歴と、同じ機械の他利用者から見えるプロセス一覧に残る。
+const runSecret = (cmd, args, value, opts = {}) => run(cmd, args, { ...opts, input: value });
+
+async function has(cmd) {
+  const probe = process.platform === 'win32' ? ['where', [cmd]] : ['which', [cmd]];
+  const r = await run(probe[0], probe[1]);
+  return r.code === 0;
+}
+
+// ── 合言葉の生成 ─────────────────────────────────────────
+
+// 閲覧用のパスワードは人が手で打つので、紛らわしい文字（0とO、1とlとI）を外す。
+// Basic 認証は送出時の文字コードが規格で定まっておらず、記号や日本語だと
+// 環境によって弾かれるため、いずれも英数字だけで作る。
+const HUMAN_CHARS   = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const MACHINE_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function generate(len, chars) {
+  let s = '';
+  for (let i = 0; i < len; i++) s += chars[randomInt(chars.length)];
+  return s;
+}
+
+// ── 状態の保存 ───────────────────────────────────────────
+// セットアップは必ずどこかで失敗する（トークンの権限不足が典型）。
+// 済んだ段階を覚えておいて、再実行したら続きから再開できるようにする。
+// **このファイルには秘密情報を入れない。**
+
+function loadState() {
+  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
+  catch { return { done: [] }; }
+}
+
+function saveState(s) {
+  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+  fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2) + '\n');
+}
+
+// ── 純粋な処理（--self-test で検証する） ─────────────────
+
+// wrangler が KV を作ったときの出力から ID を拾う。出力の書式は版によって
+// 変わる（TOML 片だったり JSON 片だったり）ので、書式ではなく
+// 「32桁の16進数」という値の形で拾う。
+export function parseKvId(text) {
+  const m = String(text).match(/\b[0-9a-f]{32}\b/);
+  return m ? m[0] : null;
+}
+
+// deploy の出力から Worker の URL を拾う。
+export function parseWorkerUrl(text) {
+  const m = String(text).match(/https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/i);
+  return m ? m[0] : null;
+}
+
+// 資料ページのリンク差し替え。作者の Worker を利用者のものに置き換える。
+export function replaceDocUrl(html, workerUrl) {
+  return html.replace(DOC_URL_RE, workerUrl.replace(/\/$/, '') + '/');
+}
+
+// wrangler.toml から、KV の ID だけを実値に差し替えた控えを作る。
+// 実値を wrangler.toml 側に書くとコミットして公開してしまうので、
+// 生成物は追跡しない別ファイルに逃がす。
+export function buildLocalToml(baseToml, kvId) {
+  return '# このファイルは tools/setup.mjs が生成します。追跡しません（.gitignore 済み）。\n'
+       + '# KV の ID は環境ごとに違うため、雛形の wrangler.toml とは分けてあります。\n'
+       + baseToml.replace(/^(\s*id\s*=\s*).*$/m, `$1"${kvId}"`);
+}
+
+// 監視条件を組み立てる。既存の selectors などは触らずに groups だけ差し替える。
+export function buildConfig(base, { primaryUrls, madori, referenceUrls, docsBaseUrl }) {
+  const groups = [{ name: '第一希望', notify: true, madori, urls: primaryUrls }];
+  if (referenceUrls.length) {
+    groups.push({ name: '参考', notify: false, madori: [], urls: referenceUrls });
+  }
+  return { ...base, groups, docs_base_url: docsBaseUrl };
+}
+
+// ── 各段階 ───────────────────────────────────────────────
+
+async function stepTools() {
+  const need = [['git', 'git'], ['gh', 'GitHub CLI'], ['node', 'Node.js']];
+  let missing = [];
+  for (const [cmd, label] of need) {
+    if (await has(cmd)) ok(`${label} は入っています`);
+    else { bad(`${label} が見つかりません`); missing.push(label); }
+  }
+  if (missing.length) {
+    warn('呼び水スクリプト（setup.ps1 / setup.sh）から起動し直してください。');
+    note('前提コマンドの導入はそちらが行います。');
+    throw new Error(`前提コマンドが足りません: ${missing.join(', ')}`);
+  }
+  const major = Number(process.versions.node.split('.')[0]);
+  if (major < 18) throw new Error(`Node 18 以上が必要です（現在 ${process.versions.node}）`);
+  ok(`Node ${process.versions.node}`);
+  return {};
+}
+
+async function stepGhAuth() {
+  let r = await run('gh', ['auth', 'status']);
+  if (r.code !== 0) {
+    guide([
+      'GitHub へのログインが必要です。ブラウザが開きます。',
+      '画面の指示にしたがって承認してください。',
+    ]);
+    if (!(await askYesNo('ログインを始めますか？'))) throw new Error('中止しました');
+    r = await run('gh', ['auth', 'login', '--web', '--git-protocol', 'https'], { quiet: false });
+    if (r.code !== 0) throw new Error('ログインに失敗しました');
+  }
+  const who = await run('gh', ['api', 'user', '--jq', '.login']);
+  if (who.code !== 0) throw new Error('ログイン状態を確認できませんでした');
+  const login = who.out.trim();
+  ok(`GitHub にログイン済みです（${login}）`);
+  return { login };
+}
+
+async function stepFork(state) {
+  const login = state.login;
+  const remote = await run('git', ['remote', 'get-url', 'origin']);
+  const url = remote.out.trim();
+
+  if (url.includes(`${login}/ur-monitor`)) {
+    ok('すでにご自身のフォークで作業しています');
+    return { repo: `${login}/ur-monitor` };
+  }
+
+  say('  いまの作業場所は作者のリポジトリを指しています。');
+  note('  フォーク（自分用の複製）を作り、以降はそちらへ変更を送ります。');
+  if (!(await askYesNo('フォークを作りますか？'))) throw new Error('中止しました');
+
+  const f = await run('gh', ['repo', 'fork', UPSTREAM, '--clone=false', '--remote=false']);
+  if (f.code !== 0 && !/already exists/i.test(f.err)) throw new Error(`フォークに失敗しました: ${f.err.trim()}`);
+
+  const repo = `${login}/ur-monitor`;
+  // origin を自分のフォークへ向け直す。作者のリポジトリには push 権限が無いため、
+  // ここを直さないと後の段階（設定の反映）で必ず失敗する。
+  await run('git', ['remote', 'set-url', 'origin', `https://github.com/${repo}.git`]);
+  await run('git', ['remote', 'add', 'upstream', `https://github.com/${UPSTREAM}.git`]);
+  ok(`フォークを作り、origin を ${repo} に向けました`);
+  return { repo };
+}
+
+async function stepConfig(state) {
+  const file = path.join(ROOT, 'config.json');
+  const base = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+  guide([
+    'UR のサイトで、見張りたいページを開いてください。',
+    `${C.d}団地ページ（例：.../saitama/50_3030.html）が確実です。${C.x}`,
+    `${C.d}エリアや駅で絞った検索結果ページでも構いません。${C.x}`,
+    'そのページの URL をブラウザからコピーして、下に貼ってください。',
+  ]);
+
+  const primaryUrls = [];
+  for (;;) {
+    const u = await ask(primaryUrls.length ? '第一希望の URL（追加、空行で次へ）: ' : '第一希望の URL: ');
+    if (!u) { if (primaryUrls.length) break; say(`  ${C.r}最低1本は必要です。${C.x}`); continue; }
+    if (!/^https:\/\/www\.ur-net\.go\.jp\//.test(u)) { say(`  ${C.r}UR のページの URL を貼ってください。${C.x}`); continue; }
+    primaryUrls.push(u);
+    ok(`登録しました（${primaryUrls.length}本目）`);
+  }
+
+  say();
+  note('通知したい間取りをカンマ区切りで入力します（例: 1LDK,2DK）。');
+  note('空のまま Enter を押すと、間取りを問わずすべて通知します。');
+  const madoriRaw = await ask('間取り: ');
+  const madori = madoriRaw ? madoriRaw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+
+  say();
+  note('参考として一覧にだけ出したいページがあれば追加できます（通知は鳴りません）。');
+  const referenceUrls = [];
+  for (;;) {
+    const u = await ask('参考の URL（不要なら空行）: ');
+    if (!u) break;
+    if (!/^https:\/\/www\.ur-net\.go\.jp\//.test(u)) { say(`  ${C.r}UR のページの URL を貼ってください。${C.x}`); continue; }
+    referenceUrls.push(u);
+    ok(`登録しました（${referenceUrls.length}本目）`);
+  }
+
+  const docsBaseUrl = `https://${state.login}.github.io/ur-monitor`;
+  const next = buildConfig(base, { primaryUrls, madori, referenceUrls, docsBaseUrl });
+  fs.writeFileSync(file, JSON.stringify(next, null, 2) + '\n');
+
+  // 書いた直後に読み直して妥当性を見る。壊れた config.json のまま先へ進むと、
+  // 失敗するのは本番実行のときになる。
+  JSON.parse(fs.readFileSync(file, 'utf8'));
+  ok(`config.json を更新しました（第一希望 ${primaryUrls.length}本 / 参考 ${referenceUrls.length}本）`);
+  return {};
+}
+
+async function stepSlack(state) {
+  guide([
+    `${C.B}Slack の通知先を用意します。${C.x}`,
+    '',
+    '「Incoming Webhook URL」を1本手に入れるのがゴールです。',
+    `${C.d}これは Slack が発行する専用の URL で、そこへメッセージを送ると${C.x}`,
+    `${C.d}指定したチャンネルに投稿される、という仕組みです。${C.x}`,
+    '',
+    `${C.B}ブラウザでの作業:${C.x}`,
+    '  1. https://api.slack.com/apps を開く',
+    '  2. Create New App → From scratch でアプリを作る',
+    '  3. Incoming Webhooks を開き、スイッチを On にする',
+    '  4. Add New Webhook to Workspace を押し、通知したいチャンネルを選ぶ',
+    '  5. 表示された URL をコピーする',
+  ]);
+  await openBrowser('https://api.slack.com/apps');
+
+  for (;;) {
+    const hook = await askSecret('Webhook URL を貼り付け（表示されません）: ');
+    if (!/^https:\/\/hooks\.slack\.com\//.test(hook)) {
+      bad('Slack の Webhook URL ではないようです。もう一度貼ってください。');
+      continue;
+    }
+    // 登録する前に実際に投げてみる。「登録したつもり」で最後まで進み、
+    // 初回通知のときに初めて気づく、という失敗を防ぐ。
+    say('  テスト投稿を送っています...');
+    const res = await fetch(hook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'ur-monitor のセットアップ確認です。この投稿が見えていれば通知先の設定は完了しています。' }),
+    }).catch((e) => ({ ok: false, statusText: e.message }));
+
+    if (!res.ok) { bad(`送信できませんでした（${res.statusText}）。URL を確認してください。`); continue; }
+    ok('テスト投稿を送りました。Slack を確認してください。');
+    if (!(await askYesNo('投稿は届きましたか？'))) continue;
+
+    const r = await runSecret('gh', ['secret', 'set', 'SLACK_WEBHOOK_URL', '--repo', state.repo], hook);
+    if (r.code !== 0) throw new Error(`GitHub への登録に失敗しました: ${r.err.trim()}`);
+    ok('SLACK_WEBHOOK_URL を GitHub に登録しました');
+    return {};
+  }
+}
+
+async function stepPat(state) {
+  guide([
+    `${C.B}Cloudflare から GitHub を起動するためのトークンを発行します。${C.x}`,
+    '',
+    `${C.d}このトークンで出来るのは「このリポジトリのワークフローを動かすこと」だけです。${C.x}`,
+    `${C.d}コードも他のリポジトリも読めないため、万一漏れても被害は限定されます。${C.x}`,
+    '',
+    `${C.B}ブラウザでの作業:${C.x}`,
+    '  1. 開いた画面で次のとおり設定する',
+    `     Token name        : ${C.B}ur-monitor-trigger${C.x}`,
+    `     Expiration        : ${C.B}No expiration${C.x}`,
+    `     Repository access : ${C.B}Only select repositories${C.x} → ${state.repo}`,
+    `     Permissions       : Actions を ${C.B}Read and write${C.x}`,
+    '  2. Generate token を押し、表示された文字列をコピーする',
+    '',
+    `${C.y}この文字列はこの画面でしか見られません。${C.x}`,
+  ]);
+  await openBrowser('https://github.com/settings/personal-access-tokens/new');
+
+  for (;;) {
+    const token = await askSecret('トークンを貼り付け（表示されません）: ');
+    if (!token) { bad('入力してください。'); continue; }
+
+    // 権限が足りているかを、登録する前に GitHub に問い合わせて確かめる。
+    // 権限不足は最も多い失敗で、しかも症状が「静かに動かない」になる。
+    say('  トークンを確認しています...');
+    const res = await fetch(`https://api.github.com/repos/${state.repo}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    }).catch((e) => ({ ok: false, status: 0, statusText: e.message }));
+
+    if (res.status === 401) { bad('トークンが認識されませんでした。貼り直してください。'); continue; }
+    if (!res.ok) { bad(`確認できませんでした（${res.status}）。対象リポジトリの指定を見直してください。`); continue; }
+    ok('トークンは有効です');
+    return { pat: token };  // メモリ内でのみ持ち回り、状態ファイルには書かない
+  }
+}
+
+async function stepCfAuth() {
+  let r = await run('npx', ['--yes', 'wrangler', 'whoami']);
+  if (r.code !== 0 || /not authenticated|You are not/i.test(r.out + r.err)) {
+    guide([
+      'Cloudflare へのログインが必要です。ブラウザが開きます。',
+      'アカウントが無ければ、その場で無料で作れます。',
+    ]);
+    if (!(await askYesNo('ログインを始めますか？'))) throw new Error('中止しました');
+    r = await run('npx', ['--yes', 'wrangler', 'login'], { quiet: false });
+    if (r.code !== 0) throw new Error('ログインに失敗しました');
+  }
+  ok('Cloudflare にログイン済みです');
+  return {};
+}
+
+async function stepDeploy(state) {
+  let kvId = state.kvId;
+
+  if (!kvId) {
+    say('  保管庫（KV）を作っています...');
+    const r = await run('npx', ['--yes', 'wrangler', 'kv', 'namespace', 'create', 'STORE'], { cwd: TRIGGER_DIR });
+    kvId = parseKvId(r.out + r.err);
+    if (!kvId) throw new Error(`KV を作れませんでした: ${(r.err || r.out).trim().slice(0, 300)}`);
+    ok(`保管庫を作りました（${kvId.slice(0, 8)}…）`);
+  } else {
+    ok('保管庫は作成済みです');
+  }
+
+  const baseToml = fs.readFileSync(path.join(TRIGGER_DIR, 'wrangler.toml'), 'utf8');
+  fs.writeFileSync(LOCAL_TOML, buildLocalToml(baseToml, kvId));
+  note('wrangler.local.toml を生成しました（追跡しません）');
+
+  say('  Worker を配備しています...');
+  const d = await run('npx', ['--yes', 'wrangler', 'deploy', '--config', 'wrangler.local.toml'], { cwd: TRIGGER_DIR });
+  const workerUrl = parseWorkerUrl(d.out + d.err);
+  if (d.code !== 0 || !workerUrl) throw new Error(`配備に失敗しました: ${(d.err || d.out).trim().slice(0, 300)}`);
+
+  ok(`Worker を配備しました: ${workerUrl}`);
+  note('5分おきの起動設定（cron）も同時に入りました');
+  return { kvId, workerUrl };
+}
+
+async function stepSecrets(state) {
+  // API_TOKEN は機械同士が突き合わせるだけの値で、人が目にする必要が一切ない。
+  // VIEW_* は閲覧時に人が打つので、紛らわしい文字を外した文字種で作る。
+  const apiToken     = generate(48, MACHINE_CHARS);
+  const viewUser     = generate(8,  HUMAN_CHARS);
+  const viewPassword = generate(24, HUMAN_CHARS);
+
+  const cfArgs = (name) => ['--yes', 'wrangler', 'secret', 'put', name, '--config', 'wrangler.local.toml'];
+  const put = async (name, value) => {
+    const r = await runSecret('npx', cfArgs(name), value + '\n', { cwd: TRIGGER_DIR });
+    if (r.code !== 0) throw new Error(`${name} の登録に失敗しました: ${r.err.trim().slice(0, 200)}`);
+    ok(`${name} を Cloudflare に登録しました`);
+  };
+
+  await put('GITHUB_TOKEN', state.pat);
+  await put('API_TOKEN', apiToken);
+  await put('VIEW_USER', viewUser);
+  await put('VIEW_PASSWORD', viewPassword);
+
+  for (const [name, value] of [['STORE_URL', state.workerUrl], ['STORE_TOKEN', apiToken]]) {
+    const r = await runSecret('gh', ['secret', 'set', name, '--repo', state.repo], value);
+    if (r.code !== 0) throw new Error(`${name} の登録に失敗しました: ${r.err.trim()}`);
+    ok(`${name} を GitHub に登録しました`);
+  }
+
+  // 登録した合言葉で実際に開けるかを確かめる。ここを飛ばすと、
+  // 閲覧できないことに気づくのは一覧を見たくなったときになる。
+  say('  一覧ページに接続して確かめています...');
+  const auth = Buffer.from(`${viewUser}:${viewPassword}`).toString('base64');
+  const res = await fetch(state.workerUrl, { headers: { Authorization: `Basic ${auth}` } })
+    .catch((e) => ({ status: 0, statusText: e.message }));
+  if (res.status === 200) ok('認証を通って一覧ページを開けました');
+  else warn(`確認できませんでした（${res.status}）。配備直後は少し待つと通ることがあります。`);
+
+  // 閲覧用の ID とパスワードは利用者が使うので、控えを残す。
+  // リポジトリの中に置くとコミット事故が起きるため、ホームディレクトリに書く。
+  const credFile = path.join(os.homedir(), 'ur-monitor-credentials.txt');
+  fs.writeFileSync(credFile,
+    `ur-monitor 空き部屋一覧の閲覧用\n\n`
+    + `URL      : ${state.workerUrl}\n`
+    + `ID       : ${viewUser}\n`
+    + `パスワード : ${viewPassword}\n\n`
+    + `このファイルは他人に見せないでください。\n`, { mode: 0o600 });
+
+  say();
+  say(`  ${C.B}${C.y}▼ 一覧を見るための ID とパスワードです。ここでしか表示しません。${C.x}`);
+  say(`     URL      : ${C.B}${state.workerUrl}${C.x}`);
+  say(`     ID       : ${C.B}${viewUser}${C.x}`);
+  say(`     パスワード : ${C.B}${viewPassword}${C.x}`);
+  say();
+  note(`控えを ${credFile} にも保存しました`);
+  await ask('控えたら Enter を押してください: ');
+
+  return { viewSaved: true };
+}
+
+async function stepDocs(state) {
+  let changed = 0;
+  for (const f of DOC_FILES) {
+    const p = path.join(ROOT, 'docs', f);
+    if (!fs.existsSync(p)) continue;
+    const before = fs.readFileSync(p, 'utf8');
+    const after  = replaceDocUrl(before, state.workerUrl);
+    if (before !== after) { fs.writeFileSync(p, after); changed++; }
+  }
+  ok(`資料ページのリンクを差し替えました（${changed}ファイル）`);
+
+  // GitHub Pages は有効化できれば有効にする。失敗しても止めない。
+  // 資料の公開は任意で、通知そのものには関係しないため。
+  const pages = await run('gh', ['api', '-X', 'POST', `repos/${state.repo}/pages`,
+    '-f', 'source[branch]=main', '-f', 'source[path]=/docs']);
+  if (pages.code === 0) ok('GitHub Pages を有効にしました');
+  else note('GitHub Pages は手動で有効にしてください（Settings → Pages）');
+
+  say('  設定をフォークへ反映しています...');
+  await run('git', ['add', 'config.json', 'docs']);
+  const st = await run('git', ['status', '--porcelain']);
+  if (!st.out.trim()) { ok('反映すべき変更はありませんでした'); return {}; }
+
+  await run('git', ['commit', '-m', '自分の監視条件と一覧の場所を設定']);
+  const branch = (await run('git', ['branch', '--show-current'])).out.trim() || 'main';
+  const push = await run('git', ['push', 'origin', `${branch}:main`]);
+  if (push.code !== 0) throw new Error(`反映に失敗しました: ${push.err.trim()}`);
+  ok('フォークへ反映しました');
+  return {};
+}
+
+async function stepSeed(state) {
+  guide([
+    `${C.B}最後に、監視の土台になる「前回の状態」を用意します。${C.x}`,
+    '',
+    `${C.d}保管庫が空のままだと「前回は0件」とみなされ、いま出ている部屋が${C.x}`,
+    `${C.d}すべて新着として通知されてしまいます。それを避けるための一手です。${C.x}`,
+  ]);
+
+  const r = await run('gh', ['workflow', 'run', 'monitor.yml', '--repo', state.repo, '-f', 'seed_state=true']);
+  if (r.code !== 0) throw new Error(`起動に失敗しました: ${r.err.trim()}`);
+  ok('初回の準備を開始しました');
+
+  say();
+  note('GitHub の Actions タブで結果を確認できます:');
+  say(`  ${C.b}https://github.com/${state.repo}/actions${C.x}`);
+  say();
+  warn('この直後の1回だけ、いま出ている部屋がまとめて通知されることがあります。');
+  note('2回目以降は、新しく出た部屋だけが通知されます。');
+  return {};
+}
+
+// ── ブラウザを開く ───────────────────────────────────────
+
+async function openBrowser(url) {
+  const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+            : process.platform === 'darwin' ? ['open', [url]]
+            : ['xdg-open', [url]];
+  const r = await run(cmd[0], cmd[1]);
+  if (r.code !== 0) note(`ブラウザで開いてください: ${url}`);
+}
+
+// ── 進行 ─────────────────────────────────────────────────
+
+const STEPS = [
+  { id: 'tools',   title: '前提コマンドを確かめる',           run: stepTools },
+  { id: 'gh-auth', title: 'GitHub にログインする',            run: stepGhAuth },
+  { id: 'fork',    title: '自分用の複製を作る',               run: stepFork },
+  { id: 'config',  title: '見張るページと通知条件を決める',    run: stepConfig },
+  { id: 'slack',   title: 'Slack の通知先を用意する',         run: stepSlack },
+  { id: 'pat',     title: 'GitHub のトークンを発行する',      run: stepPat },
+  { id: 'cf-auth', title: 'Cloudflare にログインする',        run: stepCfAuth },
+  { id: 'deploy',  title: '保管庫を作り、時計を配備する',      run: stepDeploy },
+  { id: 'secrets', title: '合言葉を作って登録する',           run: stepSecrets },
+  { id: 'docs',    title: '一覧の場所を資料に反映する',        run: stepDocs },
+  { id: 'seed',    title: '初回の状態を用意する',             run: stepSeed },
+];
+
+// pat と secrets は同じ実行の中で連続していないと成立しない。
+// トークンを状態ファイルに書かない方針のため、再開時は pat からやり直す。
+const NEEDS_PAT = new Set(['secrets']);
+
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.includes('--help') || args.includes('-h')) return printHelp();
+  if (args.includes('--self-test')) return selfTest();
+
+  const state = loadState();
+  if (args.includes('--restart')) state.done = [];
+
+  say();
+  say(`${C.B}ur-monitor セットアップ${C.x}`);
+  say(`${C.d}UR賃貸の空き部屋を見張り、条件に合う新着を Slack へ通知する仕組みを用意します。${C.x}`);
+  if (state.done.length) note(`前回の続きから再開します（${state.done.length}段階が完了済み）`);
+
+  for (let i = 0; i < STEPS.length; i++) {
+    const step = STEPS[i];
+    if (state.done.includes(step.id) && !(NEEDS_PAT.has(step.id) && !state.pat)) {
+      continue;
+    }
+    // 合言葉の登録にはトークンが要る。状態ファイルに残さない方針なので、
+    // 再開時はトークンの発行段階からやり直してもらう。
+    if (NEEDS_PAT.has(step.id) && !state.pat) {
+      state.done = state.done.filter((d) => d !== 'pat');
+      i = STEPS.findIndex((s) => s.id === 'pat') - 1;
+      continue;
+    }
+
+    heading(i + 1, STEPS.length, step.title);
+    try {
+      Object.assign(state, (await step.run(state)) || {});
+    } catch (e) {
+      say();
+      bad(e.message);
+      say();
+      note('直してから同じコマンドをもう一度実行すると、この段階から再開します。');
+      const { pat, ...persist } = state;
+      saveState(persist);
+      process.exit(1);
+    }
+    if (!state.done.includes(step.id)) state.done.push(step.id);
+    const { pat, ...persist } = state;
+    saveState(persist);
+  }
+
+  say();
+  say(`${C.g}${C.B}セットアップが完了しました。${C.x}`);
+  say();
+  say('  これ以降は放っておいて構いません。08:00〜21:00 の間、5分おきに');
+  say('  自動で見に行き、条件に合う新着が出たときだけ Slack が鳴ります。');
+  say();
+  say(`  空き部屋一覧 : ${C.b}${state.workerUrl}${C.x}`);
+  say(`  実行の記録   : ${C.b}https://github.com/${state.repo}/actions${C.x}`);
+  say();
+}
+
+function printHelp() {
+  say(`
+ur-monitor セットアップウィザード
+
+  使い方:
+    node tools/setup.mjs [オプション]
+
+  オプション:
+    --restart     最初からやり直す（登録済みの内容は消えません）
+    --self-test   ネットワークに触れずに内部処理だけを検証する
+    --help        この説明
+
+  通常は OS ごとの呼び水から起動してください。
+    Windows : powershell -ExecutionPolicy Bypass -File tools\\setup.ps1
+    Mac     : bash tools/setup.sh
+`);
+}
+
+// ── 自己検査 ─────────────────────────────────────────────
+// テストスイートが無いリポジトリなので、少なくとも文字列を組み立てる処理だけは
+// ネットワークもアカウントも無しに検証できるようにしておく。
+
+function selfTest() {
+  let failed = 0;
+  const check = (name, actual, expected) => {
+    const a = JSON.stringify(actual), e = JSON.stringify(expected);
+    if (a === e) { ok(name); } else { bad(`${name}\n     期待: ${e}\n     実際: ${a}`); failed++; }
+  };
+
+  say(`\n${C.B}自己検査${C.x}\n`);
+
+  check('KV の ID を拾える',
+    parseKvId('{ "binding": "STORE", "id": "0123456789abcdef0123456789abcdef" }'),
+    '0123456789abcdef0123456789abcdef');
+  check('ID が無ければ null', parseKvId('作成に失敗しました'), null);
+
+  check('Worker の URL を拾える',
+    parseWorkerUrl('Published ur-monitor-trigger (1.2 sec)\n  https://ur-monitor-trigger.example.workers.dev'),
+    'https://ur-monitor-trigger.example.workers.dev');
+
+  check('資料のリンクを差し替える',
+    replaceDocUrl('<a href="https://ur-monitor-trigger.tsutao.workers.dev/">一覧</a>',
+                  'https://ur-monitor-trigger.me.workers.dev'),
+    '<a href="https://ur-monitor-trigger.me.workers.dev/">一覧</a>');
+
+  check('末尾の / が重複しない',
+    replaceDocUrl('https://ur-monitor-trigger.a.workers.dev', 'https://ur-monitor-trigger.b.workers.dev/'),
+    'https://ur-monitor-trigger.b.workers.dev/');
+
+  const toml = buildLocalToml('binding = "STORE"\nid = "ここに KV の ID を入れる"\n', 'abc');
+  check('KV の ID だけを差し替える', /id = "abc"/.test(toml) && /binding = "STORE"/.test(toml), true);
+
+  const cfg = buildConfig({ selectors: { name: '.x' }, zero_streak_limit: 18 }, {
+    primaryUrls: ['https://www.ur-net.go.jp/a.html'],
+    madori: ['2DK'],
+    referenceUrls: [],
+    docsBaseUrl: 'https://me.github.io/ur-monitor',
+  });
+  check('selectors を保つ', cfg.selectors, { name: '.x' });
+  check('参考が無ければグループは1つ', cfg.groups.length, 1);
+  check('第一希望は通知する', cfg.groups[0].notify, true);
+
+  const cfg2 = buildConfig({}, {
+    primaryUrls: ['https://www.ur-net.go.jp/a.html'],
+    madori: [],
+    referenceUrls: ['https://www.ur-net.go.jp/b.html'],
+    docsBaseUrl: 'https://me.github.io/ur-monitor',
+  });
+  check('参考は通知しない', cfg2.groups[1].notify, false);
+
+  const pw = generate(24, HUMAN_CHARS);
+  check('合言葉の長さ', pw.length, 24);
+  check('合言葉は英数字のみ', /^[0-9A-Za-z]+$/.test(pw), true);
+  check('紛らわしい文字を含まない', /[0O1lI]/.test(generate(400, HUMAN_CHARS)), false);
+
+  say();
+  if (failed) { bad(`${failed}件 失敗しました`); process.exit(1); }
+  ok('すべて通りました');
+}
+
+main().catch((e) => { bad(e.stack || e.message); process.exit(1); });
