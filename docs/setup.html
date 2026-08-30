@@ -437,7 +437,7 @@ UR賃貸の空き部屋を自動で監視し、条件に合う新着が出たら
   <div class="promise-item">
     <span class="promise-mark">⏱️</span>
     <p class="promise-ttl">所要 30〜60分</p>
-    <p class="promise-sub">設定は最初の一度だけ。アカウントを新しく作る場合はその分が加算されます</p>
+    <p class="promise-sub">設定は最初の一度だけです。アカウントを新しく作る場合はその分が加算されます</p>
   </div>
   <div class="promise-item">
     <span class="promise-mark">⌨️</span>
@@ -542,7 +542,7 @@ UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あ
     <path d="M200,85 H326"/><path d="M510,85 H636"/>
   </g>
   <text x="263" y="75" class="t3">動け</text>
-  <text x="420" y="170" class="t3">時計は Cloudflare、実際の作業は GitHub。役割を分けています</text>
+  <text x="420" y="170" class="t3">時計は Cloudflare、実際の作業は GitHub と役割を分けています</text>
 </svg>
 </figure>
 
@@ -675,7 +675,7 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
 
 <table>
   <tr><th>項目</th><th>公開（Public）</th><th>非公開（Private）</th></tr>
-  <tr><td>自動実行の費用</td><td>無制限に無料</td><td>月2,000分まで無料。<strong>この設定（5分おき）だと月およそ5,000分</strong>で超過します</td></tr>
+  <tr><td>自動実行の費用</td><td>無制限に無料</td><td>月2,000分まで無料です。<strong>この設定（5分おき）だと月およそ5,000分</strong>になり超過します</td></tr>
   <tr><td>空き部屋一覧を自分だけ見る</td><td colspan="2">どちらでもできる（Cloudflare に置くため）</td></tr>
   <tr><td>資料ページの公開</td><td>できる</td><td><strong>できない</strong>（GitHub Free の場合）</td></tr>
   <tr><td>設定（監視URLと通知条件）が他人に見えるか</td><td>見える</td><td>見えない</td></tr>
@@ -749,7 +749,7 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
   <tr>
     <td><strong>団地のページ</strong></td>
     <td>ひとつの団地の空室が並ぶページ<br><code>50_3030.html</code> のような形</td>
-    <td><strong>入りたい物件が決まっている</strong>とき。名前を書かないので打ち間違いが起きません</td>
+    <td><strong>入りたい物件が決まっている</strong>ときに使います。名前を書かないので打ち間違いが起きません</td>
   </tr>
   <tr>
     <td><strong>検索結果のページ</strong></td>
@@ -803,7 +803,7 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
   <tr><th>項目</th><th>意味</th></tr>
   <tr>
     <td><code>name</code></td>
-    <td>グループの名前。<strong>そのまま通知と一覧ページの見出しになります</strong>。自分に分かる言葉で構いません</td>
+    <td>グループの名前です。<strong>そのまま通知と一覧ページの見出しになります</strong>ので、自分に分かる言葉で構いません</td>
   </tr>
   <tr>
     <td><code>notify</code></td>
@@ -811,11 +811,11 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
   </tr>
   <tr>
     <td><code>madori</code></td>
-    <td>通知したい間取り。<strong>どれか1つに合えば通知</strong>。<code>[]</code> と書くと間取りを問いません</td>
+    <td>通知したい間取りです。<strong>どれか1つに合えば通知します</strong>。<code>[]</code> と書くと間取りを問いません</td>
   </tr>
   <tr>
     <td><code>urls</code></td>
-    <td>巡回するページの URL。<strong>ここに出てくる物件だけが監視対象</strong>になります。複数書けます</td>
+    <td>巡回するページの URL です。<strong>ここに出てくる物件だけが監視対象</strong>になります。複数書けます</td>
   </tr>
 </table>
 
@@ -1162,8 +1162,8 @@ Secret にすると、あとから画面上でも中身を読み出せなくな�
 <thead><tr><th>出ているもの</th><th>意味</th></tr></thead>
 <tbody>
 <tr><td><code>JST 15時: 起動した</code></td><td>成功</td></tr>
-<tr><td><code>起動に失敗: 401 ...</code></td><td>トークンが違う。貼り直す</td></tr>
-<tr><td><code>起動に失敗: 403 ...</code></td><td>トークンの権限不足。Actions を Read and write に</td></tr>
+<tr><td><code>起動に失敗: 401 ...</code></td><td>トークンが違います。貼り直してください</td></tr>
+<tr><td><code>起動に失敗: 403 ...</code></td><td>トークンの権限が足りません。Actions を Read and write にしてください</td></tr>
 <tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
 </tbody>
 </table>
@@ -1249,9 +1249,9 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
 
 <table>
   <tr><th>名前</th><th>中身</th></tr>
-  <tr><td><code>VIEW_USER</code></td><td>一覧を開くときの ID。好きな英数字（例：<code>me</code>）</td></tr>
-  <tr><td><code>VIEW_PASSWORD</code></td><td>一覧を開くときのパスワード。<strong>英数字で20文字以上</strong>を推奨</td></tr>
-  <tr><td><code>API_TOKEN</code></td><td>監視ジョブが書き込むときの合言葉。<strong>英数字で40文字以上</strong>を推奨</td></tr>
+  <tr><td><code>VIEW_USER</code></td><td>一覧を開くときの ID です。好きな英数字で構いません（例：<code>me</code>）</td></tr>
+  <tr><td><code>VIEW_PASSWORD</code></td><td>一覧を開くときのパスワードです。<strong>英数字で20文字以上</strong>をおすすめします</td></tr>
+  <tr><td><code>API_TOKEN</code></td><td>監視ジョブが書き込むときの合言葉です。<strong>英数字で40文字以上</strong>をおすすめします</td></tr>
 </table>
 
 <div class="warn">
@@ -1296,7 +1296,7 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
   <li>リポジトリの <strong>Actions</strong> タブ → <strong>UR賃貸監視</strong> を開く</li>
   <li><strong>Run workflow</strong> を押す</li>
   <li><strong>保管先の状態を用意する</strong> にチェックを入れて実行</li>
-  <li>緑のチェックが付いたら完了。以降は自動で動きます</li>
+  <li>緑のチェックが付いたら完了です。以降は自動で動きます</li>
 </ol>
 
 <p>Worker の URL を開いて、一覧が出れば成功です。<strong>スマホのホーム画面に追加しておくと便利です。</strong></p>
@@ -1317,7 +1317,7 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
   </tr>
   <tr>
     <td>間取りの指定が合っているか</td>
-    <td><code>madori</code> が UR の表記と一致しているか（<code>2DK</code> と <code>2LDK</code> は別物）。
+    <td><code>madori</code> が UR の表記と一致しているか確かめてください（<code>2DK</code> と <code>2LDK</code> は別物です）。
     何でも通知したいときは <code>[]</code> にしてください</td>
   </tr>
 </table>
@@ -1360,11 +1360,10 @@ UR のサイトの作りが変わった可能性があります。その場合�
 <footer>
 
 <div class="note">
-<p><strong>この道具がどう動いているのかを詳しく知りたい方へ。</strong>
-Cloudflare に叩かれてから Slack に通知が届くまで、内部で何が起きているかを
-図と表でまとめた<a href="architecture.html">技術資料</a>があります。
-実行の時系列、取得に失敗したときの粘り方、時刻の扱いなど、
-<strong>あとから自分で思い出すため</strong>の資料です。</p>
+<p><strong>この道具がどう動いているのかを詳しく知りたい方は</strong>、Cloudflare に叩かれてから
+Slack に通知が届くまで、内部で何が起きているかを図と表でまとめた
+<a href="architecture.html">技術資料</a>をご覧ください。実行の時系列、取得に失敗したときの
+粘り方、時刻の扱いなど、<strong>あとから自分で思い出すため</strong>の資料です。</p>
 </div>
 
 <div class="author">
