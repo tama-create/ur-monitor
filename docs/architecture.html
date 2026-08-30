@@ -348,13 +348,13 @@
 
   <rect x="310" y="40" width="220" height="110" rx="10" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
   <text x="420" y="70" class="t1">⚙️ GitHub Actions</text>
-  <text x="420" y="94" class="t2">作業場。毎回まっさら</text>
+  <text x="420" y="94" class="t2">作業場です。毎回まっさら</text>
   <text x="420" y="116" class="t2">終わると消える</text>
   <text x="420" y="138" class="t3">.github/workflows/monitor.yml</text>
 
   <rect x="600" y="40" width="220" height="110" rx="10" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
   <text x="710" y="70" class="t1">🐘 PHP + Chrome</text>
-  <text x="710" y="94" class="t2">作業者。全処理がここ</text>
+  <text x="710" y="94" class="t2">作業者です。全処理がここ</text>
   <text x="710" y="116" class="t2">約950行の1ファイル</text>
   <text x="710" y="138" class="t3">ur_monitor.php</text>
 
@@ -391,17 +391,17 @@
 <thead><tr><th>技術</th><th>役割</th></tr></thead>
 <tbody>
 <tr><td><strong>Cloudflare Workers</strong></td><td>時計。5分ごとに GitHub を叩くだけの小さなプログラムを、Cloudflare のサーバー上で動かす仕組み</td></tr>
-<tr><td><strong>GitHub Actions</strong></td><td>プログラムを自動実行する仕組み。パソコンを起動しなくても動く理由がこれ</td></tr>
-<tr><td><strong>PHP</strong></td><td>本体の言語。<code>ur_monitor.php</code> の1ファイルだけで動いている</td></tr>
-<tr><td><strong>Headless Chrome</strong></td><td>画面のない Chrome。UR は物件情報を後から JavaScript で表示するため、本物のブラウザで開いて描画を待つ必要がある</td></tr>
+<tr><td><strong>GitHub Actions</strong></td><td>プログラムを自動実行する仕組みです。パソコンを起動しなくても動く理由がこれ</td></tr>
+<tr><td><strong>PHP</strong></td><td>本体の言語です。<code>ur_monitor.php</code> の1ファイルだけで動いています</td></tr>
+<tr><td><strong>Headless Chrome</strong></td><td>画面のない Chrome です。UR は物件情報を後から JavaScript で表示するため、本物のブラウザで開いて描画を待つ必要があります</td></tr>
 <tr><td><strong>Slack Incoming Webhook</strong></td><td>指定の URL にメッセージを送ると Slack に投稿される仕組み</td></tr>
-<tr><td><strong>GitHub Pages</strong></td><td>リポジトリ内の HTML をそのまま Web 公開できる仕組み。<code>docs/</code> に置いたものが push のたびに配信される</td></tr>
-<tr><td><strong>GitHub Secrets</strong></td><td>パスワードや鍵を預ける場所。登録後は本人でも中身を見られない</td></tr>
+<tr><td><strong>GitHub Pages</strong></td><td>リポジトリ内の HTML をそのまま Web 公開できる仕組みです。<code>docs/</code> に置いたものが push のたびに配信されます</td></tr>
+<tr><td><strong>GitHub Secrets</strong></td><td>パスワードや鍵を預ける場所です。登録後は本人でも中身を見られません</td></tr>
 </tbody>
 </table>
 
 <div class="warn">
-<p><strong>なぜ時計を分けているのか。</strong>GitHub の <code>schedule</code> は設定した間隔で動きません。
+<p><strong>なぜ時計を分けているのでしょうか。</strong>GitHub の <code>schedule</code> は設定した間隔で動きません。
 30分設定で実測46〜64分、15分設定では<strong>1日2回まで落ちました</strong>。
 一方 <code>workflow_dispatch</code>（外から叩く）は確実に動きます。
 <strong>「時刻を守るのは苦手、言われたら動くのは確実」</strong>という性質の差を利用しています。</p>
@@ -425,7 +425,7 @@
     <text x="76" y="61" class="t3" style="text-anchor:end">0秒</text>
     <rect x="120" y="34" width="700" height="44" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
     <text x="136" y="52" class="t1" style="text-anchor:start">Cloudflare の cron が発火</text>
-    <text x="136" y="70" class="t2" style="text-anchor:start">JST の時を計算 → 8〜21時なら続行。GitHub に workflow_dispatch を POST → 204 が返れば成功</text>
+    <text x="136" y="70" class="t2" style="text-anchor:start">JST の時を計算 → 8〜21時なら続行 → GitHub に workflow_dispatch を POST → 204 が返れば成功</text>
   </g>
 
   <g>
@@ -449,7 +449,7 @@
     <text x="76" y="229" class="t3" style="text-anchor:end">10秒</text>
     <rect x="120" y="202" width="700" height="44" rx="8" fill="#e6f4ea" stroke="#1a7f37"/>
     <text x="136" y="220" class="t1" style="text-anchor:start">php ur_monitor.php 開始 → まず 0〜40秒ランダムに待つ</text>
-    <text x="136" y="238" class="t2" style="text-anchor:start">この回は28秒待った。毎回同じ秒に UR を叩かないためのゆらぎ（jitter_max_seconds）</text>
+    <text x="136" y="238" class="t2" style="text-anchor:start">この回は28秒待ちました。毎回同じ秒に UR を叩かないためのゆらぎです（jitter_max_seconds）</text>
   </g>
 
   <g>
@@ -484,7 +484,7 @@
     <text x="76" y="475" class="t3" style="text-anchor:end">60秒</text>
     <rect x="120" y="448" width="700" height="44" rx="8" fill="#e6f4ea" stroke="#1a7f37"/>
     <text x="136" y="466" class="t1" style="text-anchor:start">前回と比較 → 新着があれば Slack → HTML を書き出す</text>
-    <text x="136" y="484" class="t2" style="text-anchor:start">この回は「現在26件・新着なし」。合計62件から重複を除いて26件</text>
+    <text x="136" y="484" class="t2" style="text-anchor:start">この回は「現在26件・新着なし」で、合計62件から重複を除いて26件です</text>
   </g>
 
   <g>
@@ -544,8 +544,8 @@
 
   <rect x="20" y="168" width="190" height="86" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="4 3"/>
   <text x="115" y="196" class="t2">固定秒数の待機に</text>
-  <text x="115" y="218" class="t2">置き換えないこと。</text>
-  <text x="115" y="240" class="t2">順次描画を取りこぼす</text>
+  <text x="115" y="218" class="t2">置き換えないでください。</text>
+  <text x="115" y="240" class="t2">順次描画を取りこぼします</text>
 </svg>
 </figure>
 
@@ -612,7 +612,7 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 </svg>
 </figure>
 
-<p><strong>「怪しい」の判定は2つ。</strong>0件だけを見ていると足りません。</p>
+<p><strong>「怪しい」の判定は2つあります。</strong>0件だけを見ていると足りません。</p>
 
 <table>
 <thead><tr><th>条件</th><th>意味</th></tr></thead>
@@ -624,7 +624,7 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 
 <div class="stop">
 <p><strong>0.7 という数字は実測から決めたもので、勘で緩めてはいけません。</strong>
-103回ぶんの履歴にあった減少事象は5件。そのうち誤検知2件（18→12件、19→7件）を捕まえ、
+103回ぶんの履歴にあった減少事象は5件でした。そのうち誤検知2件（18→12件、19→7件）を捕まえ、
 本物1件（20→19件）を通す値が 0.7 でした。<strong>19→7件のときは実際に誤通知が飛んでいます</strong>
 （12件が33分後に復活し、うち11件は元からあった部屋）。</p>
 </div>
@@ -679,10 +679,10 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 <table>
 <thead><tr><th>項目</th><th>動き</th></tr></thead>
 <tbody>
-<tr><td>照合のしかた</td><td><strong>部分一致</strong>（<code>str_contains</code>）。完全一致ではない</td></tr>
+<tr><td>照合のしかた</td><td><strong>部分一致</strong>（<code>str_contains</code>）です。完全一致ではありません</td></tr>
 <tr><td>空文字を書いたとき</td><td>「その条件は問わない」の意味になる</td></tr>
-<tr><td><code>notify_all_new</code></td><td>既定 <strong>オフ</strong>。オンにすると条件に関係なく全新着が飛ぶ（スパム防止のため既定オフ）</td></tr>
-<tr><td>Webhook URL</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code> から渡す。<strong>設定ファイルに実値を書かない</strong></td></tr>
+<tr><td><code>notify_all_new</code></td><td>既定は<strong>オフ</strong>です。オンにすると条件に関係なく全新着が飛びます（スパム防止のため既定オフ）</td></tr>
+<tr><td>Webhook URL</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code> から渡します。<strong>設定ファイルに実値を書かないでください</strong></td></tr>
 </tbody>
 </table>
 
@@ -707,7 +707,7 @@ UR のページからそのままコピーするのが確実です。</p>
 
 <figure class="fig">
 <svg viewBox="0 0 840 170" role="img" aria-label="UTCの23時から12時が日本時間の8時から21時にあたることを示す対応表">
-  <text x="420" y="24" class="t4">cron の時の欄は UTC。日本は9時間進んでいる</text>
+  <text x="420" y="24" class="t4">cron の時の欄は UTC です。日本は9時間進んでいます</text>
   <g>
     <rect x="40" y="44" width="760" height="40" rx="6" fill="#f6f8fa" stroke="#8c959f"/>
     <text x="70" y="69" class="t2" style="text-anchor:start">UTC</text>
@@ -905,13 +905,13 @@ UR 側の一時的な不調に耐えられる時間になります。5分に詰�
 <tr><td>通知が来ない・実行が少ない</td><td>Cloudflare の <strong>Observability</strong></td><td>トークン切れ（401）、権限不足（403）</td></tr>
 <tr><td>いつ動いたか知りたい</td><td>リポジトリの <strong>コミット履歴</strong></td><td>—（履歴が全実行記録になっている）</td></tr>
 <tr><td>全 URL が0件になる</td><td><strong>まず環境</strong>を疑う</td><td>Chrome がそもそも到達できていない</td></tr>
-<tr><td>件数が中途半端</td><td>ログの <code>前回状態を維持</code></td><td>正常動作。3段構えが効いている</td></tr>
+<tr><td>件数が中途半端</td><td>ログの <code>前回状態を維持</code></td><td>正常動作です。3段構えが効いています</td></tr>
 <tr><td>実行が赤い</td><td>Actions のログ</td><td>依存の更新、push の衝突</td></tr>
 </tbody>
 </table>
 
 <div class="note">
-<p><strong>0件のときに、セレクターより先に環境を疑う理由。</strong>
+<p><strong>0件のときは、セレクターより先に環境を疑ってください。</strong>
 <code>robots.txt チェック OK</code> が出ていても、Chrome が通信できているとは限りません。
 robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome を通らないからです。
 実際に <code>curl</code> は 200 を返すのに Chrome だけ <code>ERR_CONNECTION_RESET</code> になる環境がありました。
@@ -924,7 +924,7 @@ robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome �
 <tbody>
 <tr><td><code>JST 15時: 起動した</code></td><td>成功</td></tr>
 <tr><td><code>起動に失敗: 401 Bad credentials</code></td><td>トークンが認識されていません。作り直して入れ直してください</td></tr>
-<tr><td><code>起動に失敗: 403 ...</code></td><td>権限不足。Actions を Read and write に</td></tr>
+<tr><td><code>起動に失敗: 403 ...</code></td><td>権限が足りません。Actions を Read and write にしてください</td></tr>
 <tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
 </tbody>
 </table>
