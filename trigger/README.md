@@ -25,7 +25,7 @@ Cloudflare Workers（営業時間内を5分おき・正確）
     ↓ workflow_dispatch を POST
 GitHub Actions（従来どおり45〜85秒で監視）
     ↓
-Slack / docs/index.html
+Slack / Cloudflare の保管庫
 ```
 
 GitHub 側の `schedule` は1日4回だけ残してある。外部トリガーが死んだときの保険と、
@@ -137,4 +137,4 @@ npx wrangler secret put GITHUB_TOKEN
 
 ## 費用
 
-無料枠に十分収まる。1日96回の起動に対し、無料プランは10万リクエスト/日。
+無料枠に十分収まる。1日168回の起動に対し、無料プランは10万リクエスト/日。
