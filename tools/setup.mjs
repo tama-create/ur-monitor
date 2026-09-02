@@ -568,6 +568,28 @@ const STEPS = [
 // トークンを状態ファイルに書かない方針のため、再開時は pat からやり直す。
 const NEEDS_PAT = new Set(['secrets']);
 
+// main() の進行判定だけを取り出した純粋関数。副作用（実際の段階の実行）を
+// 起こさずに「どの順で段階が実行されるか」だけを求める。ネットワークもファイルも
+// 使わないので --self-test で検証できる。main() 側のループと分岐を変えたら
+// ここも必ず合わせること。
+export function planStepOrder(steps, needsPatIds, doneIds, hasPat) {
+  const done = new Set(doneIds);
+  const order = [];
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (done.has(step.id)) continue;
+    if (needsPatIds.has(step.id) && !hasPat) {
+      done.delete('pat');
+      i = steps.findIndex((s) => s.id === 'pat') - 1;
+      continue;
+    }
+    order.push(step.id);
+    done.add(step.id);
+    if (step.id === 'pat') hasPat = true;
+  }
+  return order;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) return printHelp();
@@ -581,19 +603,13 @@ async function main() {
   say(`${C.d}UR賃貸の空き部屋を見張り、条件に合う新着を Slack へ通知する仕組みを用意します。${C.x}`);
   if (state.done.length) note(`前回の続きから再開します（${state.done.length}段階が完了済み）`);
 
-  for (let i = 0; i < STEPS.length; i++) {
+  // 「pat が要るのに無ければ pat からやり直す」という巻き戻しは、状態を
+  // 直接いじりながらループするとバグを踏みやすい（実際に、完了済みの
+  // secrets 段階まで作り直してしまう不具合を一度作った）。判定は
+  // planStepOrder() に切り出してあるので、ここでは決まった順番をなぞるだけにする。
+  for (const id of planStepOrder(STEPS, NEEDS_PAT, state.done, Boolean(state.pat))) {
+    const i = STEPS.findIndex((s) => s.id === id);
     const step = STEPS[i];
-    if (state.done.includes(step.id) && !(NEEDS_PAT.has(step.id) && !state.pat)) {
-      continue;
-    }
-    // 合言葉の登録にはトークンが要る。状態ファイルに残さない方針なので、
-    // 再開時はトークンの発行段階からやり直してもらう。
-    if (NEEDS_PAT.has(step.id) && !state.pat) {
-      state.done = state.done.filter((d) => d !== 'pat');
-      i = STEPS.findIndex((s) => s.id === 'pat') - 1;
-      continue;
-    }
-
     heading(i + 1, STEPS.length, step.title);
     try {
       Object.assign(state, (await step.run(state)) || {});
@@ -696,6 +712,24 @@ function selfTest() {
   check('合言葉の長さ', pw.length, 24);
   check('合言葉は英数字のみ', /^[0-9A-Za-z]+$/.test(pw), true);
   check('紛らわしい文字を含まない', /[0O1lI]/.test(generate(400, HUMAN_CHARS)), false);
+
+  // ここは実際に踏んだバグの再現テスト。secrets まで完了済みの状態で
+  // もう一度実行しても、合言葉を作り直す pat / secrets が再実行されないこと。
+  const allIds = STEPS.map((s) => s.id);
+  check('完了済みの再実行では何も走らない（合言葉が作り直されない）',
+    planStepOrder(STEPS, NEEDS_PAT, allIds, false), []);
+
+  // pat の直後、secrets の前で中断 → 再開したプロセスは state.pat を
+  // 持たない。secrets の手前まで完了済みなら、pat だけやり直して secrets
+  // 以降へ続くこと（すでに終わった段階を巻き込んで作り直さないこと）。
+  const doneBeforeSecrets = allIds.slice(0, allIds.indexOf('secrets'));
+  check('secrets の手前で中断すると pat から secrets 以降へ続く',
+    planStepOrder(STEPS, NEEDS_PAT, doneBeforeSecrets, false),
+    ['pat', 'secrets', 'docs', 'seed']);
+
+  // 何も完了していない、まっさらな実行では、全段階が定義順に並ぶこと。
+  check('初回実行では全段階が順番どおり',
+    planStepOrder(STEPS, NEEDS_PAT, [], false), allIds);
 
   say();
   if (failed) { bad(`${failed}件 失敗しました`); process.exit(1); }

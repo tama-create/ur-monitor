@@ -18,3 +18,11 @@ monitor.log
 # 開発中に --dry-run を付けずに実行すると手元に生成されるが、中身は UR から
 # 取った物件名・家賃・間取りなので **コミットしないこと**。
 state.json
+
+# セットアップウィザード（tools/setup.mjs）の生成物。
+# KV の ID を含む wrangler.local.toml は実値なので追跡しない。雛形の
+# wrangler.toml は汚さず、これを別に生成することで両立させている。
+trigger/wrangler.local.toml
+
+# 進捗の記録。秘密情報は書かない設計だが、環境固有の情報なので追跡しない。
+tools/.setup-state.json
