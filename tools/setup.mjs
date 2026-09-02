@@ -1,21 +1,22 @@
 #!/usr/bin/env node
 // ur-monitor セットアップウィザード本体。
 //
-// 【使い方】直接は起動しません。OS ごとの呼び水から呼ばれます。
-//   Windows : powershell -ExecutionPolicy Bypass -File tools\setup.ps1
-//   Mac     : bash tools/setup.sh
+// 【使い方】直接は起動しません。呼び水（tools/setup.sh）から呼ばれます。
+//   bash tools/setup.sh
 //
 // 【なぜ Node で書いてあるか】
 // Cloudflare の wrangler が Node を要求するため、このツールを使う人の環境には
 // Node が必ず入ります。そこに本体を置けば、対話も検証も API 呼び出しも
-// Windows と Mac で1つのコードのまま動きます。PowerShell と bash に
-// 本体ごと書き分けると、テストが無いこのリポジトリでは片方の修正漏れに
-// 気づけるのが本番実行時になるため、OS 差は呼び水の数十行に閉じ込めています。
+// Windows と Mac で1つのコードのまま動きます。呼び水を bash 1本にしているのは、
+// git を入れると Git Bash が必ず付いてくる（Windows でも）ため、こちらも
+// 書き分けが要らないからです。OS 差はコマンド名（winget / brew）だけです。
 //
 // 【設計方針】
 // - 各段階の終わりに必ず検証を入れる。「登録したつもり」で先へ進ませない
 // - 途中で失敗しても再開できる（.setup-state.json に済んだ段階を残す）
 // - 秘密情報は画面にもファイルにもシェル履歴にも残さない（後述の run_secret）
+// - --mock を付けると、Cloudflare / GitHub の実アカウントを一切変更せずに
+//   全11段階を通しで確認できる（詳しくは「── 模擬実行 ──」を参照）
 
 import { spawn } from 'node:child_process';
 import { randomInt } from 'node:crypto';
@@ -27,13 +28,26 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT        = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TRIGGER_DIR = path.join(ROOT, 'trigger');
-const STATE_FILE  = path.join(ROOT, 'tools', '.setup-state.json');
 const LOCAL_TOML  = path.join(TRIGGER_DIR, 'wrangler.local.toml');
 const UPSTREAM    = 'tama-create/ur-monitor';
+const MOCK_DIR    = path.join(ROOT, 'tools', '.mock-run');
 
 // 資料ページに直書きしてある一覧へのリンク。フォークした人の Worker に差し替える。
 const DOC_FILES   = ['index.html', 'guide.html', 'setup.html', 'architecture.html'];
 const DOC_URL_RE  = /https:\/\/ur-monitor-trigger\.[a-z0-9-]+\.workers\.dev\/?/g;
+
+// 進行状況の記録先。--mock は本番の進み具合と混ざらないよう別ファイルに書く
+// （本番で完了済みの段階が、模擬実行のせいで誤って「完了済み」扱いになる事故を防ぐ）。
+const stateFile = (mock) => path.join(ROOT, 'tools', mock ? '.setup-state.mock.json' : '.setup-state.json');
+
+// 本番のファイルを一切変更しないよう、--mock のときは生成物をすべて
+// tools/.mock-run/ 以下へ逃がす。relPath は ROOT からの相対パス。
+function outPath(state, relPath) {
+  if (!state.mock) return path.join(ROOT, relPath);
+  const dest = path.join(MOCK_DIR, relPath);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  return dest;
+}
 
 // ── 画面表示 ─────────────────────────────────────────────
 
@@ -62,18 +76,38 @@ function guide(lines) {
 }
 
 // ── 入力 ─────────────────────────────────────────────────
+//
+// readline は「1つだけ作って使い回し、その非同期イテレータから1行ずつ
+// 取り出す」形にしてある。rl.question() を毎回呼ぶ素朴な書き方だと、
+// 届いた入力をまとめて先読みしてしまい、2問目以降が「聞いていない」
+// 扱いで取りこぼされることがある（--mock をパイプ入力で検証したときに
+// 実際に踏んだ。人がキーボードで1行ずつ打つ通常の使い方では起きないが、
+// 直しておく）。非同期イテレータはこの取りこぼしが起きない、Node 公式の
+// 対話用パターン。
 
-function ask(query, { allowEmpty = true } = {}) {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const go = () => rl.question(`  ${query}`, (v) => {
-      const t = v.trim();
-      if (!t && !allowEmpty) { say(`  ${C.r}入力してください。${C.x}`); return go(); }
-      rl.close();
-      resolve(t);
-    });
-    go();
-  });
+let rlSingleton = null;
+let lineIterator = null;
+function getReadline() {
+  if (!rlSingleton) {
+    rlSingleton = readline.createInterface({ input: process.stdin, output: process.stdout });
+    lineIterator = rlSingleton[Symbol.asyncIterator]();
+  }
+  return rlSingleton;
+}
+
+function closeReadline() {
+  if (rlSingleton) { rlSingleton.close(); rlSingleton = null; lineIterator = null; }
+}
+
+async function ask(query, { allowEmpty = true } = {}) {
+  const rl = getReadline();
+  for (;;) {
+    rl.output.write(`  ${query}`);
+    const { value, done } = await lineIterator.next();
+    const t = done ? '' : String(value).trim();
+    if (!t && !allowEmpty) { say(`  ${C.r}入力してください。${C.x}`); continue; }
+    return t;
+  }
 }
 
 async function askYesNo(query, def = true) {
@@ -84,20 +118,22 @@ async function askYesNo(query, def = true) {
 
 // 秘密情報の入力。打った文字を画面に出さない。
 // 肩越しに見られる事故と、ターミナルのスクロールバックに残る事故の両方を防ぐ。
-function askSecret(query) {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    let muted = false;
-    rl._writeToOutput = function (s) {
-      if (!muted) rl.output.write(s);
-    };
-    rl.question(`  ${query}`, (v) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(v.trim());
-    });
-    muted = true;
-  });
+// プロンプトは自分で書き出してから muted にするので、プロンプトは見えたまま
+// 打った文字だけ隠れる（対話端末でのみ効く。パイプ入力では readline 自身が
+// 何も反響しないので、この仕組みは何もしなくても安全）。
+async function askSecret(query) {
+  const rl = getReadline();
+  const original = rl._writeToOutput;
+  let muted = false;
+  rl._writeToOutput = function (s) {
+    if (!muted) original.call(rl, s);
+  };
+  rl.output.write(`  ${query}`);
+  muted = true;
+  const { value, done } = await lineIterator.next();
+  rl._writeToOutput = original;
+  process.stdout.write('\n');
+  return done ? '' : String(value).trim();
 }
 
 // ── コマンド実行 ─────────────────────────────────────────
@@ -155,14 +191,15 @@ function generate(len, chars) {
 // 済んだ段階を覚えておいて、再実行したら続きから再開できるようにする。
 // **このファイルには秘密情報を入れない。**
 
-function loadState() {
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
+function loadState(mock) {
+  try { return JSON.parse(fs.readFileSync(stateFile(mock), 'utf8')); }
   catch { return { done: [] }; }
 }
 
-function saveState(s) {
-  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2) + '\n');
+function saveState(s, mock) {
+  const f = stateFile(mock);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, JSON.stringify(s, null, 2) + '\n');
 }
 
 // ── 純粋な処理（--self-test で検証する） ─────────────────
@@ -214,7 +251,7 @@ async function stepTools() {
     else { bad(`${label} が見つかりません`); missing.push(label); }
   }
   if (missing.length) {
-    warn('呼び水スクリプト（setup.ps1 / setup.sh）から起動し直してください。');
+    warn('呼び水スクリプト（tools/setup.sh）から起動し直してください。');
     note('前提コマンドの導入はそちらが行います。');
     throw new Error(`前提コマンドが足りません: ${missing.join(', ')}`);
   }
@@ -256,10 +293,17 @@ async function stepFork(state) {
   note('  フォーク（自分用の複製）を作り、以降はそちらへ変更を送ります。');
   if (!(await askYesNo('フォークを作りますか？'))) throw new Error('中止しました');
 
+  const repo = `${login}/ur-monitor`;
+
+  if (state.mock) {
+    ok(`[MOCK] フォークを作り、origin を ${repo} に向けたものとして進めます`);
+    note('実際の git remote は変更していません。');
+    return { repo };
+  }
+
   const f = await run('gh', ['repo', 'fork', UPSTREAM, '--clone=false', '--remote=false']);
   if (f.code !== 0 && !/already exists/i.test(f.err)) throw new Error(`フォークに失敗しました: ${f.err.trim()}`);
 
-  const repo = `${login}/ur-monitor`;
   // origin を自分のフォークへ向け直す。作者のリポジトリには push 権限が無いため、
   // ここを直さないと後の段階（設定の反映）で必ず失敗する。
   await run('git', ['remote', 'set-url', 'origin', `https://github.com/${repo}.git`]);
@@ -307,12 +351,13 @@ async function stepConfig(state) {
 
   const docsBaseUrl = `https://${state.login}.github.io/ur-monitor`;
   const next = buildConfig(base, { primaryUrls, madori, referenceUrls, docsBaseUrl });
-  fs.writeFileSync(file, JSON.stringify(next, null, 2) + '\n');
+  const outFile = outPath(state, 'config.json');
+  fs.writeFileSync(outFile, JSON.stringify(next, null, 2) + '\n');
 
   // 書いた直後に読み直して妥当性を見る。壊れた config.json のまま先へ進むと、
   // 失敗するのは本番実行のときになる。
-  JSON.parse(fs.readFileSync(file, 'utf8'));
-  ok(`config.json を更新しました（第一希望 ${primaryUrls.length}本 / 参考 ${referenceUrls.length}本）`);
+  JSON.parse(fs.readFileSync(outFile, 'utf8'));
+  ok(`config.json を更新しました（${state.mock ? '模擬出力へ、' : ''}第一希望 ${primaryUrls.length}本 / 参考 ${referenceUrls.length}本）`);
   return {};
 }
 
@@ -331,7 +376,8 @@ async function stepSlack(state) {
     '  4. Add New Webhook to Workspace を押し、通知したいチャンネルを選ぶ',
     '  5. 表示された URL をコピーする',
   ]);
-  await openBrowser('https://api.slack.com/apps');
+  if (state.mock) note('[MOCK] ブラウザは開きません。実在しない URL でも構いません。');
+  else await openBrowser('https://api.slack.com/apps');
 
   for (;;) {
     const hook = await askSecret('Webhook URL を貼り付け（表示されません）: ');
@@ -339,6 +385,13 @@ async function stepSlack(state) {
       bad('Slack の Webhook URL ではないようです。もう一度貼ってください。');
       continue;
     }
+
+    if (state.mock) {
+      ok('[MOCK] テスト投稿・GitHub への登録はどちらも行いません');
+      note('形式が正しいことだけ確認し、登録したものとして進めます。');
+      return {};
+    }
+
     // 登録する前に実際に投げてみる。「登録したつもり」で最後まで進み、
     // 初回通知のときに初めて気づく、という失敗を防ぐ。
     say('  テスト投稿を送っています...');
@@ -360,6 +413,12 @@ async function stepSlack(state) {
 }
 
 async function stepPat(state) {
+  if (state.mock) {
+    ok('[MOCK] トークンの発行画面は開きません');
+    note('実際のトークンは発行していません。secrets 段階でも Cloudflare / GitHub には登録しません。');
+    return { pat: `mock-pat-${generate(12, MACHINE_CHARS)}` };
+  }
+
   guide([
     `${C.B}Cloudflare から GitHub を起動するためのトークンを発行します。${C.x}`,
     '',
@@ -396,7 +455,12 @@ async function stepPat(state) {
   }
 }
 
-async function stepCfAuth() {
+async function stepCfAuth(state) {
+  if (state.mock) {
+    ok('[MOCK] Cloudflare へのログインは省略します');
+    return {};
+  }
+
   let r = await run('npx', ['--yes', 'wrangler', 'whoami']);
   if (r.code !== 0 || /not authenticated|You are not/i.test(r.out + r.err)) {
     guide([
@@ -412,6 +476,18 @@ async function stepCfAuth() {
 }
 
 async function stepDeploy(state) {
+  if (state.mock) {
+    const baseToml = fs.readFileSync(path.join(TRIGGER_DIR, 'wrangler.toml'), 'utf8');
+    const kvId = state.kvId || generate(32, 'abcdef0123456789');
+    const workerUrl = state.workerUrl
+      || `https://ur-monitor-trigger.mock-${generate(6, 'abcdefghijklmnopqrstuvwxyz0123456789')}.workers.dev`;
+    fs.writeFileSync(outPath(state, path.join('trigger', 'wrangler.local.toml')), buildLocalToml(baseToml, kvId));
+    ok(`[MOCK] 保管庫を作ったものとして進めます（${kvId.slice(0, 8)}…）`);
+    ok(`[MOCK] Worker を配備したものとして進めます: ${workerUrl}`);
+    note('実際の Cloudflare には触れていません。');
+    return { kvId, workerUrl };
+  }
+
   let kvId = state.kvId;
 
   if (!kvId) {
@@ -445,38 +521,47 @@ async function stepSecrets(state) {
   const viewUser     = generate(8,  HUMAN_CHARS);
   const viewPassword = generate(24, HUMAN_CHARS);
 
-  const cfArgs = (name) => ['--yes', 'wrangler', 'secret', 'put', name, '--config', 'wrangler.local.toml'];
-  const put = async (name, value) => {
-    const r = await runSecret('npx', cfArgs(name), value + '\n', { cwd: TRIGGER_DIR });
-    if (r.code !== 0) throw new Error(`${name} の登録に失敗しました: ${r.err.trim().slice(0, 200)}`);
-    ok(`${name} を Cloudflare に登録しました`);
-  };
+  if (state.mock) {
+    note('[MOCK] Cloudflare / GitHub への登録は行いません。');
+    ok('[MOCK] GITHUB_TOKEN / API_TOKEN / VIEW_USER / VIEW_PASSWORD を Cloudflare に登録したものとして進めます');
+    ok('[MOCK] STORE_URL / STORE_TOKEN を GitHub に登録したものとして進めます');
+    ok('[MOCK] 一覧ページへの接続確認は省略します');
+  } else {
+    const cfArgs = (name) => ['--yes', 'wrangler', 'secret', 'put', name, '--config', 'wrangler.local.toml'];
+    const put = async (name, value) => {
+      const r = await runSecret('npx', cfArgs(name), value + '\n', { cwd: TRIGGER_DIR });
+      if (r.code !== 0) throw new Error(`${name} の登録に失敗しました: ${r.err.trim().slice(0, 200)}`);
+      ok(`${name} を Cloudflare に登録しました`);
+    };
 
-  await put('GITHUB_TOKEN', state.pat);
-  await put('API_TOKEN', apiToken);
-  await put('VIEW_USER', viewUser);
-  await put('VIEW_PASSWORD', viewPassword);
+    await put('GITHUB_TOKEN', state.pat);
+    await put('API_TOKEN', apiToken);
+    await put('VIEW_USER', viewUser);
+    await put('VIEW_PASSWORD', viewPassword);
 
-  for (const [name, value] of [['STORE_URL', state.workerUrl], ['STORE_TOKEN', apiToken]]) {
-    const r = await runSecret('gh', ['secret', 'set', name, '--repo', state.repo], value);
-    if (r.code !== 0) throw new Error(`${name} の登録に失敗しました: ${r.err.trim()}`);
-    ok(`${name} を GitHub に登録しました`);
+    for (const [name, value] of [['STORE_URL', state.workerUrl], ['STORE_TOKEN', apiToken]]) {
+      const r = await runSecret('gh', ['secret', 'set', name, '--repo', state.repo], value);
+      if (r.code !== 0) throw new Error(`${name} の登録に失敗しました: ${r.err.trim()}`);
+      ok(`${name} を GitHub に登録しました`);
+    }
+
+    // 登録した合言葉で実際に開けるかを確かめる。ここを飛ばすと、
+    // 閲覧できないことに気づくのは一覧を見たくなったときになる。
+    say('  一覧ページに接続して確かめています...');
+    const auth = Buffer.from(`${viewUser}:${viewPassword}`).toString('base64');
+    const res = await fetch(state.workerUrl, { headers: { Authorization: `Basic ${auth}` } })
+      .catch((e) => ({ status: 0, statusText: e.message }));
+    if (res.status === 200) ok('認証を通って一覧ページを開けました');
+    else warn(`確認できませんでした（${res.status}）。配備直後は少し待つと通ることがあります。`);
   }
 
-  // 登録した合言葉で実際に開けるかを確かめる。ここを飛ばすと、
-  // 閲覧できないことに気づくのは一覧を見たくなったときになる。
-  say('  一覧ページに接続して確かめています...');
-  const auth = Buffer.from(`${viewUser}:${viewPassword}`).toString('base64');
-  const res = await fetch(state.workerUrl, { headers: { Authorization: `Basic ${auth}` } })
-    .catch((e) => ({ status: 0, statusText: e.message }));
-  if (res.status === 200) ok('認証を通って一覧ページを開けました');
-  else warn(`確認できませんでした（${res.status}）。配備直後は少し待つと通ることがあります。`);
-
-  // 閲覧用の ID とパスワードは利用者が使うので、控えを残す。
-  // リポジトリの中に置くとコミット事故が起きるため、ホームディレクトリに書く。
-  const credFile = path.join(os.homedir(), 'ur-monitor-credentials.txt');
+  // 閲覧用の ID とパスワードは利用者が使うので、控えを残す。リポジトリの中に
+  // 置くとコミット事故が起きるため、ホームディレクトリに書く。--mock のときは
+  // 本物の控えと混ざらないよう、別のファイル名にする。
+  const credFile = path.join(os.homedir(), state.mock ? 'ur-monitor-credentials.mock.txt' : 'ur-monitor-credentials.txt');
   fs.writeFileSync(credFile,
-    `ur-monitor 空き部屋一覧の閲覧用\n\n`
+    (state.mock ? '【模擬実行】実際には登録していません\n\n' : '')
+    + `ur-monitor 空き部屋一覧の閲覧用\n\n`
     + `URL      : ${state.workerUrl}\n`
     + `ID       : ${viewUser}\n`
     + `パスワード : ${viewPassword}\n\n`
@@ -495,15 +580,22 @@ async function stepSecrets(state) {
 }
 
 async function stepDocs(state) {
+  // 読み込みは常に本物の docs/ から。書き込み先だけ --mock で切り替える
+  // （本番の資料ページに、模擬実行で作った偽の Worker URL が焼き込まれるのを防ぐ）。
   let changed = 0;
   for (const f of DOC_FILES) {
     const p = path.join(ROOT, 'docs', f);
     if (!fs.existsSync(p)) continue;
     const before = fs.readFileSync(p, 'utf8');
     const after  = replaceDocUrl(before, state.workerUrl);
-    if (before !== after) { fs.writeFileSync(p, after); changed++; }
+    if (before !== after) { fs.writeFileSync(outPath(state, path.join('docs', f)), after); changed++; }
   }
-  ok(`資料ページのリンクを差し替えました（${changed}ファイル）`);
+  ok(`資料ページのリンクを差し替えました（${state.mock ? '模擬出力へ、' : ''}${changed}ファイル）`);
+
+  if (state.mock) {
+    note('[MOCK] GitHub Pages の有効化・コミット・push は行いません。');
+    return {};
+  }
 
   // GitHub Pages は有効化できれば有効にする。失敗しても止めない。
   // 資料の公開は任意で、通知そのものには関係しないため。
@@ -532,6 +624,12 @@ async function stepSeed(state) {
     `${C.d}保管庫が空のままだと「前回は0件」とみなされ、いま出ている部屋が${C.x}`,
     `${C.d}すべて新着として通知されてしまいます。それを避けるための一手です。${C.x}`,
   ]);
+
+  if (state.mock) {
+    ok('[MOCK] ワークフローの起動は行いません');
+    note('実際の Actions は動いていません。');
+    return {};
+  }
 
   const r = await run('gh', ['workflow', 'run', 'monitor.yml', '--repo', state.repo, '-f', 'seed_state=true']);
   if (r.code !== 0) throw new Error(`起動に失敗しました: ${r.err.trim()}`);
@@ -603,12 +701,17 @@ async function main() {
   if (args.includes('--help') || args.includes('-h')) return printHelp();
   if (args.includes('--self-test')) return selfTest();
 
-  const state = loadState();
+  const mock = args.includes('--mock');
+  const state = loadState(mock);
+  state.mock = mock;
   if (args.includes('--restart')) state.done = [];
 
   say();
-  say(`${C.B}ur-monitor セットアップ${C.x}`);
+  say(`${C.B}ur-monitor セットアップ${mock ? `${C.y}（模擬実行）${C.x}` : ''}${C.x}`);
   say(`${C.d}UR賃貸の空き部屋を見張り、条件に合う新着を Slack へ通知する仕組みを用意します。${C.x}`);
+  if (mock) {
+    note('Cloudflare / GitHub の実アカウントは一切変更しません。生成物は tools/.mock-run/ に置きます。');
+  }
   if (state.done.length) note(`前回の続きから再開します（${state.done.length}段階が完了済み）`);
 
   // 「pat が要るのに無ければ pat からやり直す」という巻き戻しは、状態を
@@ -627,23 +730,34 @@ async function main() {
       say();
       note('直してから同じコマンドをもう一度実行すると、この段階から再開します。');
       const { pat, ...persist } = state;
-      saveState(persist);
+      saveState(persist, mock);
       process.exit(1);
     }
     if (!state.done.includes(step.id)) state.done.push(step.id);
     const { pat, ...persist } = state;
-    saveState(persist);
+    saveState(persist, mock);
   }
 
   say();
-  say(`${C.g}${C.B}セットアップが完了しました。${C.x}`);
+  if (mock) {
+    say(`${C.y}${C.B}模擬実行が完了しました。${C.x}`);
+    say();
+    say('  Cloudflare にも GitHub にも変更は加わっていません。');
+    say(`  生成物は ${C.b}tools/.mock-run/${C.x} にあります。消しても構いません。`);
+    say('  本番として進めるときは、--mock を外してもう一度実行してください');
+    say('  （模擬実行の進み具合とは別に記録されるので、最初からになります）。');
+  } else {
+    say(`${C.g}${C.B}セットアップが完了しました。${C.x}`);
+    say();
+    say('  これ以降は放っておいて構いません。08:00〜21:00 の間、5分おきに');
+    say('  自動で見に行き、条件に合う新着が出たときだけ Slack が鳴ります。');
+    say();
+    say(`  空き部屋一覧 : ${C.b}${state.workerUrl}${C.x}`);
+    say(`  実行の記録   : ${C.b}https://github.com/${state.repo}/actions${C.x}`);
+  }
   say();
-  say('  これ以降は放っておいて構いません。08:00〜21:00 の間、5分おきに');
-  say('  自動で見に行き、条件に合う新着が出たときだけ Slack が鳴ります。');
-  say();
-  say(`  空き部屋一覧 : ${C.b}${state.workerUrl}${C.x}`);
-  say(`  実行の記録   : ${C.b}https://github.com/${state.repo}/actions${C.x}`);
-  say();
+  // readline を開いたままだと標準入力を待ち続け、プロセスが終わらない。
+  closeReadline();
 }
 
 function printHelp() {
@@ -654,13 +768,16 @@ ur-monitor セットアップウィザード
     node tools/setup.mjs [オプション]
 
   オプション:
+    --mock        Cloudflare / GitHub の実アカウントを変更せずに全段階を試す
+                  （Slack 送信・トークン発行・Worker 配備・合言葉の登録・
+                  push・ワークフロー起動をすべて省略し、模擬の値で進める。
+                  進み具合は本番とは別に記録するので、毎回 --mock を付けること）
     --restart     最初からやり直す（登録済みの内容は消えません）
     --self-test   ネットワークに触れずに内部処理だけを検証する
     --help        この説明
 
-  通常は OS ごとの呼び水から起動してください。
-    Windows : powershell -ExecutionPolicy Bypass -File tools\\setup.ps1
-    Mac     : bash tools/setup.sh
+  通常は呼び水から起動してください（Windows / Mac 共通）。
+    bash tools/setup.sh
 `);
 }
 

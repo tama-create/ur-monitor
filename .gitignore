@@ -26,3 +26,8 @@ trigger/wrangler.local.toml
 
 # 進捗の記録。秘密情報は書かない設計だが、環境固有の情報なので追跡しない。
 tools/.setup-state.json
+
+# --mock（模擬実行）の生成物。本物の config.json / docs/ には触れず、
+# ここへ出力を逃がしている。進捗の記録も本番とは別ファイルにしてある。
+tools/.mock-run/
+tools/.setup-state.mock.json

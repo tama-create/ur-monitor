@@ -57,7 +57,7 @@ UR営業センターの窓口での書類提出（本申込み）になります
 
 **プログラミングの知識がなくても使えます。** 画面の操作と設定値のコピー＆ペーストだけで、
 30〜60分ほどでセットアップできます。`git` / `gh` / `Node.js` を使える方は、
-[セットアップウィザード](tools/setup.mjs)（`bash tools/setup.sh` / `powershell -File tools\setup.ps1`）
+[セットアップウィザード](tools/setup.mjs)（`bash tools/setup.sh`。Windows も Git Bash で同じコマンドです）
 で大半を自動化できます。詳しくは手順書の案内をご覧ください。
 
 ### 2.1 使い方ガイド
