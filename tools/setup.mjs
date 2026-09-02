@@ -322,8 +322,9 @@ async function stepConfig(state) {
     `${C.d}エリアや駅で絞った検索結果ページでも構いません。${C.x}`,
     'そのページの URL をブラウザからコピーして、下に貼ってください。',
   ]);
-  if (state.mock) note('[MOCK] ブラウザは開きません。');
-  else await openBrowser('https://www.ur-net.go.jp/chintai/');
+  // UR のサイトを見るだけならアカウントも何も関係ないので、--mock でも
+  // 遠慮せず開く（Slack・GitHub のように「実際に作る・発行する」ページとは違う）。
+  await openBrowser('https://www.ur-net.go.jp/chintai/');
 
   const primaryUrls = [];
   for (;;) {
