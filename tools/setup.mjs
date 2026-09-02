@@ -649,12 +649,26 @@ async function stepSeed(state) {
 
 // ── ブラウザを開く ───────────────────────────────────────
 
-async function openBrowser(url) {
-  const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
-            : process.platform === 'darwin' ? ['open', [url]]
-            : ['xdg-open', [url]];
-  const r = await run(cmd[0], cmd[1]);
-  if (r.code !== 0) note(`ブラウザで開いてください: ${url}`);
+function openBrowser(url) {
+  return new Promise((resolve) => {
+    let child;
+    if (process.platform === 'win32') {
+      // cmd.exe の start は「ウィンドウタイトル」を第一引数に取るビルトインで、
+      // 位置引数の解釈が独特なため、run() の汎用クォート（npx や gh のような
+      // 普通の実行ファイル向け）を通すと正しく起動できない。Node 公式が
+      // このケース向けに示している windowsVerbatimArguments を使う。
+      child = spawn('cmd', ['/c', 'start', '""', url], { windowsVerbatimArguments: true, stdio: 'ignore' });
+    } else if (process.platform === 'darwin') {
+      child = spawn('open', [url], { stdio: 'ignore' });
+    } else {
+      child = spawn('xdg-open', [url], { stdio: 'ignore' });
+    }
+    child.on('error', () => { note(`ブラウザで開いてください: ${url}`); resolve(); });
+    child.on('exit', (code) => {
+      if (code !== 0) note(`ブラウザで開いてください: ${url}`);
+      resolve();
+    });
+  });
 }
 
 // ── 進行 ─────────────────────────────────────────────────
