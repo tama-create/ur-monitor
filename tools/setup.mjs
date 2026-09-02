@@ -104,9 +104,17 @@ function askSecret(query) {
 
 function run(cmd, args, { cwd = ROOT, input = null, quiet = true } = {}) {
   return new Promise((resolve) => {
-    const p = spawn(cmd, args, {
+    // Windows では npx などが .cmd 経由でしか呼べないため shell を挟む必要があるが、
+    // shell:true と配列の args を素直に組み合わせると Node が非推奨警告を出す
+    // （naive に連結されるだけでエスケープされないため）。ここでは自分で
+    // 1本のコマンド文字列に組み立てて渡し、args 配列は使わない形にする。
+    const onWindows = process.platform === 'win32';
+    const quote = (a) => `"${String(a).replace(/"/g, '""')}"`;
+    const spawnCmd  = onWindows ? [cmd, ...args].map(quote).join(' ') : cmd;
+    const spawnArgs = onWindows ? undefined : args;
+    const p = spawn(spawnCmd, spawnArgs, {
       cwd,
-      shell: process.platform === 'win32', // Windows では gh/wrangler が .cmd のため
+      shell: onWindows,
       stdio: [input === null ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
     let out = '', err = '';
