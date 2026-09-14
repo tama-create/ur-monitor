@@ -221,8 +221,13 @@ Pages が再ビルドされるのは資料を手で変えたときだけ。
 取り違えて公開したときの保険。**外さないこと。**
 
 以前は Cloudflare Pages の Direct Upload を使っていたが、GitHub Pages で足りるため廃止した。
-API トークンと Account ID の Secrets、wrangler の実行手順、`deploy/_headers`、
-「デプロイは常に一式を送る」という制約が、まとめて不要になっている。
+`deploy/_headers` と「デプロイは常に一式を送る」という制約は不要になっている。
+Cloudflare 側の Pages プロジェクト（`ur-monitor-6pd.pages.dev`）には8月の一覧が公開されたまま残っていたので、
+2026-09-14 に削除した。当時の Pages 専用 API トークンも削除済み。
+
+**`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` の Secrets は、いまは Worker の自動反映
+（`deploy-trigger.yml`）で使っている。** 名前は Pages の頃と同じだが中身は別物（「Edit Cloudflare Workers」の
+ひな形で作ったトークン）。消したり Pages 用の権限に戻したりしないこと。
 
 ## スタイル
 

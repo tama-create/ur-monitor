@@ -1214,6 +1214,14 @@ GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完�
 残りは次の第10章だけです。</p>
 </div>
 
+<div class="note">
+<p><strong><code>worker.js</code> の更新を自動にしたい方へ（任意）。</strong>
+Cloudflare の API トークンを1つ作って GitHub に登録しておくと、以降は <code>worker.js</code> を直して push するだけで
+Cloudflare に反映され、画面に貼り直す必要がなくなります。手順は
+<a href="https://github.com/tama-create/ur-monitor/blob/main/trigger/README.md#自動反映を使えるようにする最初に1回だけ" target="_blank" rel="noopener">trigger/README の「自動反映を使えるようにする」</a>
+にあります。第10章の保管庫を作ってから設定してください（反映のときに保管庫を名前で探すため）。</p>
+</div>
+
 <h2 id="s10">保管庫を用意して一覧を見られるようにする <span class="step-time">（15分）</span></h2>
 
 <div class="stop">
@@ -1317,7 +1325,7 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
 第9章で貼った <code>worker.js</code> には、一覧を預かって見せる部分が入っています。
 すでに最新のコードを貼っていれば、そのまま <strong>Deploy</strong> を押すだけです。
 古いコードのままなら、<a href="https://github.com/tama-create/ur-monitor/blob/main/trigger/worker.js">worker.js</a>
-をもう一度コピーして貼り直してください。
+をもう一度コピーして貼り直してください（<a href="#s8b-5">第9章の最後</a>の自動反映を設定していれば、貼り直しは要りません）。
 </p>
 
 <p>Worker の URL（Worker の画面に出ている <code>https://ur-monitor-trigger.<var>あなたのサブドメイン</var>.workers.dev</code>）をブラウザで開き、<strong>ID とパスワードの入力欄</strong>が出れば成功です。</p>
@@ -1457,7 +1465,8 @@ GitHub では、実行がマシンを割り当ててもらえず「待ち」の�
 使うには、<a href="https://github.com/tama-create/ur-monitor/blob/main/trigger/worker.js">worker.js</a>
 を貼り直して <strong>Deploy</strong> し（先頭の <code>OWNER</code> の書き換えを忘れずに）、
 <a href="#s10-2">第10章</a>の表にある <code>SLACK_WEBHOOK_URL</code> を Worker に追加してください。
-トークンの権限はそのままで足ります。</p>
+トークンの権限はそのままで足ります。自動反映（<a href="#s8b-5">第9章の最後</a>）を設定済みなら、
+最新のリポジトリを取り込んで push するだけで <code>worker.js</code> は入れ替わります。</p>
 <p>きっかけは、1つの実行が「待ち」のまま固まり、<strong>約24時間止まったのに誰も気づけなかった</strong>ことです。
 それまでの見張り（「止まっていました」）は監視ジョブの中にあったため、ジョブが動けないと一緒に止まっていました。</p>
 </div>
