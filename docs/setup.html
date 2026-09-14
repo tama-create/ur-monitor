@@ -1198,6 +1198,8 @@ Secret にすると、あとから画面上でも中身を読み出せなくな�
 <tr><td><code>SLACK_WEBHOOK_URL が未設定のため止まりの見張りを省略</code></td><td>正常。止まったときの知らせは<a href="#s10-2">第10章</a>で設定します</td></tr>
 <tr><td><code>詰まった実行をキャンセル: run ...</code></td><td>正常。終わらないまま残っていた実行を自動で片付けました（<a href="#s11-5">詳しく</a>）</td></tr>
 <tr><td><code>詰まった実行の片付けに失敗: 403 ...</code></td><td>トークンの権限が足りません。Actions を Read and write にしてください。起動そのものは続きます</td></tr>
+<tr><td><code>止まりの疑い（...分）。次の見回りでも同じなら警告する</code></td><td>止まっているように見えました。5分後の見回りでも同じなら警告します（一時的な誤りで鳴らないように、2回続けて確かめています）</td></tr>
+<tr><td><code>前回の「止まりの疑い」は解消した</code></td><td>正常。前回の疑いは一時的なものでした</td></tr>
 <tr><td><code>止まりを警告した（最後の成功 run ...）</code></td><td>Slack に「監視が止まっています」を送りました（<a href="#s11-5">詳しく</a>）</td></tr>
 <tr><td><code>止まりの見張りに失敗: ...</code></td><td>見張りだけが失敗しました。起動そのものは続きます。403 なら権限不足です</td></tr>
 </tbody>
@@ -1293,7 +1295,7 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
   <tr><td><code>VIEW_USER</code></td><td>一覧を開くときの ID です。好きな英数字で構いません（例：<code>me</code>）</td></tr>
   <tr><td><code>VIEW_PASSWORD</code></td><td>一覧を開くときのパスワードです。<strong>英数字で20文字以上</strong>をおすすめします</td></tr>
   <tr><td><code>API_TOKEN</code></td><td>監視ジョブが書き込むときの合言葉です。<strong>英数字で40文字以上</strong>をおすすめします</td></tr>
-  <tr><td><code>SLACK_WEBHOOK_URL</code></td><td>（任意）GitHub に入れたものと同じ Slack の URL です。入れておくと、監視が30分以上止まったときに <strong>GitHub の外から</strong>知らせます。入れなくても監視は動きます</td></tr>
+  <tr><td><code>SLACK_WEBHOOK_URL</code></td><td>（任意）GitHub に入れたものと同じ Slack の URL です。入れておくと、監視が止まったとき（35分ほどで）<strong>GitHub の外から</strong>知らせます。入れなくても監視は動きます</td></tr>
 </table>
 
 <div class="warn">
@@ -1419,7 +1421,7 @@ UR のサイトの作りが変わった可能性があります。その場合�
   <tr>
     <td>🚨 <strong>監視が止まっています</strong></td>
     <td>Cloudflare（GitHub の外）</td>
-    <td><strong>いま止まっています。</strong>最後に成功した実行から、稼働時間帯で30分以上空きました。同じ停止については1回だけ届きます</td>
+    <td><strong>いま止まっています。</strong>最後に成功した実行から、稼働時間帯で30分以上空いた状態を2回続けて確かめました（止まってから35分ほどで届きます）。同じ停止については1回だけ届きます</td>
   </tr>
   <tr>
     <td>⚠️ <strong>監視が止まっていました</strong></td>

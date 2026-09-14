@@ -133,14 +133,37 @@ GitHub の **Actions** タブに `workflow_dispatch` の実行が5分おきに�
 
 ## 変更するとき
 
-`wrangler` を使うなら、このディレクトリで次を実行する。
+**`worker.js` や `wrangler.toml` を直して `main` に push すれば、自動で Cloudflare に反映される**
+（`.github/workflows/deploy-trigger.yml`）。反映の前に `worker.test.mjs` の動作テストが流れ、
+通らなければ反映しない。手元で確かめるときは次を実行する。
 
 ```bash
-npx wrangler deploy
-npx wrangler secret put GITHUB_TOKEN
+node trigger/worker.test.mjs
 ```
 
-画面から貼り付けても同じ。どちらでもよい。
+### 自動反映を使えるようにする（最初に1回だけ）
+
+1. Cloudflare の画面右上のアイコン → **My Profile** → **API Tokens** → **Create Token**
+2. ひな形の **Edit Cloudflare Workers** の **Use template** を押す
+3. **Account Resources** で自分のアカウントを選び、**Zone Resources** は **All zones** のまま
+   **Continue to summary** → **Create Token**。表示されたトークンをコピーする（この画面でしか見られない）
+4. **Workers & Pages** の画面の右側にある **Account ID** をコピーする
+5. リポジトリの **Settings** → **Secrets and variables** → **Actions** → **New repository secret** で2つ登録する
+
+| Name | Secret |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | 手順3のトークン |
+| `CLOUDFLARE_ACCOUNT_ID` | 手順4の Account ID |
+
+登録したら、Actions タブの **起動トリガーを反映** → **Run workflow** で1回流し、緑のチェックが付けば完了。
+未登録のあいだは、テストだけ流して反映を飛ばす（失敗にはならない）。
+
+保管庫（KV）の ID はリポジトリに書かず、反映のたびに Cloudflare から名前（`ur-monitor`）で探して埋める。
+違う名前で作った場合は、同じ画面の **Variables** に `KV_NAMESPACE_TITLE` として名前を登録する。
+
+**自動反映は `wrangler.toml` の内容で Worker の設定を上書きする。** cron・KV の結び付け・ログ（Observability）を
+画面で変えても、次の反映で `wrangler.toml` の内容に戻るので、設定は必ずこのファイルで変えること。
+Secret（`GITHUB_TOKEN` など）は上書きされない。
 
 ## 費用
 

@@ -50,8 +50,16 @@ const UNFINISHED_STATUSES = ['queued', 'in_progress', 'pending', 'waiting'];
 // 誰も気づけなかった。こちらは Cloudflare から見るので Actions が止まっても鳴る。
 // 最後に成功した回から稼働時間帯で STALE_ALERT_MINUTES 以上空いたら Slack へ送る。
 // 5分おきの起動なので30分は6回ぶんの取りこぼしにあたり、一時的な失敗（1〜2回）では鳴らない。
+//
+// 「空いている」と1回見ただけでは送らず、次の見回り（5分後）でも同じだったときに送る。
+// GitHub の API がまれに古い結果を返すため（2026-09-14 19:40、実行は5分おきに成功していたのに、
+// 前日の成功を「最新」として返して誤報になった）。本当に止まったときの知らせは5分遅れるだけで済む。
 const STALE_ALERT_MINUTES = 30;
-const KV_STALE_ALERTED = 'stale_alerted';   // 同じ停止で連投しないよう、警告済みの run id を置く
+const KV_STALE_ALERTED = 'stale_alerted';   // 同じ停止で連投しないよう、警告済みの印を置く
+const KV_STALE_SUSPECT = 'stale_suspect';   // 前回の見回りで「空いている」と見た印。次も同じなら送る
+// 最後の成功を探すときに見る、直近の実行の数。status=success で絞り込む問い合わせは使わない。
+// 上の誤報はこの絞り込みの結果が古かったもので、絞り込まない一覧は正しい結果を返していた。
+const RECENT_RUNS = 50;
 
 
 // ── 一覧の保管と閲覧 ─────────────────────────
@@ -174,31 +182,60 @@ async function warnIfStale(env, now) {
     console.log('SLACK_WEBHOOK_URL が未設定のため止まりの見張りを省略');
     return;
   }
+  // 絞り込まない一覧を新しい順に見て、最初の成功を探す（理由は RECENT_RUNS の説明）
   const res = await fetch(
-    `${API_BASE}/workflows/${WORKFLOW}/runs?status=success&per_page=1`,
+    `${API_BASE}/workflows/${WORKFLOW}/runs?per_page=${RECENT_RUNS}`,
     { headers: githubHeaders(env) },
   );
   if (!res.ok) {
-    throw new Error(`成功した実行の取得に失敗: ${res.status} ${await res.text()}`);
+    throw new Error(`実行一覧の取得に失敗: ${res.status} ${await res.text()}`);
   }
-  const last = (await res.json()).workflow_runs?.[0];
-  if (!last) return;   // まだ1回も成功していない（初期設定中）
+  const runs = (await res.json()).workflow_runs || [];
+  const last = runs.find((r) => r.conclusion === 'success');
+  let lastMs;
+  let mark;   // 同じ停止かどうかを見分ける印
+  if (last) {
+    lastMs = Date.parse(last.updated_at);
+    mark = String(last.id);
+  } else if (runs.length >= RECENT_RUNS) {
+    // 直近の実行がすべて成功していない。いつから止まっているかは、見えている一番古い実行で下限をとる
+    const oldest = runs[runs.length - 1];
+    lastMs = Date.parse(oldest.created_at);
+    mark = `none:${oldest.id}`;
+  } else {
+    return;   // まだ1回も成功していない（初期設定中）
+  }
 
-  const lastMs = Date.parse(last.updated_at);
   const gap = monitoringGapMinutes(lastMs, now, START_HOUR, END_HOUR);
-  if (gap < STALE_ALERT_MINUTES) return;
+  if (gap < STALE_ALERT_MINUTES) {
+    // 前回「空いている」と見ていたなら、それは一時的な誤りだったので印を消す
+    if (env.STORE && (await env.STORE.get(KV_STALE_SUSPECT)) !== null) {
+      await env.STORE.delete(KV_STALE_SUSPECT);
+      console.log('前回の「止まりの疑い」は解消した');
+    }
+    return;
+  }
 
-  // 同じ「最後の成功」に対しては1回だけ鳴らす。復旧すれば id が変わるので次の停止でまた鳴る。
-  // KV が結び付いていなければ連投防止ができないが、黙るよりは鳴るほうを選ぶ
-  const alerted = env.STORE ? await env.STORE.get(KV_STALE_ALERTED) : null;
-  if (alerted === String(last.id)) return;
+  // 同じ停止に対しては1回だけ鳴らす。復旧すれば印が変わるので次の停止でまた鳴る。
+  // KV が結び付いていなければ連投防止も2回確認もできないが、黙るよりは鳴るほうを選ぶ
+  if (env.STORE) {
+    if ((await env.STORE.get(KV_STALE_ALERTED)) === mark) return;
+    if ((await env.STORE.get(KV_STALE_SUSPECT)) !== mark) {
+      await env.STORE.put(KV_STALE_SUSPECT, mark);
+      console.log(`止まりの疑い（${gap}分）。次の見回りでも同じなら警告する`);
+      return;
+    }
+  }
 
   const lastJst = new Date(lastMs + 9 * 3600 * 1000);
   const when = `${lastJst.getUTCMonth() + 1}/${lastJst.getUTCDate()} ` +
     `${String(lastJst.getUTCHours()).padStart(2, '0')}:${String(lastJst.getUTCMinutes()).padStart(2, '0')}`;
+  const lead = last
+    ? `最後に成功した実行は ${when}（稼働時間帯で ${Math.floor(gap / 60)}時間${gap % 60}分 前）。\n`
+    : `直近 ${RECENT_RUNS} 回の実行に成功がありません（${when} 以降、稼働時間帯で ${Math.floor(gap / 60)}時間${gap % 60}分）。\n`;
   const text =
     `:rotating_light: *監視が止まっています*\n` +
-    `最後に成功した実行は ${when}（稼働時間帯で ${Math.floor(gap / 60)}時間${gap % 60}分 前）。\n` +
+    lead +
     `詰まった実行は自動でキャンセルしますが、続くようなら Actions の実行一覧を確認してください。\n` +
     `https://github.com/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}`;
   const s = await fetch(env.SLACK_WEBHOOK_URL, {
@@ -209,8 +246,11 @@ async function warnIfStale(env, now) {
   if (!s.ok) {
     throw new Error(`Slack への送信に失敗: ${s.status}`);
   }
-  if (env.STORE) await env.STORE.put(KV_STALE_ALERTED, String(last.id));
-  console.log(`止まりを警告した（最後の成功 run ${last.id}・${gap}分）`);
+  if (env.STORE) {
+    await env.STORE.put(KV_STALE_ALERTED, mark);
+    await env.STORE.delete(KV_STALE_SUSPECT);
+  }
+  console.log(`止まりを警告した（${last ? `最後の成功 run ${last.id}` : mark}・${gap}分）`);
 }
 
 function needAuth() {

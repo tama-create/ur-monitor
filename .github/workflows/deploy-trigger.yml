@@ -1,0 +1,86 @@
+name: 起動トリガーを反映
+
+# trigger/worker.js を Cloudflare へ自動で反映する。以前は Cloudflare の画面にコードを貼って
+# デプロイしていたが、手作業だと反映漏れや貼り間違いが起きるうえ、毎回人の手が要るため自動にした。
+#
+# 最初に1回だけ、リポジトリの Secrets に次の2つを登録する（手順は trigger/README.md）。
+#   CLOUDFLARE_API_TOKEN   … 「Edit Cloudflare Workers」のひな形で作った API トークン
+#   CLOUDFLARE_ACCOUNT_ID  … Cloudflare のアカウント ID
+# 登録していなければ、テストだけ流して反映は飛ばす（フォークした人の push を赤くしないため）。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'trigger/worker.js'
+      - 'trigger/wrangler.toml'
+      - 'trigger/worker.test.mjs'
+      - '.github/workflows/deploy-trigger.yml'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '反映せず、送る内容だけ確かめる'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# 続けて push したときに、古い版があとから反映されて新しい版を上書きしないようにする
+concurrency:
+  group: deploy-trigger
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v5
+
+      - name: Node をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 壊れたコードを反映すると、監視の起動も見張りも止まる。反映の前に必ず通す
+      - name: 動作テスト
+        run: node trigger/worker.test.mjs
+
+      - name: 鍵が登録されているか確かめる
+        id: check
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID が未登録のため、反映を省略します（trigger/README.md 参照）"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # wrangler.toml の KV の ID はリポジトリに書いていない（ひな形のまま）。Cloudflare から名前で探して埋める。
+      # 名前は手順書で作る「ur-monitor」。違う名前にした場合は、リポジトリの Variables に KV_NAMESPACE_TITLE を置く
+      - name: 保管庫の ID を調べて設定ファイルを作る
+        if: steps.check.outputs.ready == 'true'
+        working-directory: trigger
+        env:
+          KV_TITLE: ${{ vars.KV_NAMESPACE_TITLE || 'ur-monitor' }}
+        run: |
+          set -euo pipefail
+          list=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces?per_page=100")
+          ids=$(echo "$list" | jq -r --arg t "$KV_TITLE" '.result[] | select(.title == $t) | .id')
+          count=$(echo -n "$ids" | grep -c . || true)
+          if [ "$count" != "1" ]; then
+            echo "::error::名前が「$KV_TITLE」の KV が ${count} 件見つかりました（1件である必要があります）。ある KV: $(echo "$list" | jq -r '[.result[].title] | join(", ")')"
+            exit 1
+          fi
+          sed "s/ここに KV の ID を入れる/$ids/" wrangler.toml > wrangler.ci.toml
+          grep -q "$ids" wrangler.ci.toml
+
+      - name: 反映する
+        if: steps.check.outputs.ready == 'true'
+        working-directory: trigger
+        run: npx --yes wrangler@4 deploy --config wrangler.ci.toml ${{ inputs.dry_run && '--dry-run' || '' }}

@@ -18,9 +18,13 @@ php -l ur_monitor.php          # 構文チェック
 ほかのモード（`--seed-state` / `--setup` / `--check-robots`）は README の「6. 開発」にある。
 `--dry-run` を付けない実行は**ローカルでは基本しない**（下記「状態はリポジトリに無い」参照）。
 
-**テストスイートは無い。** 検証は `php -l` と `--dry-run` の実行ログで行う。PR で走る CI も無い
-（`monitor.yml` は `schedule` + `workflow_dispatch`、`verify-cloud-setup.yml` は `workflow_dispatch` のみで、
-どちらも `pull_request` トリガーを持たない）。変更したら `--dry-run` を実際に流して確かめること。
+**`ur_monitor.php` にテストスイートは無い。** 検証は `php -l` と `--dry-run` の実行ログで行う。PR で走る CI も無い
+（どのワークフローも `pull_request` トリガーを持たない）。変更したら `--dry-run` を実際に流して確かめること。
+
+`trigger/worker.js` には `node trigger/worker.test.mjs`（GitHub・Slack・KV を模擬した場面テスト）がある。
+**`trigger/` を変えて `main` に push すると、このテストが通ったときだけ Cloudflare へ自動で反映される**
+（`.github/workflows/deploy-trigger.yml`）。push する前に手元でもテストを流すこと。反映は `wrangler.toml` の
+内容で Worker の設定を上書きするので、cron や KV の結び付けは画面ではなく `wrangler.toml` で変える。
 
 ## 構成
 

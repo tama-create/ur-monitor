@@ -931,7 +931,7 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
   <rect x="450" y="46" width="180" height="70" rx="8" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
   <text x="540" y="68" class="tn">見回り 2</text>
   <text x="540" y="90" class="t1">止まりを見張る</text>
-  <text x="540" y="108" class="t2">最後の成功から30分</text>
+  <text x="540" y="108" class="t2">30分の空きを2回続けて確認</text>
 
   <rect x="670" y="46" width="150" height="70" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
   <text x="745" y="74" class="t1">起動を依頼</text>
@@ -953,7 +953,7 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <thead><tr><th>見回り</th><th>中身</th><th>理由</th></tr></thead>
 <tbody>
 <tr><td>詰まりの片付け</td><td>queued / in_progress / pending / waiting の実行のうち、作成から<strong>20分</strong>を過ぎたものを cancel、<strong>40分</strong>を過ぎたものは force-cancel</td><td>正常な実行は2分以内に終わります（<code>timeout-minutes</code> は10分）。普通の取り消しを受け付けない実行があるため、2段にしています</td></tr>
-<tr><td>止まりの見張り</td><td>最後に成功した実行から、稼働時間帯で<strong>30分</strong>以上空いたら Slack へ1回だけ送る</td><td>5分おきなので6回ぶんの取りこぼしにあたり、1〜2回の一時的な失敗では鳴りません。連投しないよう、警告済みの run id を KV の <code>stale_alerted</code> に置きます</td></tr>
+<tr><td>止まりの見張り</td><td>直近50回の実行一覧から最後の成功を探し、稼働時間帯で<strong>30分</strong>以上空いていたら、<strong>次の見回り（5分後）でも同じだったとき</strong>に Slack へ1回だけ送る</td><td>5分おきなので6回ぶんの取りこぼしにあたり、1〜2回の一時的な失敗では鳴りません。2回続けて確かめるのは、GitHub の API がまれに古い結果を返して誤報になったためです（2026-09-14 19:40）。疑いの印は KV の <code>stale_suspect</code>、警告済みの印は <code>stale_alerted</code> に置きます</td></tr>
 </tbody>
 </table>
 
@@ -963,7 +963,9 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <div class="stop">
 <p><strong>見張りを Actions の中だけに置かないでください。</strong>止まるときは見張りごと止まります。
 なお Worker に <code>SLACK_WEBHOOK_URL</code> が無ければ見張りだけ黙り、KV が結び付いていなければ
-連投防止が効かず5分おきに届きます（黙るよりは鳴るほうを選んでいます）。</p>
+2回確認も連投防止もできず、1回目から5分おきに届きます（黙るよりは鳴るほうを選んでいます）。</p>
+<p><strong><code>worker.js</code> は push すると自動で Cloudflare に反映されます</strong>（<code>.github/workflows/deploy-trigger.yml</code>）。
+反映の前に <code>trigger/worker.test.mjs</code> の場面テスト（今回の誤報の再現を含む）が流れ、通らなければ反映しません。</p>
 </div>
 <h2 id="a9">数字のまとめ</h2>
 
@@ -981,7 +983,7 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <tr><td>怪しいと判断する減り方</td><td>前回の <strong>0.7 倍</strong>未満</td><td><code>shrink_guard_ratio</code></td></tr>
 <tr><td>粘る回数</td><td><strong>18回</strong>（＝約90分）</td><td><code>zero_streak_limit</code></td></tr>
 <tr><td>「止まっていました」を出す空白</td><td>3時間</td><td><code>stale_warning_hours</code>（監視ジョブ）</td></tr>
-<tr><td>「止まっています」を出す空白</td><td>30分</td><td><code>STALE_ALERT_MINUTES</code>（<code>worker.js</code>）</td></tr>
+<tr><td>「止まっています」を出す空白</td><td>30分（2回続けて確認するので、届くのは35分ほど後）</td><td><code>STALE_ALERT_MINUTES</code>（<code>worker.js</code>）</td></tr>
 <tr><td>詰まったとみなして取り消す</td><td>20分（40分で強制）</td><td><code>STUCK_MINUTES</code> / <code>FORCE_CANCEL_MINUTES</code>（<code>worker.js</code>）</td></tr>
 <tr><td>UR へのアクセス</td><td>平均 75秒に1回（稼働時間帯のみ）</td><td>4URL × 168回</td></tr>
 </tbody>

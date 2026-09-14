@@ -111,8 +111,9 @@ output/               ローカル実行で生成される一覧（保管先が�
 trigger/              Cloudflare Workers。監視処理（UR の取得）は持たない
   worker.js           稼働時間帯に5分おきで workflow_dispatch を叩く。詰まった実行の片付け、
                       止まりの見張り、保管庫（KV）の出し入れと一覧の閲覧も受け持つ
-  wrangler.toml       cron と KV の設定
-  README.md           セットアップ手順
+  wrangler.toml       cron・KV・ログの設定（自動反映はこの内容で Worker を上書きする）
+  worker.test.mjs     worker.js の場面テスト（node trigger/worker.test.mjs）
+  README.md           セットアップ手順と、自動反映の準備
 
 tools/
   setup.sh / setup.mjs  セットアップウィザード（git / gh / Node.js が使える人向け）
@@ -120,6 +121,7 @@ tools/
 
 .github/workflows/
   monitor.yml             本番実行（Cloudflare から起動。schedule は保険と心拍）
+  deploy-trigger.yml      trigger/ を変えて push したら、テストを通して Cloudflare へ自動で反映
   verify-cloud-setup.yml  cloud-setup.sh の検証（手動実行のみ）
 ```
 

@@ -35,6 +35,11 @@ crons = ["*/5 0-12,23 * * *"]
 binding = "STORE"
 id = "ここに KV の ID を入れる"
 
+# 実行ログ（Cloudflare の画面の Observability）を残す。自動デプロイ（.github/workflows/deploy-trigger.yml）は
+# このファイルの内容で Worker の設定を上書きするので、ここに書いていないと画面で有効にした設定が消える。
+[observability]
+enabled = true
+
 # Secret（wrangler では設定しない。画面の Settings → Variables and Secrets で
 # **必ず Secret 種別で**入れる。Text にすると画面を開いた人に中身が見える）
 #   GITHUB_TOKEN   … workflow_dispatch を叩き、詰まった実行をキャンセルするためのトークン
