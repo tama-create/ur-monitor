@@ -305,7 +305,7 @@
   <p class="toc-ttl">目次</p>
   <ol>
     <li><a href="#a1">登場人物は3つ</a>
-      <ol><li><a href="#a1-1">登場する技術</a></li></ol>
+      <ol><li><a href="#a1-1">登場する技術</a></li><li><a href="#a1-2">入力と出力</a></li></ol>
     </li>
     <li><a href="#a2">1回の実行で何が起きるか</a></li>
     <li><a href="#a3">PHP の中の流れ</a></li>
@@ -325,6 +325,7 @@
 
 <div class="note">
 <p><strong>この資料は「動いている最中に何が起きているか」だけを書いています。</strong>
+コードの処理の順番は <a href="https://github.com/tama-create/ur-monitor/blob/main/FLOW.md" target="_blank" rel="noopener">FLOW.md</a>、
 導入手順は<a href="setup.html">セットアップ手順書</a>、設定項目は
 <a href="https://github.com/tama-create/ur-monitor#readme" target="_blank" rel="noopener">README</a>、
 コードを触るときの注意は
@@ -409,6 +410,29 @@
 一方 <code>workflow_dispatch</code>（外から叩く）は確実に動きます。
 <strong>「時刻を守るのは苦手、言われたら動くのは確実」</strong>という性質の差を利用しています。</p>
 </div>
+
+<h3 id="a1-2">入力と出力</h3>
+
+<table>
+<thead><tr><th>種類</th><th>もの</th><th>中身</th></tr></thead>
+<tbody>
+<tr><td>入力</td><td><code>config.json</code></td><td>監視対象・通知条件・しきい値・セレクター（項目は README）</td></tr>
+<tr><td>入力</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code></td><td>Slack の送り先</td></tr>
+<tr><td>入力</td><td>環境変数 <code>STORE_URL</code> / <code>STORE_TOKEN</code></td><td>保管庫の URL と合言葉。無ければ手元のファイル（<code>state.json</code> / <code>docs/index.html</code>）を使う（開発用）</td></tr>
+<tr><td>入力</td><td><code>templates/list.html</code> / <code>list.css</code></td><td>一覧ページの見た目</td></tr>
+<tr><td>出力</td><td>Slack</td><td>新着の通知、停止の警告</td></tr>
+<tr><td>出力</td><td>保管庫の <code>/state</code> と <code>/list</code></td><td>前回の状態（JSON）と一覧ページ（HTML）</td></tr>
+<tr><td>出力</td><td><code>monitor.log</code></td><td>実行ログ（画面にも同じものを出す）</td></tr>
+</tbody>
+</table>
+
+<table>
+<thead><tr><th>終了コード</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>正常。前回の状態を維持してスキップした場合も含む</td></tr>
+<tr><td>1</td><td>設定・前回の状態・書き込みの異常、または想定外の例外（Actions では赤いバツになる）</td></tr>
+</tbody>
+</table>
 <h2 id="a2">1回の実行で何が起きるか</h2>
 
 <p>2026年8月28日 15:15 の実行（run #114）の実測です。<strong>秒数は実際のログから取っています。</strong>
@@ -508,6 +532,10 @@ push の衝突に備えていましたが、状態と一覧を Cloudflare に預
 次が始まって、古い状態で上書きするのを防ぐためです。この仕組みが裏目に出た件は8章にあります。</p>
 </div>
 <h2 id="a3">PHP の中の流れ</h2>
+
+<p>ここでは1つの URL を処理するときの要点と理由だけを図にしています。コードの順番どおりの流れは
+<a href="https://github.com/tama-create/ur-monitor/blob/main/FLOW.md" target="_blank" rel="noopener">FLOW.md</a>
+にあり、この図は FLOW.md の 2.7 にあたります。</p>
 
 <figure class="fig">
 <svg viewBox="0 0 840 430" role="img" aria-label="1つのURLを処理するときの流れ。robots確認、ページ取得、描画待ち、抽出、信用判定">
@@ -919,13 +947,8 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 </tbody>
 </table>
 
-<table>
-<thead><tr><th>Slack に届く文面</th><th>送り手</th><th>意味</th></tr></thead>
-<tbody>
-<tr><td>🚨 監視が止まっています</td><td>Cloudflare（<code>worker.js</code>）</td><td>いま止まっている。最後の成功から30分以上</td></tr>
-<tr><td>⚠️ 監視が止まっていました</td><td>監視ジョブ（<code>warn_if_stale</code>）</td><td>もう再開した。前回の実行から3時間以上空いていた</td></tr>
-</tbody>
-</table>
+<p>Slack に届く2種類の文面（「止まっています」と「止まっていました」）の違いと、届いたときの対処は
+<a href="setup.html#s11-5">セットアップ手順書の 11.5</a> にあります。</p>
 
 <div class="stop">
 <p><strong>見張りを Actions の中だけに置かないでください。</strong>止まるときは見張りごと止まります。
@@ -1000,19 +1023,9 @@ robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome �
 描画待ちの問題ではなく取得そのものの失敗です。</p>
 </div>
 
-<table>
-<thead><tr><th>Cloudflare のログに出るもの</th><th>意味</th></tr></thead>
-<tbody>
-<tr><td><code>JST 15時: 起動した</code></td><td>成功</td></tr>
-<tr><td><code>起動に失敗: 401 Bad credentials</code></td><td>トークンが認識されていません。作り直して入れ直してください</td></tr>
-<tr><td><code>起動に失敗: 403 ...</code></td><td>権限が足りません。Actions を Read and write にしてください</td></tr>
-<tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
-<tr><td><code>詰まった実行をキャンセル: run ...</code></td><td>正常。見回り1が働いた</td></tr>
-<tr><td><code>止まりを警告した（最後の成功 run ...）</code></td><td>見回り2が Slack に送った</td></tr>
-<tr><td><code>SLACK_WEBHOOK_URL が未設定のため止まりの見張りを省略</code></td><td>Worker に Secret が無い。起動と片付けは動いている</td></tr>
-<tr><td><code>詰まった実行の片付けに失敗</code> / <code>止まりの見張りに失敗</code></td><td>見回りだけが失敗。起動は続いている。403 なら権限不足</td></tr>
-</tbody>
-</table>
+<p>Cloudflare のログに出る行の意味は、<a href="setup.html#s8b-5">セットアップ手順書の 9.5</a> にまとめてあります。
+監視ジョブの中でどこまで進んだかは、<a href="https://github.com/tama-create/ur-monitor/blob/main/FLOW.md" target="_blank" rel="noopener">FLOW.md</a>
+の番号でコードの位置と突き合わせられます。</p>
 
 <footer>
 <div class="author">

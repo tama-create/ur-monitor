@@ -3,25 +3,9 @@
  * ur_monitor.php — UR賃貸 空き部屋監視スクリプト
  *
  * UR のページから空き部屋を取り出し、前回との差分で新着を見つけ、条件に合えば Slack へ通知する。
- * 本番は GitHub Actions で動く（起動するのは Cloudflare の trigger/worker.js）。
- * 詳しい処理の流れとフローチャートは FLOW.md にある。
  *
- * モード:
- *   （なし）          通常の監視 … run_monitor()
- *   --dry-run         取得と差分だけ。通知と書き込みはしない（開発用）
- *   --seed-state      保管先に前回状態を置く（初回に1回だけ）… run_seed_state()
- *   --setup           画面ありで開き、セレクター調整用のファイルを保存する … run_setup()
- *   --check-robots    robots.txt の確認だけ
- *
- * 通常の監視のあらすじ:
- *   1. 設定と前回状態を読む（読めなければ止まる）
- *   2. 監視 URL ごとにページを開いて部屋を取り出す
- *   3. 怪しい結果（0件・急減）は取り直し、続くあいだは前回状態を使う
- *   4. 前回に無い部屋のうち、条件に合うものを Slack へ送る
- *   5. 一覧ページと今回の状態を保管先へ書く
- *
- * 入力: config.json、環境変数 SLACK_WEBHOOK_URL / STORE_URL / STORE_TOKEN、templates/
- * 出力: Slack、保管先（/state・/list）、monitor.log
+ * 処理の順番は FLOW.md にある。コード中の「// [FLOW 2.3]」のような印が、FLOW.md の見出し番号に対応する。
+ * 設定項目・動作の仕様・理由は README.md と docs/architecture.html にある。
  */
 
 date_default_timezone_set('Asia/Tokyo');
@@ -61,6 +45,7 @@ function log_msg(string $level, string $msg): void
 
 /**
  * config.json を読む。環境変数 SLACK_WEBHOOK_URL があれば Slack の送り先をそれで上書きする。
+ * [FLOW 1.1]
  *
  * @return array 設定
  */
@@ -147,6 +132,7 @@ function store_request(string $method, string $path, ?string $body = null): arra
 /**
  * 前回の状態を読む（保管先があれば保管先、無ければ state.json）。
  * 保管先に無い・読めない・壊れているときは終了コード1で止まる（空とみなすと全部屋が新着になるため）。
+ * [FLOW 2.3]
  *
  * @return array rooms / zero_streak / last_checked
  */
@@ -194,6 +180,7 @@ function load_state(): array
 
 /**
  * 今回の状態を書き出す（保管先があれば保管先、無ければ state.json）。書けなければ終了コード1。
+ * [FLOW 2.14]
  *
  * @param array $state rooms / zero_streak / last_checked
  */
@@ -250,6 +237,7 @@ function robots_rule_matches(string $rule, string $target): bool
 
 /**
  * robots.txt がこの URL へのアクセスを許可しているかを確かめる。取得できなければ許可とみなす。
+ * [FLOW 2.7.2 / 5.2]
  *
  * @param string $url 確認する URL
  * @return bool 許可なら true
@@ -396,6 +384,7 @@ function detect_chrome_path(array $config): ?string
 /**
  * Chrome を閉じる。閉じるときの例外は無視する
  * （Chrome 側がソケットを先に閉じると例外が飛ぶことがあるが、結果には影響しない）。
+ * [FLOW 2.8]
  *
  * @param object $browser chrome-php の Browser
  */
@@ -446,6 +435,7 @@ function configured_chrome_flags(array $config): array
 
 /**
  * Chrome を起動する。失敗したらプロファイルを作り直して1回だけやり直す。
+ * [FLOW 2.6 / 4.2]
  *
  * @param array $config   設定
  * @param bool  $headless false なら画面あり（--setup 用）
@@ -542,6 +532,7 @@ function wait_for_rooms(object $page, array $selectors, int $timeoutSec = 20): b
 
 /**
  * 1つの URL を開いて、空き部屋の一覧を取り出す。例外は呼び出し側へ投げる。
+ * [FLOW 2.7.3 / 4.2]
  *
  * @param object $browser  chrome-php の Browser
  * @param string $url      UR のページ
@@ -702,6 +693,7 @@ JS;
 /**
  * --setup 用。Chrome を起動して1つの URL を取得し、閉じる。
  * 複数 URL のループには使わないこと（URL ごとに Chrome を起動してしまう）。
+ * [FLOW 4.2]
  *
  * @param array $config   設定（search_url を読む）
  * @param bool  $headless false なら画面あり
@@ -747,6 +739,7 @@ function render_template(string $file, array $vars): string
 /**
  * 空き部屋の一覧ページを作って書き出す（保管先があれば保管先、無ければ docs/index.html）。
  * 見た目は templates/list.html と templates/list.css。書けなければ終了コード1。
+ * [FLOW 2.13]
  *
  * @param array[]  $rooms   今回の部屋
  * @param string[] $newUrls 新着の部屋 URL
@@ -965,6 +958,7 @@ function room_matches_watch(array $r, array $watch): bool
 
 /**
  * 通知対象の新着を、グループごとにまとめて Slack へ1通で送る。
+ * [FLOW 2.11]
  *
  * @param string  $webhookUrl Webhook URL
  * @param array[] $matched    通知する部屋
@@ -1037,6 +1031,7 @@ function monitoring_gap_minutes(int $from, int $to, int $startHour, int $endHour
 
 /**
  * 前回の実行から、稼働時間帯で stale_warning_hours 以上空いていたら Slack に「監視が止まっていました」を送る。
+ * [FLOW 2.4]
  *
  * 止まるときは「黙って止まる」になり、実際に4日間気づかなかったため置いている。
  * 実行できたときにしか出せないので、実行そのものが詰まった場合は trigger/worker.js が知らせる。
@@ -1082,6 +1077,7 @@ function warn_if_stale(array $state, string $webhookUrl, array $config): void
 
 /**
  * 取得結果が怪しいかを判定する（前回あったのに0件、または前回5件以上から $ratio 倍未満に急減）。
+ * [FLOW 2.7.3 / 2.7.5]
  *
  * 描画待ちが足りないと中途半端な件数で返ることがあり、素通しすると誤った新着通知が飛ぶ。
  * 実際に 18→12 件、19→7 件が起き、後者で誤通知が出た。0.7 はこの2件を捕まえ、本物の 20→19 件を通す値。
@@ -1110,6 +1106,7 @@ function untrusted_result_reason(array $rooms, array $prevForUrl, float $ratio):
 /**
  * 設定を「希望順位ごとのグループ」（name / notify / madori / urls / legacy）の一覧にそろえる。
  * 旧形式（search_urls + watch）なら1つのグループにまとめる。フォークした人の設定を壊さないため両方読む。
+ * [FLOW 2.1 / 4.1 / 5.1]
  *
  * @param array $config 設定
  * @return array[] グループ（上ほど希望順位が高い）。監視対象が無ければ空配列
@@ -1157,6 +1154,7 @@ function normalize_groups(array $config): array
 
 /**
  * 監視 URL → グループの対応表を作る。同じ URL が複数あれば上のグループを採る。キーの順が巡回の順になる。
+ * [FLOW 2.1 / 4.1 / 5.1]
  *
  * @param array[] $groups グループ一覧
  * @return array URL → グループ
@@ -1174,6 +1172,7 @@ function group_url_map(array $groups): array
 
 /**
  * 部屋を Slack に通知すべきかを判定する（グループの notify と間取りで決める。旧形式は watch で決める）。
+ * [FLOW 2.11]
  *
  * @param array $room   部屋
  * @param array $group  部屋のグループ
@@ -1203,13 +1202,15 @@ function room_notifies(array $room, array $group, array $config): bool
 }
 
 /**
- * 通常の監視を1回行う。流れは FLOW.md を参照。
+ * 通常の監視を1回行う。
+ * [FLOW 2]
  *
  * @param array $config 設定
  * @param bool  $dryRun true なら取得と差分だけ行い、通知・書き込み・待機をしない（開発用）
  */
 function run_monitor(array $config, bool $dryRun = false): void
 {
+    // [FLOW 2.1] 監視対象を整える
     $groups     = normalize_groups($config);
     $webhookUrl = $config['slack_webhook_url'] ?? '';
 
@@ -1222,6 +1223,7 @@ function run_monitor(array $config, bool $dryRun = false): void
     $urlGroup   = group_url_map($groups);
     $searchUrls = array_keys($urlGroup);
 
+    // [FLOW 2.2] ランダムに待つ
     if ($dryRun) {
         log_msg('INFO', "dry-run: Slack 通知と state.json / docs/index.html の更新は行いません");
     }
@@ -1238,13 +1240,16 @@ function run_monitor(array $config, bool $dryRun = false): void
         }
     }
 
+    // [FLOW 2.3] 前回の状態を読む
     $state      = load_state();
 
+    // [FLOW 2.4] 止まっていなかったか確認する
     // スクレイプの成否に関わらず、まず前回からの空白を見る
     if (!$dryRun) {
         warn_if_stale($state, $webhookUrl, $config);
     }
 
+    // [FLOW 2.5] 取得の準備をする
     $prevUrls   = array_keys($state['rooms'] ?? []);
     $currentMap = [];
     // 「取得できた結果を信用してよい URL」が1つでもあったか。
@@ -1264,9 +1269,11 @@ function run_monitor(array $config, bool $dryRun = false): void
     // 前回のこの割合を下回ったら部分取得を疑う。1.0 で無効（0 件だけを見る）。
     $shrinkRatio = min(1.0, max(0.0, (float)($config['shrink_guard_ratio'] ?? 0.7)));
 
+    // [FLOW 2.6] Chrome を起動する
     // Chrome を1回だけ起動してすべての URL を処理（高速化）
     $browser = create_browser($config, headless: true);
     try {
+        // [FLOW 2.7] URL ごとに取得する
         foreach ($searchUrls as $i => $searchUrl) {
             if ($i > 0) {
                 sleep(3); // 連続アクセスを避けるため URL 間に 3 秒待機
@@ -1274,6 +1281,7 @@ function run_monitor(array $config, bool $dryRun = false): void
             $group = $urlGroup[$searchUrl];
             log_msg('INFO', sprintf('URL %d/%d を処理中（%s）', $i + 1, count($searchUrls), $group['name']));
 
+            // [FLOW 2.7.1] 前回この URL にあった部屋を取り出す
             // 前回 state のうち、この検索URL 由来の分だけ取り出しておく（失敗時の引き継ぎ用）
             $prevForUrl = [];
             foreach ($state['rooms'] ?? [] as $prevUrl => $prevRoom) {
@@ -1282,6 +1290,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 }
             }
 
+            // [FLOW 2.7.2] robots.txt を確かめる
             // robots.txt が許可していない URL は取りに行かない。前回状態は引き継ぎ、
             // 一時的な取得失敗と同じ扱いにする（誤った「成約」通知を出さないため）。
             if (!check_robots_txt($searchUrl)) {
@@ -1289,6 +1298,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 continue;
             }
 
+            // [FLOW 2.7.3] ページを取得する（怪しければ1回だけ取り直す）
             try {
                 $rooms = scrape_url($browser, $searchUrl, $config);
 
@@ -1301,6 +1311,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                     $rooms = scrape_url($browser, $searchUrl, $config);
                 }
             } catch (\Throwable $e) {
+                // [FLOW 2.7.4] 取得に失敗したら引き継ぐ
                 // 1 URL の失敗で全体を巻き添えにしない。前回 state のこの URL 分を引き継ぎ、
                 // 一時的な取得失敗が誤った「成約」「新着」通知を生むのを防ぐ。
                 log_msg('ERROR', "URL の取得に失敗（前回状態を維持してスキップ）: {$searchUrl} — " . $e->getMessage());
@@ -1308,6 +1319,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 continue;
             }
 
+            // [FLOW 2.7.5] 怪しい結果が続くか数える
             // 取り直しても怪しい。一時障害なら前回状態を維持したいが、本当に減った場合に
             // 古い部屋を永久に表示し続けてしまうため、一定回数続いたら実態として受け入れる。
             $reason = untrusted_result_reason($rooms, $prevForUrl, $shrinkRatio);
@@ -1321,6 +1333,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 }
                 log_msg('WARNING', "{$zeroLimit} 回連続で{$reason}のため、実態として受け入れます: {$searchUrl}");
             }
+            // [FLOW 2.7.6] 部屋を今回の一覧に加える
             unset($zeroStreak[$searchUrl]);
             $scrapedOk = true;
 
@@ -1340,9 +1353,11 @@ function run_monitor(array $config, bool $dryRun = false): void
             }
         }
     } finally {
+        // [FLOW 2.8] Chrome を閉じる
         close_browser_safely($browser);
     }
 
+    // [FLOW 2.9] 信用できる結果が無ければ終わる
     // 全 URL が引き継ぎ扱いで終わった＝結果を信用できないので、state も HTML も触らない。
     // 逆に「ちゃんと取得できたうえで 0 件」なら、それは事実なので下へ進んで反映する。
     // （ここで一律 return すると、3 回連続 0 件の判定が state に永久に書かれない）
@@ -1351,6 +1366,7 @@ function run_monitor(array $config, bool $dryRun = false): void
         return;
     }
 
+    // [FLOW 2.10] 前回と比べる
     if (empty($currentMap)) {
         log_msg('WARNING', "空き部屋は 0 件でした（取得自体は成功しています）");
     } else {
@@ -1360,6 +1376,7 @@ function run_monitor(array $config, bool $dryRun = false): void
     $newUrls  = array_diff(array_keys($currentMap), $prevUrls);
     $goneUrls = array_diff($prevUrls, array_keys($currentMap));
 
+    // [FLOW 2.11] 新着を通知する
     if (!empty($newUrls)) {
         log_msg('INFO', "新着 " . count($newUrls) . " 件");
         $newRooms = array_values(array_intersect_key($currentMap, array_flip($newUrls)));
@@ -1388,13 +1405,16 @@ function run_monitor(array $config, bool $dryRun = false): void
         log_msg('INFO', "成約/非表示: " . count($goneUrls) . " 件");
     }
 
+    // [FLOW 2.12] --dry-run ならここで終わる
     if ($dryRun) {
         log_msg('INFO', "dry-run: ここで state.json / docs/index.html を更新するところを省略しました");
         return;
     }
 
+    // [FLOW 2.13] 一覧ページを書く
     save_html(array_values($currentMap), array_values($newUrls), $groups, $config);
 
+    // [FLOW 2.14] 今回の状態を書く
     save_state([
         'rooms'        => $currentMap,
         'zero_streak'  => $zeroStreak,
@@ -1405,14 +1425,17 @@ function run_monitor(array $config, bool $dryRun = false): void
 /**
  * 保管先に前回状態を置く（--seed-state。保管先を作った直後に1回だけ）。
  * これをしないと load_state が止まったままになる。既に状態があれば上書きせず止まる。
+ * [FLOW 3]
  */
 function run_seed_state(): void
 {
+    // [FLOW 3.1] 保管先の設定を確かめる
     [$base] = store_conf();
     if ($base === '') {
         log_msg('ERROR', 'STORE_URL / STORE_TOKEN が設定されていません');
         exit(1);
     }
+    // [FLOW 3.2] 置く状態を用意する
     // 引き継ぐ state がある場合（保管先へ移す途中）と、まっさらから始める場合の両方を扱う。
     // リポジトリに state.json は置いていないので、フォークした直後はこちらの経路になる。
     if (file_exists(STATE_FILE)) {
@@ -1431,6 +1454,7 @@ function run_seed_state(): void
             . '次の実行では、いま出ている部屋がすべて新着として通知されます');
     }
 
+    // [FLOW 3.3] 上書きしないか確かめる
     // 二度流し込んで、動いている状態を古い内容で上書きしないようにする
     [$status] = store_request('GET', '/state');
     if ($status === 200) {
@@ -1442,6 +1466,7 @@ function run_seed_state(): void
         exit(1);
     }
 
+    // [FLOW 3.4] 保管先へ置く
     [$put] = store_request('PUT', '/state', $raw);
     if ($put !== 200) {
         log_msg('ERROR', "保管先へ書けませんでした（HTTP {$put}）");
@@ -1452,22 +1477,25 @@ function run_seed_state(): void
 
 /**
  * 先頭の監視 URL を画面ありで開き、セレクター調整用のファイルを保存して結果を表示する（--setup）。
+ * [FLOW 4]
  *
  * @param array $config 設定
  */
 function run_setup(array $config): void
 {
+    // [FLOW 4.1] 先頭の監視 URL を選ぶ
     $searchUrls = array_keys(group_url_map(normalize_groups($config)));
     if (empty($searchUrls)) {
         log_msg('ERROR', "config.json の groups（または search_urls）を設定してください");
         exit(1);
     }
-
-    // 先頭のURLで確認
     $config['search_url'] = $searchUrls[0];
+
+    // [FLOW 4.2] 画面ありで開いてファイルを保存する
     log_msg('INFO', "セットアップモード: 1番目のURLでブラウザを表示します");
     $rooms = scrape_rooms($config, headless: false);
 
+    // [FLOW 4.3] 結果を表示する
     if (!empty($rooms)) {
         log_msg('INFO', "取得成功: " . count($rooms) . " 件（先頭5件を表示）");
         foreach (array_slice($rooms, 0, 5) as $i => $r) {
@@ -1486,20 +1514,24 @@ function run_setup(array $config): void
 
 // 引数でモードを選ぶ。例外はすべて monitor.log に残して終了コード1（無人実行で黙って死なないため）
 try {
+    // [FLOW 1.1] 設定を読む
     $config = load_config();
     $args   = array_slice($argv, 1);
 
+    // [FLOW 1.2] モードを選ぶ
     if (in_array('--setup', $args)) {
         run_setup($config);
     } elseif (in_array('--seed-state', $args)) {
         run_seed_state();
     } elseif (in_array('--check-robots', $args)) {
-        // 1件でも拒否があれば終了コードで分かるようにする（CI や手動確認で拾えるように）
+        // [FLOW 5.1] 監視 URL を読む
         $urls = array_keys(group_url_map(normalize_groups($config)));
         if (empty($urls)) {
             log_msg('ERROR', "config.json の groups（または search_urls）を設定してください");
             exit(1);
         }
+        // [FLOW 5.2] すべての URL を確かめる
+        // 1件でも拒否があれば終了コードで分かるようにする（CI や手動確認で拾えるように）
         $allowed = true;
         foreach ($urls as $url) {
             $allowed = check_robots_txt($url) && $allowed;
@@ -1511,6 +1543,7 @@ try {
         run_monitor($config, dryRun: in_array('--dry-run', $args));
     }
 } catch (\Throwable $e) {
+    // [FLOW 1.3] 想定外の例外で止める
     log_msg('ERROR', "未捕捉の例外で停止: " . $e->getMessage()
         . " ({$e->getFile()}:{$e->getLine()})");
     exit(1);
