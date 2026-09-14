@@ -860,13 +860,17 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
     // 相対パスだと Worker 側の存在しない URL を指してしまう。行き先が分かるとき
     // （config.json の docs_base_url）だけ絶対 URL で出し、無ければリンク自体を出さない。
     $docsBase = rtrim((string)($config['docs_base_url'] ?? ''), '/');
+    // 並びと名前は資料ページの上部メニューと同じ（資料の入口 → 空き部屋一覧 → 使い方ガイド → …）。
+    // 入口だけは「いま見ているページ」の印より前に出すので、別に組み立てる。
+    $docHome  = '';
     $docNav   = '';
     if ($docsBase !== '') {
         $b = htmlspecialchars($docsBase, ENT_QUOTES, 'UTF-8');
-        foreach ([['', '資料一覧'],
-                  ['guide.html', '使い方ガイド'],
+        $docHome = "      <a href=\"{$b}/\">資料の入口</a>\n"
+                 . "      <span class=\"sep\">│</span>\n";
+        foreach ([['guide.html', '使い方ガイド'],
                   ['setup.html', 'セットアップ手順書'],
-                  ['architecture.html', '仕組みの技術資料']] as [$file, $label]) {
+                  ['architecture.html', '技術資料']] as [$file, $label]) {
             $docNav .= "      <span class=\"sep\">│</span>\n"
                      . "      <a href=\"{$b}/{$file}\">{$label}</a>\n";
         }
@@ -874,6 +878,7 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
 
     $html = render_template('list.html', [
         'style'    => render_template('list.css', []),
+        'doc_home' => $docHome,
         'doc_nav'  => $docNav,
         'count'    => (string)$count,
         'tiles'    => $newTile . $hotTile,

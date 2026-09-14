@@ -47,7 +47,7 @@
     display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px;
   }
   .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; }
-  /* 右に置くのはサイトの外へ出る先だけ。本体（空き部屋一覧）は左端に置く */
+  /* 並びと名前は資料ページと同じ（資料の入口 → 空き部屋一覧 → …）。右に置くのはサイトの外へ出る先だけ */
   .nav > .grp-right { margin-left: auto; }
   .nav .sep { color: rgba(255,255,255,.32); }
   /* リンクと「いま見ているページ」の印を同じ大きさの箱にする（ずれ防止。資料ページと同じ） */
