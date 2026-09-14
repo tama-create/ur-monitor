@@ -21,7 +21,8 @@
     --code-bg: #f6f8fa;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  /* スクロールバーの有無でページごとに横幅が変わり、上部メニューがずれるのを防ぐ */
+  html { scroll-behavior: smooth; scrollbar-gutter: stable; }
   body {
     font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
     margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
@@ -67,11 +68,17 @@
     margin: 14px 0 0; padding-top: 12px;
     border-top: 1px solid rgba(255,255,255,.16);
     font-size: .82rem; color: #cfe2f7;
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px;
   }
   .hero-meta .sep { color: rgba(255,255,255,.32); }
-  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
-  .hero-meta a:hover { border-bottom-color: #fff; }
+  /* リンクと「いま見ているページ」の印を同じ大きさの箱にする。大きさが違うと、
+     開いているページによって後ろの項目の位置が変わり、ページを移るたびにメニューがずれる。
+     下線は border ではなく text-decoration で引く（箱の高さを変えないため） */
+  .hero-meta a {
+    color: #fff; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+    text-decoration: underline; text-decoration-color: rgba(255,255,255,.5); text-underline-offset: 4px;
+  }
+  .hero-meta a:hover { text-decoration-color: #fff; }
   /* いま見ているページ。リンクにせず「ここにいる」ことだけ示す。
      並びは2ページで揃えてあるので、順番を変えるときは両方を直すこと。 */
   .hero-meta .current {
@@ -84,7 +91,7 @@
      内側にある。URL は人それぞれになるので、フォークしたら自分のものに書き換えること。
      右へ寄せるのはサイトの外へ出る先だけ。
      狭い画面では折り返すため右寄せを解除する。 */
-  .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; }
   .hero-meta > .grp-right { margin-left: auto; }
 
   /* ===== 追従するメニュー =====

@@ -6,6 +6,8 @@
     --code-bg: #f6f8fa;
   }
   * { box-sizing: border-box; }
+  /* スクロールバーの有無でページごとに横幅が変わり、上部メニューがずれるのを防ぐ */
+  html { scrollbar-gutter: stable; }
   body {
     font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
     margin: 0; color: var(--ink); background: var(--bg); line-height: 1.8;
@@ -22,12 +24,15 @@
     background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
     background-size: 20px 20px; opacity: .45;
   }
-  .hero-inner { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 20px 24px 18px; }
+  /* 帯とメニューは資料ページ（docs/*.html）と1px も違わないように揃える。
+     違うと、一覧と資料を行き来するたびに上部メニューがずれて見える。行の高さも資料ページに合わせる */
+  .hero, .topbar { line-height: 1.85; }
+  .hero-inner { position: relative; z-index: 2; max-width: 1200px; margin: 0 auto; padding: 20px 24px 18px; }
   .hero-head { display: flex; align-items: center; gap: 15px; }
   .hero-icon { flex: none; }
   .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
   .hero-kicker { margin: 0 0 3px; font-size: .8rem; font-weight: 700; letter-spacing: .16em; color: #8fc2f5; }
-  .hero h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; color: #fff; }
+  .hero h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; letter-spacing: .01em; color: #fff; }
 
   /* 資料ページと同じ、追従するメニュー。.hero は overflow:hidden なので外に置く */
   .topbar {
@@ -37,16 +42,20 @@
     box-shadow: 0 2px 10px rgba(0,0,0,.22);
   }
   .nav {
-    max-width: 1100px; margin: 0 auto; padding: 11px 24px;
+    max-width: 1200px; margin: 0 auto; padding: 11px 24px;
     font-size: .82rem; color: #cfe2f7;
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px;
   }
-  .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .nav > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; }
   /* 右に置くのはサイトの外へ出る先だけ。本体（空き部屋一覧）は左端に置く */
   .nav > .grp-right { margin-left: auto; }
   .nav .sep { color: rgba(255,255,255,.32); }
-  .nav a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
-  .nav a:hover { border-bottom-color: #fff; }
+  /* リンクと「いま見ているページ」の印を同じ大きさの箱にする（ずれ防止。資料ページと同じ） */
+  .nav a {
+    color: #fff; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+    text-decoration: underline; text-decoration-color: rgba(255,255,255,.5); text-underline-offset: 4px;
+  }
+  .nav a:hover { text-decoration-color: #fff; }
   .nav .current { color: #fff; font-weight: 700; background: rgba(255,255,255,.16); padding: 2px 10px; border-radius: 999px; }
 
   .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 24px 90px; }
@@ -102,12 +111,16 @@
   footer { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; color: var(--sub); font-size: .82rem; }
   footer a { color: var(--accent); }
 
-  @media (max-width: 720px) {
+  /* 帯とメニューが狭い画面向けに切り替わる幅は、資料ページと同じ 900px にする */
+  @media (max-width: 900px) {
     .hero-inner { padding: 16px 18px 14px; }
-    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
     .hero h1 { font-size: 1.3rem; }
+    .hero-kicker { font-size: .72rem; letter-spacing: .12em; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
     .nav { padding: 9px 18px; font-size: .76rem; }
     .nav > .grp-right { margin-left: 0; flex-basis: 100%; }
+  }
+  @media (max-width: 720px) {
     .wrap { padding: 20px 18px 70px; }
     .tiles { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
     .tile { padding: 10px 12px; }
