@@ -1,16 +1,151 @@
 <?php
 /**
- * ur_monitor.php - UR賃貸 空き部屋監視スクリプト
+ * ur_monitor.php — UR賃貸 空き部屋監視スクリプト
  *
- * 本番は GitHub Actions（Linux）で定期実行する。開発は Windows / macOS でも行うため、
+ * UR賃貸のページを開いて空き部屋を取り出し、前回との差分から「新着」を見つけ、
+ * config.json の条件に合うものを Slack へ通知する。
+ * 本番は GitHub Actions（Linux）で動く。開発は Windows / macOS でも行うため、
  * OS 固有の処理は置かず、Chrome の場所だけ detect_chrome_path() で吸収している。
  *
- * 使い方:
- *   php ur_monitor.php              # 通常監視実行（結果は保管先の Worker へ出力）
- *   php ur_monitor.php --dry-run    # 開発用。Slack 送信と state / 一覧の更新をしない
- *   php ur_monitor.php --seed-state # 保管先を用意した直後に1回だけ。state.json を移す
- *   php ur_monitor.php --setup      # セレクター確認用（ブラウザ表示 + スクリーンショット保存）
- *   php ur_monitor.php --check-robots  # robots.txt 確認のみ
+ * ==========================================================================
+ * 全体の中での位置づけ
+ * ==========================================================================
+ *   Cloudflare Worker（trigger/worker.js）
+ *     └ 8〜21時（JST）の5分おきに、GitHub Actions の monitor.yml を起動する
+ *   GitHub Actions（.github/workflows/monitor.yml）
+ *     └ まっさらな Ubuntu に PHP と依存を入れ、このスクリプトを実行する
+ *   このスクリプト
+ *     └ UR を読み、差分を取り、Slack へ通知し、状態と一覧を Worker の保管庫（KV）へ預ける
+ *
+ * ==========================================================================
+ * 起動のしかた（モード）
+ * ==========================================================================
+ *   php ur_monitor.php                 通常の監視（本番）。下の「処理の流れ（通常の監視）」を行う
+ *   php ur_monitor.php --dry-run       開発用。取得と差分までは行うが、Slack 送信と
+ *                                      state / 一覧の書き込みをしない
+ *   php ur_monitor.php --seed-state    保管先を作った直後に1回だけ。前回状態を保管先へ置く
+ *   php ur_monitor.php --setup         セレクター調整用。画面ありの Chrome で開き、
+ *                                      debug_page.html とスクリーンショットを保存する
+ *   php ur_monitor.php --check-robots  robots.txt の確認だけ。拒否が1件でもあれば終了コード1
+ *
+ * ==========================================================================
+ * 処理の流れ（通常の監視 = run_monitor()）
+ * ==========================================================================
+ *  1. 設定を読む（load_config）
+ *     1-1. config.json を読む。無ければ終了コード1で止まる
+ *     1-2. 環境変数 SLACK_WEBHOOK_URL があれば、config の slack_webhook_url をそれで上書きする
+ *
+ *  2. 監視対象を整える（normalize_groups / group_url_map）
+ *     2-1. config の groups を「名前・通知するか・間取り・URL 一覧」の形にそろえる
+ *          （旧形式の search_urls + watch なら、全 URL を1つのグループにまとめる）
+ *     2-2. 「URL → グループ」の対応表を作る。同じ URL が複数のグループにあれば上のグループを採る
+ *     2-3. 監視対象が1つも無ければ終了コード1で止まる
+ *
+ *  3. ランダムに待つ（0〜jitter_max_seconds 秒。--dry-run では待たない）
+ *     Cloudflare からの起動は毎回同じ秒に来るので、UR から見て規則的な足跡にならないようにする
+ *
+ *  4. 前回の状態を読む（load_state）
+ *     4-1. STORE_URL / STORE_TOKEN があれば、Worker の保管先（GET /state）から読む。
+ *          無ければ手元の state.json を読む（開発用）
+ *     4-2. 保管先に state が無い（404）・読めない・JSON が壊れている → 終了コード1で止まる
+ *          （空とみなすと全部屋が新着になり、まとめて誤通知が飛ぶため）
+ *
+ *  5. 監視が止まっていなかったかを見る（warn_if_stale。--dry-run では行わない）
+ *     前回の実行時刻から今までの空白を、稼働時間帯（monitoring_hours）の中だけで数え、
+ *     stale_warning_hours（既定3時間）以上なら Slack に「監視が止まっていました」を送る
+ *
+ *  6. Chrome を1回だけ起動する（create_browser）
+ *
+ *  7. 監視対象の URL ごとに次を繰り返す（2本目以降は3秒あけてから）
+ *     7-1. 前回の state から、この URL で取れていた部屋だけを取り出しておく（失敗時の引き継ぎ用）
+ *     7-2. robots.txt を確認する（check_robots_txt）。
+ *          拒否されていたら取りに行かず、前回の部屋をそのまま引き継いで次の URL へ
+ *     7-3. ページを開いて部屋を取り出す（scrape_url）
+ *          a. ページを開き、DOM の読み込みを待つ（最長30秒）
+ *          b. 部屋の行の件数が1秒間変わらなくなるまで待つ（wait_for_rooms。最長20秒）
+ *          c. 各部屋の建物名・部屋名・家賃・間取り・URL を取り出す
+ *     7-4. 結果が怪しいかを判定する（untrusted_result_reason）
+ *          ・前回この URL に部屋があったのに、今回0件
+ *          ・前回5件以上あったのに、前回の shrink_guard_ratio（既定0.7）倍を下回った
+ *          怪しければ5秒待って、1回だけ取り直す
+ *     7-5. 取得中に例外が起きたら、前回の部屋を引き継いで次の URL へ
+ *     7-6. 取り直しても怪しければ、この URL の連続回数（zero_streak）を1増やす
+ *          ・zero_streak_limit（既定18回）未満なら、前回の部屋を引き継いで次の URL へ
+ *            （ログに「…のため前回状態を維持」が出る。これは正常な動作）
+ *          ・達したら「本当にそうなった」と判断して、今回の結果を受け入れる
+ *     7-7. 信用できる結果なら連続回数を消し、部屋を今回の一覧に加える
+ *          （同じ部屋 URL が既に入っていれば、先に入った＝上のグループのほうを残す）
+ *
+ *  8. Chrome を閉じる（close_browser_safely。途中で例外が起きても必ず閉じる）
+ *
+ *  9. 信用できる結果が1つも無く、今回の一覧も空なら、何も書き込まずに終わる
+ *     （state も一覧も前回のまま。取得の失敗を「空室ゼロ」と取り違えないため）
+ *
+ * 10. 前回と比べる
+ *     ・新着   = 今回あって、前回に無い部屋 URL
+ *     ・消えた = 前回あって、今回に無い部屋 URL（件数をログに出すだけ）
+ *
+ * 11. 新着のうち、通知すべきものを選んで送る（room_notifies / notify_watch）
+ *     ・その部屋のグループが notify: true で、間取りが madori のどれかに部分一致すれば通知する
+ *       （madori が空なら間取りを問わない）
+ *     ・旧形式では、watch の建物名・間取りとの部分一致、または notify_all_new で決める
+ *     ・通知対象があれば、グループごとにまとめて Slack へ1通で送る（--dry-run では送らない）
+ *
+ * 12. --dry-run なら、ここで終わる
+ *
+ * 13. 一覧ページ（HTML）を作って書き出す（save_html）
+ *     保管先があれば PUT /list、無ければ docs/index.html（開発用）。失敗したら終了コード1
+ *
+ * 14. 今回の状態を書き出す（save_state）
+ *     部屋の一覧・連続回数・実行時刻（last_checked）を、保管先があれば PUT /state、
+ *     無ければ state.json へ書く。失敗したら終了コード1
+ *     （一覧を state より先に書くのは、state だけ進んで一覧が古いまま残るのを防ぐため）
+ *
+ * ==========================================================================
+ * 処理の流れ（--seed-state = run_seed_state()）
+ * ==========================================================================
+ *  1. STORE_URL / STORE_TOKEN が無ければ終了コード1
+ *  2. 手元に state.json があればその中身を、無ければ空の状態（部屋0件）を用意する
+ *  3. 保管先に state が既にある（200）なら、動いている状態を上書きしないよう終了コード1
+ *  4. 保管先へ PUT /state する
+ *  ※ 空の状態を置いた場合、次の通常実行では、いま出ている部屋がすべて新着として通知される
+ *
+ * ==========================================================================
+ * 処理の流れ（--setup = run_setup()）
+ * ==========================================================================
+ *  1. 監視対象の先頭の URL を、画面ありの Chrome で開く
+ *  2. 描画を待ってから、スクリーンショット（debug_日時.png）と HTML（debug_page.html）を保存する
+ *  3. 取れた件数と先頭5件を表示する。0件なら、セレクターを直す手順を表示する
+ *
+ * ==========================================================================
+ * 処理の流れ（--check-robots）
+ * ==========================================================================
+ *  1. 監視対象のすべての URL について robots.txt を確認する
+ *  2. 1件でも拒否されていれば終了コード1
+ *
+ * ==========================================================================
+ * 入力と出力
+ * ==========================================================================
+ *   入力  config.json                        監視対象・通知条件・しきい値・セレクター
+ *         環境変数 SLACK_WEBHOOK_URL          Slack の送り先
+ *         環境変数 STORE_URL / STORE_TOKEN    保管先の URL と合言葉（無ければローカルのファイル）
+ *   出力  Slack                              新着の通知、停止の警告
+ *         保管先の /state と /list           前回状態（JSON）と一覧ページ（HTML）
+ *         monitor.log                        実行ログ（画面にも同じものを出す）
+ *   終了コード  0 = 正常（前回状態を維持してスキップした場合も含む）
+ *               1 = 設定・前回状態・書き込みの異常、または想定外の例外
+ *
+ * ==========================================================================
+ * 判断の基準
+ * ==========================================================================
+ *   通知を1回逃すより、誤った通知を飛ばすほうが害が大きい。
+ *   そのため「怪しい結果は採用しない」「前回状態が分からなければ止まる」を優先している。
+ *
+ * ==========================================================================
+ * コード内の節（// ── で区切ってある）
+ * ==========================================================================
+ *   ユーティリティ / 実行結果の保管先 / robots.txt チェック / スクレイピング / HTML 出力 /
+ *   Slack 通知 / 監視が止まっていないかの見張り / メイン処理 / エントリーポイント
  */
 
 date_default_timezone_set('Asia/Tokyo');
@@ -32,6 +167,16 @@ define('RESULTS_FILE', BASE_DIR . '/docs/index.html');
 // ユーティリティ
 // ──────────────────────────────────────────
 
+/**
+ * ログを1行出す。
+ *
+ * 画面（標準出力）と monitor.log の両方に、時刻とレベルを付けて書く。
+ * GitHub Actions では画面の出力がそのまま実行ログになる。
+ *
+ * @param string $level ログの重さ（INFO / WARNING / ERROR）
+ * @param string $msg   本文
+ * @return void
+ */
 function log_msg(string $level, string $msg): void
 {
     $ts   = date('Y-m-d H:i:s');
@@ -40,6 +185,15 @@ function log_msg(string $level, string $msg): void
     file_put_contents(LOG_FILE, $line . PHP_EOL, FILE_APPEND);
 }
 
+/**
+ * config.json を読み、秘密情報を環境変数から補う。
+ *
+ * 1. config.json が無ければ終了コード1で止まる
+ * 2. JSON として読む（解釈できなければ空の設定になり、後で「監視対象が無い」として止まる）
+ * 3. 環境変数 SLACK_WEBHOOK_URL があれば、slack_webhook_url をそれで上書きする
+ *
+ * @return array 設定
+ */
 function load_config(): array
 {
     if (!file_exists(CONFIG_FILE)) {
@@ -70,6 +224,15 @@ function load_config(): array
 //
 // STORE_URL / STORE_TOKEN が無ければ従来どおりローカルのファイルを使う。
 // 開発中の --dry-run が秘密情報なしでそのまま動くようにするため。
+
+/**
+ * 保管先（Cloudflare Worker）の URL と合言葉を、環境変数から取り出す。
+ *
+ * STORE_URL と STORE_TOKEN の両方がそろっているときだけ有効とみなす。
+ * 片方でも欠けていれば「保管先なし」を返し、呼び出し側はローカルのファイルを使う。
+ *
+ * @return array{0: string, 1: string} [URL（末尾の / は除く）, 合言葉]。保管先なしなら ['', '']
+ */
 function store_conf(): array
 {
     $url   = (string)(getenv('STORE_URL')   ?: '');
@@ -77,8 +240,17 @@ function store_conf(): array
     return ($url !== '' && $token !== '') ? [rtrim($url, '/'), $token] : ['', ''];
 }
 
-// 保管先への1往復。戻り値は [HTTPステータス, 本文]。
-// 通信自体が失敗したらステータスは 0 を返す（呼び出し側が「読めなかった」と扱えるように）。
+/**
+ * 保管先へ HTTP リクエストを1回送る。
+ *
+ * 合言葉を Authorization: Bearer に付けて送り、4xx / 5xx でも本文を受け取る（タイムアウト15秒）。
+ * 通信自体が失敗したらステータスは 0 を返す（呼び出し側が「読めなかった」と扱えるように）。
+ *
+ * @param string      $method HTTP メソッド（GET / PUT）
+ * @param string      $path   保管先のパス（/state または /list）
+ * @param string|null $body   送る本文。null なら本文なし
+ * @return array{0: int, 1: string} [HTTP ステータス（通信失敗は 0）, 応答の本文]
+ */
 function store_request(string $method, string $path, ?string $body = null): array
 {
     [$base, $token] = store_conf();
@@ -107,6 +279,24 @@ function store_request(string $method, string $path, ?string $body = null): arra
     return [$status, $res];
 }
 
+/**
+ * 前回の状態（state）を読む。
+ *
+ * 1. 保管先があれば GET /state で読む
+ *    ・404（まだ置かれていない）なら、全部屋が新着になるのを避けて終了コード1
+ *    ・200 以外なら、前回状態が分からないので終了コード1
+ * 2. 保管先が無ければ state.json を読む
+ *    ・ファイルが無ければ初回とみなし、部屋0件の状態を返す（開発用の経路）
+ *    ・読めなければ終了コード1
+ * 3. JSON として解釈できなければ終了コード1
+ *
+ * state の中身:
+ *   rooms        部屋 URL → 部屋の情報（building / name / price / floor_plan / url / source_url / group）
+ *   zero_streak  監視 URL → 怪しい結果が続いた回数
+ *   last_checked 前回の実行時刻（ISO 8601）
+ *
+ * @return array 前回の状態
+ */
 function load_state(): array
 {
     [$base] = store_conf();
@@ -149,6 +339,15 @@ function load_state(): array
     return $decoded;
 }
 
+/**
+ * 今回の状態（state）を書き出す。
+ *
+ * 保管先があれば PUT /state、無ければ state.json に JSON で書く。
+ * 書けなかったら終了コード1で止まる（次回が古い state で動き、消えた部屋がまた新着になるため）。
+ *
+ * @param array $state rooms・zero_streak・last_checked を持つ状態
+ * @return void
+ */
 function save_state(array $state): void
 {
     $json = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -182,6 +381,17 @@ function save_state(array $state): void
 // クエリ文字列を使うため、パスの前方一致だけでは判定できない。`*`（任意文字列）と
 // 末尾 `$`（終端固定）を正規表現に変換し、クエリを含めた文字列に対して照合する。
 // Allow は「より長く一致した方が勝つ」という一般的な解釈に従う。
+
+/**
+ * robots.txt の1つのルール（Disallow / Allow の値）が、URL に当てはまるかを判定する。
+ *
+ * ルール中の「*」を任意の文字列、末尾の「$」を終端として正規表現に直し、
+ * URL のパスとクエリを先頭から照合する。
+ *
+ * @param string $rule   ルールの値（例: /chintai/ で始まる文字列。* と末尾 $ を含んでよい）
+ * @param string $target 判定する URL のパスとクエリ（例: /chintai/kanto/saitama/area/208.html）
+ * @return bool 当てはまれば true
+ */
 function robots_rule_matches(string $rule, string $target): bool
 {
     // メタ文字を殺してから、robots.txt での意味を持つ * と末尾 $ だけを戻す
@@ -192,6 +402,19 @@ function robots_rule_matches(string $rule, string $target): bool
     return (bool)preg_match('#^' . $regex . ($anchored ? '$' : '') . '#', $target);
 }
 
+/**
+ * URL へのアクセスを robots.txt が許可しているかを確認する。
+ *
+ * 1. そのホストの robots.txt を PHP で取得する（Chrome は使わない。同じホストは1回だけ取得）
+ * 2. 取得できなければ警告を出して「許可」とみなす（robots.txt が無いサイトは全許可が既定）
+ * 3. User-agent: * のブロックだけを読み、当てはまる Disallow / Allow のうち最長のものを探す
+ * 4. Disallow のほうが長く当てはまれば拒否、それ以外は許可
+ *
+ * robots.txt が取得できても Chrome が UR に届くとは限らない（通信の経路が違う）点に注意。
+ *
+ * @param string $url 確認する URL
+ * @return bool 許可なら true、拒否なら false
+ */
 function check_robots_txt(string $url): bool
 {
     static $contentCache = [];
@@ -262,7 +485,14 @@ function check_robots_txt(string $url): bool
 // スクレイピング
 // ──────────────────────────────────────────
 
-// ディレクトリを再帰削除（壊れた Chrome プロファイルの掃除に使用）
+/**
+ * ディレクトリを中身ごと削除する。
+ *
+ * 壊れた Chrome のプロファイルを掃除するために使う。ディレクトリが無ければ何もしない。
+ *
+ * @param string $dir 削除するディレクトリ
+ * @return void
+ */
 function remove_dir_recursive(string $dir): void
 {
     if (!is_dir($dir)) {
@@ -278,9 +508,20 @@ function remove_dir_recursive(string $dir): void
     @rmdir($dir);
 }
 
-// Chrome の実行ファイルを探す。本番は GitHub Actions（Linux）だが、開発は
-// Windows / macOS でも行うため 3 OS 分の既定パスを見る。
-// config.json に chrome_path があればそれを最優先（環境差の逃げ道として残してある）。
+/**
+ * Chrome の実行ファイルの場所を探す。
+ *
+ * 1. config.json に chrome_path があり、そのファイルが存在すればそれを使う
+ *    （存在しなければ警告を出して 2 へ）
+ * 2. OS ごとの既定の場所を順に探す（Windows / macOS / Linux）
+ * 3. どこにも無ければ null を返し、chrome-php の既定の探し方（PATH 上の chrome）に任せる
+ *
+ * 本番は GitHub Actions（Linux）だが、開発は Windows / macOS でも行うため 3 OS 分の既定パスを見る。
+ * chrome_path は環境差の逃げ道として残してあり、本番では設定しない。
+ *
+ * @param array $config 設定
+ * @return string|null 実行ファイルのパス。見つからなければ null
+ */
 function detect_chrome_path(array $config): ?string
 {
     $configured = trim((string)($config['chrome_path'] ?? ''));
@@ -323,8 +564,15 @@ function detect_chrome_path(array $config): ?string
     return null;
 }
 
-// Browser の終了時例外は握りつぶす。Chrome 側がソケットを先に閉じると
-// 「Socket is not connected」が飛ぶことがあるが、スクレイプ結果には影響しない。
+/**
+ * Chrome を閉じる。閉じるときに起きた例外は、ログに残して無視する。
+ *
+ * Chrome 側がソケットを先に閉じると「Socket is not connected」が飛ぶことがあるが、
+ * スクレイプ結果には影響しないため、処理を止めない。
+ *
+ * @param object $browser chrome-php の Browser
+ * @return void
+ */
 function close_browser_safely(object $browser): void
 {
     try {
@@ -334,9 +582,18 @@ function close_browser_safely(object $browser): void
     }
 }
 
-// config.json の chrome_flags を Chrome の起動フラグとして受け取る。
-// chrome_path と同じ「環境差の逃げ道」で、本番では空のまま使わない想定。
-// 実行環境側の都合（プロキシ、TLS、サンドボックス）でコード変更なしに逃げられるようにしておく。
+/**
+ * config.json の chrome_flags から、Chrome に追加する起動フラグを取り出す。
+ *
+ * 配列でない・文字列でない・「--」で始まらない要素は、警告を出して捨てる。
+ * 空文字は黙って捨てる。
+ *
+ * chrome_path と同じ「環境差の逃げ道」で、本番では空のまま使わない想定。
+ * 実行環境側の都合（プロキシ、TLS、サンドボックス）でコード変更なしに逃げられるようにしておく。
+ *
+ * @param array $config 設定
+ * @return string[] 使ってよい起動フラグの一覧
+ */
 function configured_chrome_flags(array $config): array
 {
     $raw = $config['chrome_flags'] ?? [];
@@ -366,6 +623,18 @@ function configured_chrome_flags(array $config): array
     return $flags;
 }
 
+/**
+ * Chrome を起動する。
+ *
+ * 1. 作業用のプロファイルを一時ディレクトリに用意する（通常用と --setup 用で分ける）
+ * 2. 既定の起動フラグ（画像を読まない、UA を通常のブラウザに見せる など）の後ろに
+ *    chrome_flags を足す（同じフラグは後ろの config 側が勝つ）
+ * 3. 起動する。失敗したらプロファイルを消して、1回だけやり直す
+ *
+ * @param array $config   設定
+ * @param bool  $headless true なら画面なし（通常の監視）、false なら画面あり（--setup）
+ * @return object chrome-php の Browser
+ */
 function create_browser(array $config, bool $headless = true): object
 {
     // 作業用プロファイルは一時ディレクトリに置く（リポジトリを汚さないため）。
@@ -407,13 +676,23 @@ function create_browser(array $config, bool $headless = true): object
     }
 }
 
-// 部屋行が DOM に現れ、件数が増えなくなるまで待つ。
-//
-// UR のページは物件情報を HTML と一緒に返さず、描画後に JS が取得して差し込む。
-// そのため DOMContentLoaded の時点では中身が空で、固定秒数の待機だと回線やサーバーが
-// 遅いときに空の DOM を読んで 0 件になる（実際に発生を確認済み）。
-// 件数が 1 秒間変化しなくなるまで見るのは、行が順次描画される途中で読み取って
-// 取りこぼすのを防ぐため。現れれば即座に返るので通常は数秒で終わる。
+/**
+ * 部屋の行が描画され、件数が増えなくなるまで待つ。
+ *
+ * 0.3秒ごとに「リンクを持つ部屋の行」の数を数え、1件以上あって1秒間変わらなければ完了とする。
+ * $timeoutSec 秒待っても落ち着かなければ、警告を出して false を返す。
+ *
+ * UR のページは物件情報を HTML と一緒に返さず、描画後に JS が取得して差し込む。
+ * そのため DOMContentLoaded の時点では中身が空で、固定秒数の待機だと回線やサーバーが
+ * 遅いときに空の DOM を読んで 0 件になる（実際に発生を確認済み）。
+ * 件数が 1 秒間変化しなくなるまで見るのは、行が順次描画される途中で読み取って
+ * 取りこぼすのを防ぐため。現れれば即座に返るので通常は数秒で終わる。
+ *
+ * @param object $page       chrome-php の Page
+ * @param array  $selectors  セレクター（room_rows と link を使う）
+ * @param int    $timeoutSec 最長の待ち時間（秒）
+ * @return bool 描画を確認できたら true。時間切れなら false（本当に空室ゼロのページでも false）
+ */
 function wait_for_rooms(object $page, array $selectors, int $timeoutSec = 20): bool
 {
     // room_rows には部屋以外の行（「リノベーションしたお部屋とは？」等の説明の吹き出し。
@@ -451,6 +730,28 @@ function wait_for_rooms(object $page, array $selectors, int $timeoutSec = 20): b
     return false;
 }
 
+/**
+ * 1つの URL を開いて、空き部屋の一覧を取り出す。
+ *
+ * 1. セレクターを決める（コード内の既定値を、config.json の selectors で上書き）
+ * 2. 新しいタブでページを開き、DOM の読み込みを待つ（最長30秒）
+ * 3. 部屋の行が描画されるまで待つ（wait_for_rooms）
+ * 4. 画面ありのとき（--setup）は、スクリーンショットと HTML を保存する
+ * 5. ページ内で JavaScript を実行して部屋を取り出す
+ *    ・検索結果ページは団地ごとの箱から、団地ページは見出し（h1）から建物名を取る
+ *    ・リンクを持たない行（「リノベーションしたお部屋とは？」などの吹き出し）は捨てる
+ *    ・家賃欄が空の割引対象の部屋は、行の文字から金額を拾う
+ * 6. 部屋の URL を絶対 URL にそろえ、欠けた項目には「（名称不明）」「（家賃不明）」を入れる
+ * 7. タブを閉じる（途中で例外が起きても閉じる）
+ *
+ * 取得中の例外は呼び出し側へそのまま投げる（run_monitor が前回状態の引き継ぎで扱う）。
+ *
+ * @param object $browser  chrome-php の Browser
+ * @param string $url      開く UR のページ
+ * @param array  $config   設定
+ * @param bool   $headless false なら --setup 用のスクリーンショットと HTML も保存する
+ * @return array[] 部屋の一覧。各要素は building / name / price / floor_plan / url を持つ
+ */
 function scrape_url(object $browser, string $url, array $config, bool $headless = true): array
 {
     // 建物レベル・部屋レベルすべてのセレクターを config から取得（未指定は現行サイトのデフォルト）
@@ -601,9 +902,16 @@ JS;
     return $rooms;
 }
 
-// --setup モード専用の単発ラッパー。
-// 内部で create_browser を呼ぶため、複数 URL をループで処理する用途には使わないこと
-// （その場合は create_browser を1回だけ呼び、scrape_url を直接ループさせる）。
+/**
+ * --setup 用に、Chrome の起動・1つの URL の取得・Chrome の終了をまとめて行う。
+ *
+ * 内部で create_browser を呼ぶため、複数 URL をループで処理する用途には使わないこと
+ * （その場合は create_browser を1回だけ呼び、scrape_url を直接ループさせる）。
+ *
+ * @param array $config   設定（search_url に取得する URL を入れておく）
+ * @param bool  $headless false なら画面ありで開き、スクリーンショットと HTML を保存する
+ * @return array[] 部屋の一覧
+ */
 function scrape_rooms(array $config, bool $headless = true): array
 {
     $browser = create_browser($config, $headless);
@@ -618,6 +926,23 @@ function scrape_rooms(array $config, bool $headless = true): array
 // HTML 出力
 // ──────────────────────────────────────────
 
+/**
+ * 空き部屋の一覧ページ（HTML）を作って書き出す。
+ *
+ * 1. 「候補」（通知の対象になる部屋）を判定する関数を用意し、件数を数える
+ * 2. 部屋をグループごとに分ける（config の並び順のまま。グループ名の無い古い部屋は先頭へ）
+ * 3. グループごとに見出しとカードを作る。新着には「NEW」、候補には「候補」の印を付ける
+ * 4. 上段に件数（空き部屋・新着・候補）を置き、docs_base_url があれば上部メニューに資料へのリンクを置く
+ * 5. 保管先があれば PUT /list、無ければ docs/index.html に書く。失敗したら終了コード1
+ *
+ * 生成時刻を埋め込むので、部屋に変化が無くても毎回内容が変わる。
+ *
+ * @param array[]  $rooms   今回の部屋の一覧
+ * @param string[] $newUrls 新着の部屋 URL
+ * @param array[]  $groups  normalize_groups() の結果
+ * @param array    $config  設定
+ * @return void
+ */
 function save_html(array $rooms, array $newUrls, array $groups, array $config = []): void
 {
     $ts       = date('Y-m-d H:i');
@@ -949,7 +1274,16 @@ HTML;
 // Slack 通知（オプション）
 // ──────────────────────────────────────────
 
-// Slack へテキストを1通 POST する（Webhook 未設定・プレースホルダ時は何もしない）
+/**
+ * Slack へメッセージを1通送る。
+ *
+ * Webhook URL が空、または「YOUR_」を含むプレースホルダのときは何もしない。
+ * 送信の成否はログに出すだけで、失敗しても処理は止めない（タイムアウト10秒）。
+ *
+ * @param string $webhookUrl Slack の Incoming Webhook URL
+ * @param string $text       送る本文（Slack の mrkdwn 記法）
+ * @return void
+ */
 function slack_send(string $webhookUrl, string $text): void
 {
     if (!$webhookUrl || str_contains($webhookUrl, 'YOUR_')) {
@@ -966,7 +1300,16 @@ function slack_send(string $webhookUrl, string $text): void
     log_msg($res !== false ? 'INFO' : 'ERROR', $res !== false ? "Slack 通知完了" : "Slack 通知失敗");
 }
 
-// 部屋が watch 条件（物件名 building ＆ 間取り madori の部分一致）のいずれかに合致するか
+/**
+ * 旧形式の watch 条件のどれかに、部屋が合うかを判定する。
+ *
+ * 条件ごとに、building（建物名）が部屋名に、madori（間取り）が間取り欄に部分一致するかを見る。
+ * 空文字の項目は「その条件は問わない」。両方を満たす条件が1つでもあれば合う。
+ *
+ * @param array   $r     部屋
+ * @param array[] $watch 条件の一覧（各要素は building / madori を持つ）
+ * @return bool どれか1つに合えば true
+ */
 function room_matches_watch(array $r, array $watch): bool
 {
     $name = $r['name'] ?? '';
@@ -983,7 +1326,20 @@ function room_matches_watch(array $r, array $watch): bool
     return false;
 }
 
-// 狙っている条件に合致した新着を、目立つ形で Slack 通知
+/**
+ * 通知対象の新着を、グループごとにまとめて Slack へ1通で送る。
+ *
+ * 本文の形:
+ *   【空き速報】新着 N件
+ *   グループ名（複数のグループにまたがるときは見出しとして、1つだけなら「… に新着」）
+ *   物件名　間取り/㎡/階　家賃　詳細を見る（部屋のページへのリンク）   ← 1部屋1行
+ *
+ * 対象が0件なら何もしない。
+ *
+ * @param string  $webhookUrl Slack の Incoming Webhook URL
+ * @param array[] $matched    通知する部屋（group を持つ）
+ * @return void
+ */
 function notify_watch(string $webhookUrl, array $matched): void
 {
     if (empty($matched)) {
@@ -1018,7 +1374,17 @@ function notify_watch(string $webhookUrl, array $matched): void
     slack_send($webhookUrl, implode("\n", $lines));
 }
 
-// 全新着をまとめて Slack 通知（notify_all_new=true のときのみ呼ばれる）
+/**
+ * 新着をすべて、1部屋2行の箇条書きで Slack へ送る。
+ *
+ * いまの run_monitor からは呼ばれていない（notify_all_new も含め、通知は notify_watch に一本化した）。
+ * 旧形式の頃の送り方として残してある。
+ *
+ * @param string  $webhookUrl Slack の Incoming Webhook URL
+ * @param array[] $newRooms   新着の部屋
+ * @param string  $searchUrl  本文に載せる検索ページの URL
+ * @return void
+ */
 function notify_slack(string $webhookUrl, array $newRooms, string $searchUrl): void
 {
     if (empty($newRooms)) {
@@ -1036,8 +1402,19 @@ function notify_slack(string $webhookUrl, array $newRooms, string $searchUrl): v
 // 監視が止まっていないかの見張り
 // ──────────────────────────────────────────
 
-// 2つの時刻の間で、稼働時間帯に何分あったかを数える。
-// 夜間に動かないのは正常なので、その分を差し引かないと毎朝「11時間空いた」と誤報になる。
+/**
+ * 2つの時刻のあいだに、稼働時間帯が何分含まれるかを数える。
+ *
+ * 始まりの前日の0時から1日ずつ、その日の [開始時, 終了時] の枠と期間の重なりを足していく。
+ * 夜間に動かないのは正常なので、その分を差し引かないと毎朝「11時間空いた」と誤報になる。
+ * trigger/worker.js の monitoringGapMinutes も同じ数え方をしている。
+ *
+ * @param int $from      始まりの時刻（UNIX 時刻）
+ * @param int $to        終わりの時刻（UNIX 時刻）
+ * @param int $startHour 稼働時間帯の開始（時・JST）
+ * @param int $endHour   稼働時間帯の終了（時・JST）
+ * @return int 稼働時間帯に含まれる分数（$to が $from 以前なら 0）
+ */
 function monitoring_gap_minutes(int $from, int $to, int $startHour, int $endHour): int
 {
     if ($to <= $from) {
@@ -1056,13 +1433,28 @@ function monitoring_gap_minutes(int $from, int $to, int $startHour, int $endHour
     return $minutes;
 }
 
-// 前回の実行から不自然に空いていたら Slack に知らせる。
-//
-// 外部トリガー（Cloudflare Workers）が死んでも、トークンが切れても、GitHub の遅延が
-// 悪化しても、症状はすべて「黙って止まる」になる。実際に4日間気づかなかったことがある。
-// GitHub の schedule を低頻度で残してあるので、そこで動いた回がこの見張りを実行し、
-// 空白に気づける。この関数は実行のたびに呼ばれるが、警告後は last_checked が
-// 更新されるため連投にはならない。
+/**
+ * 前回の実行から不自然に空いていたら、Slack に「監視が止まっていました」を送る。
+ *
+ * 1. state の last_checked が無い・時刻として読めなければ何もしない（初回）
+ * 2. stale_warning_hours（既定3時間）が 0 以下なら何もしない（無効）
+ * 3. 前回の実行から今までの空白を、稼働時間帯（monitoring_hours、既定 8〜21時）の中だけで数える
+ * 4. しきい値以上なら、ログと Slack に警告を出す
+ *
+ * 外部トリガー（Cloudflare Workers）が死んでも、トークンが切れても、GitHub の遅延が
+ * 悪化しても、症状はすべて「黙って止まる」になる。実際に4日間気づかなかったことがある。
+ * GitHub の schedule を低頻度で残してあるので、そこで動いた回がこの見張りを実行し、
+ * 空白に気づける。この関数は実行のたびに呼ばれるが、警告後は last_checked が
+ * 更新されるため連投にはならない。
+ *
+ * ただしこの警告は、実行が動けたときにしか出せない（再開したあとの事後報告になる）。
+ * 実行そのものが詰まった場合は、trigger/worker.js が GitHub の外から「監視が止まっています」を送る。
+ *
+ * @param array  $state      前回の状態（last_checked を見る）
+ * @param string $webhookUrl Slack の Incoming Webhook URL
+ * @param array  $config     設定（stale_warning_hours と monitoring_hours を見る）
+ * @return void
+ */
 function warn_if_stale(array $state, string $webhookUrl, array $config): void
 {
     $last = (string)($state['last_checked'] ?? '');
@@ -1098,15 +1490,28 @@ function warn_if_stale(array $state, string $webhookUrl, array $config): void
 // メイン処理
 // ──────────────────────────────────────────
 
-// 取得結果を信用してよいかを判定する。信用できないなら理由を返し、できるなら null。
-//
-// 0 件だけでなく「前回より大幅に減った」も疑う。描画待ちが足りないと件数が 0 ではなく
-// 中途半端な数で返ることがあり、素通しすると消えた分が「成約」、戻ってきた分が「新着」
-// として通知される。実際に2回起きた:
-//   2026-08-22 16:36  18 → 12 件（うち5件が1時間後に復活）
-//   2026-08-24 14:34  19 →  7 件（12件が33分後に復活し、誤った新着通知が飛んだ）
-// この2件を両方捕まえるため、既定のしきい値は「前回の 70% 未満」にしてある。
-// 同じ103回の履歴で本物の減少は 20 → 19 件（95%）だけで、これは誤って捕まえない。
+/**
+ * 取得結果を信用してよいかを判定する。
+ *
+ * 次のどちらかに当てはまれば「怪しい」として、その理由を返す。
+ *   ・前回この URL に部屋があったのに、今回0件
+ *   ・前回5件以上あり、今回の件数が前回の $ratio 倍を下回った
+ * 前回この URL に部屋が無ければ（初回や、新しく足した URL）比べようがないので信用する。
+ * 前回5件未満を割合の判定から外すのは、1〜2件の出入りで割合が大きく振れるため。
+ *
+ * 0 件だけでなく「前回より大幅に減った」も疑う。描画待ちが足りないと件数が 0 ではなく
+ * 中途半端な数で返ることがあり、素通しすると消えた分が「成約」、戻ってきた分が「新着」
+ * として通知される。実際に2回起きた:
+ *   2026-08-22 16:36  18 → 12 件（うち5件が1時間後に復活）
+ *   2026-08-24 14:34  19 →  7 件（12件が33分後に復活し、誤った新着通知が飛んだ）
+ * この2件を両方捕まえるため、既定のしきい値は「前回の 70% 未満」にしてある。
+ * 同じ103回の履歴で本物の減少は 20 → 19 件（95%）だけで、これは誤って捕まえない。
+ *
+ * @param array[] $rooms      今回取れた部屋
+ * @param array   $prevForUrl 前回この URL で取れていた部屋
+ * @param float   $ratio      急減とみなす割合（shrink_guard_ratio）
+ * @return string|null 怪しければ理由（例: 「0 件」「件数が急減（19 → 7 件）」）、信用できれば null
+ */
 function untrusted_result_reason(array $rooms, array $prevForUrl, float $ratio): ?string
 {
     $prevCount = count($prevForUrl);
@@ -1123,14 +1528,28 @@ function untrusted_result_reason(array $rooms, array $prevForUrl, float $ratio):
     return null;
 }
 
-// 設定を「希望順位ごとのグループ」に正規化する。
-//
-// 入居したい団地ほど上に置き、相場を知りたいだけの地域は下に置いて通知を切る。
-// グループの名前がそのまま一覧ページの見出しになるので、「エリア 1」のような
-// 無意味な見出しが消える。
-//
-// 旧形式（search_urls + watch）の設定もそのまま動く。フォークした人の設定が
-// ある日いきなり壊れないようにするため、当面は両方を読む。
+/**
+ * 設定を「希望順位ごとのグループ」の一覧にそろえる。
+ *
+ * ・groups があるとき: 各グループを次の形にそろえる。URL の無いグループは捨てる
+ *     name    グループ名（無ければ「グループ N」）
+ *     notify  通知するか（省略時は true）
+ *     madori  通知する間取りの一覧（空文字は捨てる。空配列なら間取りを問わない）
+ *     urls    監視するページの URL
+ *     legacy  false
+ * ・groups が無いとき: 旧形式とみなし、search_urls 全体を「監視対象」という1グループにする
+ *   （notify は true、legacy は true。通知の判定は watch に任せる）
+ *
+ * 入居したい団地ほど上に置き、相場を知りたいだけの地域は下に置いて通知を切る。
+ * グループの名前がそのまま一覧ページの見出しになるので、「エリア 1」のような
+ * 無意味な見出しが消える。
+ *
+ * 旧形式（search_urls + watch）の設定もそのまま動く。フォークした人の設定が
+ * ある日いきなり壊れないようにするため、当面は両方を読む。
+ *
+ * @param array $config 設定
+ * @return array[] グループの一覧（config の並び順＝希望順位の高い順）。監視対象が無ければ空配列
+ */
 function normalize_groups(array $config): array
 {
     if (!empty($config['groups']) && is_array($config['groups'])) {
@@ -1172,9 +1591,16 @@ function normalize_groups(array $config): array
     ]];
 }
 
-// URL からグループを引く表。同じ URL が複数のグループにあるときは、
-// 上のグループ（希望順位が高いほう）を採る。取得ループ・robots 確認・
-// セットアップの3か所が同じ URL 一覧を見るようにするための共通化。
+/**
+ * 監視ページの URL からグループを引く対応表を作る。
+ *
+ * 同じ URL が複数のグループにあるときは、上のグループ（希望順位が高いほう）を採る。
+ * 表のキーの並びが、そのまま URL を巡回する順番になる。
+ * 取得ループ・robots 確認・セットアップの3か所が同じ URL 一覧を見るようにするための共通化。
+ *
+ * @param array[] $groups normalize_groups() の結果
+ * @return array<string, array> 監視ページの URL → グループ
+ */
 function group_url_map(array $groups): array
 {
     $map = [];
@@ -1186,8 +1612,20 @@ function group_url_map(array $groups): array
     return $map;
 }
 
-// この部屋を通知すべきか。グループの希望順位と間取りで決める。
-// 旧形式のときだけ、従来どおり watch と notify_all_new を見る。
+/**
+ * 部屋を Slack に通知すべきかを判定する。
+ *
+ * 次の順に判定する。
+ *   1. 旧形式のグループ: notify_all_new が true なら通知。そうでなければ watch 条件に合えば通知
+ *   2. notify: false のグループ: 通知しない（一覧に出すだけ）
+ *   3. madori が空: 間取りを問わず通知
+ *   4. それ以外: 間取り欄に madori のどれかが部分一致すれば通知
+ *
+ * @param array $room   部屋（floor_plan を見る）
+ * @param array $group  部屋が属するグループ
+ * @param array $config 設定（旧形式のときだけ watch と notify_all_new を見る）
+ * @return bool 通知するなら true
+ */
 function room_notifies(array $room, array $group, array $config): bool
 {
     if (!empty($group['legacy'])) {
@@ -1210,8 +1648,19 @@ function room_notifies(array $room, array $group, array $config): bool
     return false;
 }
 
-// $dryRun: 開発（Windows / macOS）用。スクレイプはするが Slack 送信と
-// state.json / docs/index.html の書き込みを行わない。本番の状態を壊さずに動作確認できる。
+/**
+ * 通常の監視を1回行う。
+ *
+ * 処理の順番は、ファイル冒頭の「処理の流れ（通常の監視）」の 2〜14 のとおり。
+ *
+ * $dryRun: 開発（Windows / macOS）用。スクレイプはするが Slack 送信と
+ * state.json / docs/index.html の書き込みを行わない。本番の状態を壊さずに動作確認できる。
+ * ランダム待機と「止まっていました」の確認も省く。
+ *
+ * @param array $config 設定
+ * @param bool  $dryRun true なら取得と差分だけ行い、送信と書き込みをしない
+ * @return void
+ */
 function run_monitor(array $config, bool $dryRun = false): void
 {
     $groups     = normalize_groups($config);
@@ -1406,11 +1855,17 @@ function run_monitor(array $config, bool $dryRun = false): void
     ]);
 }
 
-// いまの state.json を保管先へ1回だけ移す（保管先を用意した直後に使う）。
-//
-// これをやらずに本番を回すと、保管先が空のまま「前回の部屋がゼロ」になり、
-// **いま出ている部屋がすべて新着として Slack に飛ぶ。** load_state は 404 で
-// 止まるようにしてあるが、その止まった状態を解くのがこの処理。
+/**
+ * 保管先へ前回状態を1回だけ置く（--seed-state）。保管先を用意した直後に使う。
+ *
+ * 処理の順番は、ファイル冒頭の「処理の流れ（--seed-state）」のとおり。
+ *
+ * これをやらずに本番を回すと、保管先が空のまま「前回の部屋がゼロ」になり、
+ * **いま出ている部屋がすべて新着として Slack に飛ぶ。** load_state は 404 で
+ * 止まるようにしてあるが、その止まった状態を解くのがこの処理。
+ *
+ * @return void
+ */
 function run_seed_state(): void
 {
     [$base] = store_conf();
@@ -1455,6 +1910,15 @@ function run_seed_state(): void
     log_msg('INFO', '保管先へ state を置きました（' . count($decoded['rooms']) . ' 件）');
 }
 
+/**
+ * セレクター調整用に、監視対象の先頭の URL を画面ありで開いて結果を表示する（--setup）。
+ *
+ * 処理の順番は、ファイル冒頭の「処理の流れ（--setup）」のとおり。
+ * 保存した debug_page.html をブラウザで開き、config.json の selectors を直すのに使う。
+ *
+ * @param array $config 設定
+ * @return void
+ */
 function run_setup(array $config): void
 {
     $searchUrls = array_keys(group_url_map(normalize_groups($config)));
@@ -1484,7 +1948,12 @@ function run_setup(array $config): void
 
 // ── エントリーポイント ─────────────────────────
 
-// どこで例外が起きても必ず monitor.log に痕跡を残す（無人実行のサイレント死を防ぐ）
+// 引数を見てモードを選び、対応する処理を呼ぶ。
+//   --setup        → run_setup（セレクター調整）
+//   --seed-state   → run_seed_state（保管先へ前回状態を置く）
+//   --check-robots → すべての監視 URL の robots.txt を確認する。拒否が1件でもあれば終了コード1
+//   それ以外       → run_monitor（--dry-run があれば dry-run として）
+// どこで例外が起きても必ず monitor.log に痕跡を残し、終了コード1で止まる（無人実行のサイレント死を防ぐ）
 try {
     $config = load_config();
     $args   = array_slice($argv, 1);
