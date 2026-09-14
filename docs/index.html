@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ur-monitor 資料の入口</title>
+<!-- サイトのトップ。すべての資料を「使う人向け」「開発する人向け」に分けて並べる。
+     資料の一覧と役割はここだけに書く（README などからはここへリンクする）。
+     体裁（色・帯・メニュー）は guide.html / setup.html / architecture.html と揃えてある。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<style>
+  :root {
+    --ink: #24292f; --sub: #57606a; --line: #d0d7de; --bg: #fff;
+    --accent: #005bac; --accent-bg: #e8f0fb;
+    --ok-bg: #e6f4ea; --ok-line: #1a7f37;
+    --code-bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    margin: 0; color: var(--ink); background: var(--bg); line-height: 1.85;
+  }
+
+  /* ===== 冒頭のヒーロー（ほかの資料ページと同じ） ===== */
+  .hero {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      radial-gradient(120% 200% at 84% 30%, #1a6fd0 0%, rgba(26,111,208,0) 62%),
+      linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+    background-size: 20px 20px; opacity: .45;
+  }
+  .hero-inner { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 20px 24px 18px; }
+  .hero-head { display: flex; align-items: center; gap: 15px; }
+  .hero-icon { flex: none; }
+  .hero-icon svg { width: 52px; height: 52px; display: block; border-radius: 13px; }
+  .hero-kicker { margin: 0 0 3px; font-size: .8rem; font-weight: 700; letter-spacing: .16em; color: #8fc2f5; }
+  .hero h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; color: #fff; }
+
+  /* ===== 追従するメニュー（ほかの資料ページと同じ並び） ===== */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: linear-gradient(120deg, #07203a 0%, #00417f 58%, #002b56 100%);
+    border-bottom: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 2px 10px rgba(0,0,0,.22);
+  }
+  .hero-meta {
+    max-width: 1100px; margin: 0 auto; padding: 11px 24px;
+    font-size: .82rem; color: #cfe2f7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+  }
+  .hero-meta > .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .hero-meta > .grp-right { margin-left: auto; }
+  .hero-meta .sep { color: rgba(255,255,255,.32); }
+  .hero-meta a { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.5); }
+  .hero-meta a:hover { border-bottom-color: #fff; }
+  .hero-meta .current { color: #fff; font-weight: 700; background: rgba(255,255,255,.16); padding: 2px 10px; border-radius: 999px; }
+
+  /* ===== 本文 ===== */
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 30px 24px 90px; }
+  .lead { color: var(--sub); margin: 0 0 8px; }
+  h2 {
+    font-size: 1.18rem; margin: 40px 0 6px; padding: 10px 16px;
+    background: var(--accent-bg); border-left: 5px solid var(--accent);
+  }
+  .for { margin: 0 0 16px; font-size: .9rem; color: var(--sub); }
+  code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, Consolas, monospace; font-size: .88em; border: 1px solid var(--line);
+  }
+
+  /* 資料カード。1枚＝1資料。どれを開けばよいかを「書いてあること」で選べるようにする */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card {
+    display: flex; flex-direction: column; text-decoration: none; color: inherit;
+    border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px 14px; background: #fff;
+    transition: box-shadow .15s, transform .15s, border-color .15s;
+  }
+  .card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.10); transform: translateY(-1px); border-color: var(--accent); }
+  .card-ttl { margin: 0 0 2px; font-size: 1.02rem; font-weight: 700; }
+  .card-file { margin: 0 0 8px; font-size: .78rem; color: var(--sub); }
+  .card-body { margin: 0 0 12px; font-size: .9rem; flex: 1; }
+  .card-go { margin: 0; font-size: .8rem; font-weight: 700; color: var(--accent); }
+  .card-go .ext { font-weight: 400; color: var(--sub); }
+
+  .note {
+    margin: 36px 0 0; padding: 14px 18px; border-radius: 6px;
+    background: var(--code-bg); border-left: 5px solid var(--line); font-size: .9rem;
+  }
+  .note p { margin: 0; }
+
+  footer { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; border-top: 1px solid var(--line); color: var(--sub); font-size: .85rem; }
+  footer p { margin: 0 0 6px; }
+
+  @media (max-width: 720px) {
+    .hero-inner { padding: 16px 18px 14px; }
+    .hero-icon svg { width: 42px; height: 42px; border-radius: 11px; }
+    .hero h1 { font-size: 1.3rem; }
+    .hero-meta { padding: 9px 18px; font-size: .76rem; }
+    .hero-meta > .grp-right { margin-left: 0; flex-basis: 100%; }
+    .wrap { padding: 22px 18px 70px; }
+    .cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>資料の入口</h1>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="topbar" aria-label="ページ切り替え">
+    <p class="hero-meta">
+      <span class="grp">
+        <a href="https://ur-monitor-trigger.tsutao.workers.dev/">空き部屋一覧</a>
+        <span class="sep">│</span>
+        <span class="current" aria-current="page">資料一覧</span>
+        <span class="sep">│</span>
+        <a href="guide.html">使い方ガイド</a>
+        <span class="sep">│</span>
+        <a href="setup.html">セットアップ手順書</a>
+        <span class="sep">│</span>
+        <a href="architecture.html">仕組みの技術資料</a>
+      </span>
+      <span class="grp grp-right">
+        <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+      </span>
+    </p>
+</nav>
+
+<main class="wrap">
+
+<p class="lead">
+UR賃貸の空き部屋を自動で見張り、条件に合う新着を Slack に知らせるツールの資料です。
+使う人向けと、開発する人向けに分けて並べています。
+</p>
+
+<h2 id="users">1. 使う人向け</h2>
+<p class="for">ツールを入れて、通知を受け取って動く人が読む資料です。</p>
+
+<div class="cards">
+  <a class="card" href="https://ur-monitor-trigger.tsutao.workers.dev/">
+    <p class="card-ttl">空き部屋一覧</p>
+    <p class="card-file">Cloudflare の Worker（ID とパスワードが必要）</p>
+    <p class="card-body">いま出ている空き部屋と、新着・候補の印。5分おきに更新されます。</p>
+    <p class="card-go">開く →</p>
+  </a>
+  <a class="card" href="guide.html">
+    <p class="card-ttl">使い方ガイド</p>
+    <p class="card-file">docs/guide.html</p>
+    <p class="card-body">UR の申込みの流れと、通知が来たときにどう動けばよいか。</p>
+    <p class="card-go">開く →</p>
+  </a>
+  <a class="card" href="setup.html">
+    <p class="card-ttl">セットアップ手順書</p>
+    <p class="card-file">docs/setup.html</p>
+    <p class="card-body">導入の手順、ログの読み方、うまくいかないときの対処。</p>
+    <p class="card-go">開く →</p>
+  </a>
+</div>
+
+<h2 id="developers">2. 開発する人向け</h2>
+<p class="for">仕組みを知りたい人、フォークして設定やコードを変える人が読む資料です。</p>
+
+<div class="cards">
+  <a class="card" href="architecture.html">
+    <p class="card-ttl">技術資料</p>
+    <p class="card-file">docs/architecture.html</p>
+    <p class="card-body">動作の仕様、入力と出力、数値、そうしている理由。</p>
+    <p class="card-go">開く →</p>
+  </a>
+  <a class="card" href="https://github.com/tama-create/ur-monitor#readme" target="_blank" rel="noopener">
+    <p class="card-ttl">README</p>
+    <p class="card-file">README.md</p>
+    <p class="card-body">ツールの概要、設定項目（<code>config.json</code> と Secrets）、開発のしかた。</p>
+    <p class="card-go">開く <span class="ext">（GitHub）</span></p>
+  </a>
+  <a class="card" href="https://github.com/tama-create/ur-monitor/blob/main/FLOW.md" target="_blank" rel="noopener">
+    <p class="card-ttl">処理の流れ</p>
+    <p class="card-file">FLOW.md</p>
+    <p class="card-body"><code>ur_monitor.php</code> の処理の順番だけ。見出し番号がコードの <code>// [FLOW 2.3]</code> と対応します。</p>
+    <p class="card-go">開く <span class="ext">（GitHub）</span></p>
+  </a>
+  <a class="card" href="https://github.com/tama-create/ur-monitor/blob/main/trigger/README.md" target="_blank" rel="noopener">
+    <p class="card-ttl">起動トリガーの設定</p>
+    <p class="card-file">trigger/README.md</p>
+    <p class="card-body">Cloudflare Worker（5分おきの起動・見張り・保管庫）の設定と変更の手順。</p>
+    <p class="card-go">開く <span class="ext">（GitHub）</span></p>
+  </a>
+  <a class="card" href="https://github.com/tama-create/ur-monitor/blob/main/CLAUDE.md" target="_blank" rel="noopener">
+    <p class="card-ttl">コードを直すときの注意</p>
+    <p class="card-file">CLAUDE.md</p>
+    <p class="card-body">コードを直す AI 向け。変えてはいけない点と、その理由への案内。</p>
+    <p class="card-go">開く <span class="ext">（GitHub）</span></p>
+  </a>
+</div>
+
+<div class="note">
+<p><strong>同じことを複数の資料に書かない</strong>ようにしています。詳しい説明は1か所にだけ置き、
+ほかの資料からはそこへリンクしています。資料を足したり役割を変えたりしたときは、このページも直してください。</p>
+</div>
+
+</main>
+
+<footer>
+<p>最終更新 2026年9月14日</p>
+<p>このツールは MIT ライセンスで公開されています。自由に使えますが<strong>無保証</strong>です。
+リポジトリ: <a href="https://github.com/tama-create/ur-monitor">github.com/tama-create/ur-monitor</a></p>
+</footer>
+
+</body>
+</html>

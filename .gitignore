@@ -18,6 +18,8 @@ monitor.log
 # 開発中に --dry-run を付けずに実行すると手元に生成されるが、中身は UR から
 # 取った物件名・家賃・間取りなので **コミットしないこと**。
 state.json
+# 保管先が未設定のときの一覧の書き出し先。docs/index.html は資料の入口なので、そこへは書かない
+output/
 
 # セットアップウィザード（tools/setup.mjs）の生成物。
 # KV の ID を含む wrangler.local.toml は実値なので追跡しない。雛形の

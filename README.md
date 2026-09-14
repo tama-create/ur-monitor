@@ -42,19 +42,11 @@ Slack に通知が届くまで、**内部で何が起きているか**を図と�
 （実測秒つき）、取得に失敗したときの粘り方、UTC と JST の扱いなどを載せています。
 コードを触る前に読むと早いです。
 
-### 2.4 資料の役割分担
+### 2.4 資料の一覧
 
+すべての資料は、[資料の入口](https://tama-create.github.io/ur-monitor/)（`docs/index.html`）に
+「使う人向け」「開発する人向け」に分けて並べてあります。資料ごとの役割もそこにあります。
 **同じことを複数の資料に書かず**、詳しい説明は1か所に置いて、ほかの資料からはリンクします。
-
-| 資料 | 読む人 | 書いてあること |
-|---|---|---|
-| [使い方ガイド](https://tama-create.github.io/ur-monitor/guide.html)（`docs/guide.html`） | 使う人 | UR の手続きと、通知が来たときの動き方 |
-| [セットアップ手順書](https://tama-create.github.io/ur-monitor/setup.html)（`docs/setup.html`） | 使う人 | 導入の手順、ログの読み方、困ったときの対処 |
-| [技術資料](https://tama-create.github.io/ur-monitor/architecture.html)（`docs/architecture.html`） | 仕組みを知りたい人 | 動作の仕様、入力と出力、数値、そうしている理由 |
-| `README.md`（この資料） | フォークする人・コードを読む人 | 概要、設定項目、開発のしかた |
-| [`FLOW.md`](FLOW.md) | コードと並べて読む人 | `ur_monitor.php` の処理の順番だけ（コードの `// [FLOW 2.3]` と見出し番号が対応） |
-| [`trigger/README.md`](trigger/README.md) | Worker を設定する人 | 起動トリガーの設定と変更の手順 |
-| `CLAUDE.md` | コードを直す AI | 変えてはいけない点と注意 |
 
 以降のこの README は、**フォークして自分の設定に変える方・コードを読む方向け**の参照情報です。
 
@@ -107,12 +99,14 @@ config.json           監視URL・通知条件・セレクター。振る舞い�
 composer.json / .lock 依存は chrome-php/chrome のみ
 
 docs/                 ＝ GitHub Pages の公開ディレクトリ。置いたものは全部 Web に出る
+  index.html          資料の入口（すべての資料の一覧）
   guide.html          使い方ガイド
   setup.html          セットアップ手順書
   architecture.html   技術資料（内部の動き）
   .nojekyll           Jekyll の変換を止める空ファイル。消さないこと
-                      （空き部屋一覧は置かない。ローカル実行で docs/index.html が
-                        生成されることがあるが、コミットしないこと）
+                      （空き部屋一覧は置かない）
+
+output/               ローカル実行で生成される一覧（保管先が未設定のとき）。追跡しない
 
 trigger/              Cloudflare Workers。監視処理（UR の取得）は持たない
   worker.js           稼働時間帯に5分おきで workflow_dispatch を叩く。詰まった実行の片付け、
@@ -398,10 +392,10 @@ Actions からは、監視ワークフローを手動実行して `seed_state` �
 
 資料ページ（`docs/*.html`）の上部メニュー左端に「空き部屋一覧」を置いてあります。行き先は
 **自分の Worker の URL** です（Basic 認証の内側）。資料は生成物ではなく手で書いた HTML なので、
-`config.json` の値は使えず、**3ファイルに直接書いてあります**。
+`config.json` の値は使えず、**4ファイルに直接書いてあります**。
 
 ```
-docs/guide.html  docs/setup.html  docs/architecture.html
+docs/index.html  docs/guide.html  docs/setup.html  docs/architecture.html
 ```
 
 フォークしたら `ur-monitor-trigger.<自分>.workers.dev` に置き換えてください。書き換えなくても
@@ -411,6 +405,7 @@ docs/guide.html  docs/setup.html  docs/architecture.html
 
 | URL | 中身 |
 |---|---|
+| `https://<ユーザー名>.github.io/ur-monitor/` | 資料の入口（すべての資料の一覧） |
 | `https://<ユーザー名>.github.io/ur-monitor/guide.html` | 使い方ガイド |
 | `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
 | `https://<ユーザー名>.github.io/ur-monitor/architecture.html` | 技術資料（内部の動き） |

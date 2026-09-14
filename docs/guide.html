@@ -76,7 +76,7 @@
     background: rgba(255,255,255,.16);
     padding: 2px 10px; border-radius: 999px;
   }
-  /* 並びは「本体 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
+  /* 並びは「本体 → 資料一覧 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
      いちばん見たい空き部屋一覧を置く。行き先は Cloudflare の Worker で、Basic 認証の
      内側にある。URL は人それぞれになるので、フォークしたら自分のものに書き換えること。
      右へ寄せるのはサイトの外へ出る先だけ。
@@ -311,6 +311,8 @@
     <p class="hero-meta">
       <span class="grp">
         <a href="https://ur-monitor-trigger.tsutao.workers.dev/">空き部屋一覧</a>
+        <span class="sep">│</span>
+        <a href="./">資料一覧</a>
         <span class="sep">│</span>
         <span class="current" aria-current="page">使い方ガイド</span>
         <span class="sep">│</span>

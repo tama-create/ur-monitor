@@ -76,7 +76,7 @@
     background: rgba(255,255,255,.16);
     padding: 2px 10px; border-radius: 999px;
   }
-  /* 並びは「本体 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
+  /* 並びは「本体 → 資料一覧 → 使い方 → 入れ方 → 中身 → ソース」の順。左端が一番強い位置なので、
      いちばん見たい空き部屋一覧を置く。行き先は Cloudflare の Worker で、Basic 認証の
      内側にある。URL は人それぞれになるので、フォークしたら自分のものに書き換えること。
      右へ寄せるのはサイトの外へ出る先だけ。
@@ -288,6 +288,8 @@
       <span class="grp">
         <a href="https://ur-monitor-trigger.tsutao.workers.dev/">空き部屋一覧</a>
         <span class="sep">│</span>
+        <a href="./">資料一覧</a>
+        <span class="sep">│</span>
         <a href="guide.html">使い方ガイド</a>
         <span class="sep">│</span>
         <a href="setup.html">セットアップ手順書</a>
@@ -418,7 +420,7 @@
 <tbody>
 <tr><td>入力</td><td><code>config.json</code></td><td>監視対象・通知条件・しきい値・セレクター（項目は README）</td></tr>
 <tr><td>入力</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code></td><td>Slack の送り先</td></tr>
-<tr><td>入力</td><td>環境変数 <code>STORE_URL</code> / <code>STORE_TOKEN</code></td><td>保管庫の URL と合言葉。無ければ手元のファイル（<code>state.json</code> / <code>docs/index.html</code>）を使う（開発用）</td></tr>
+<tr><td>入力</td><td>環境変数 <code>STORE_URL</code> / <code>STORE_TOKEN</code></td><td>保管庫の URL と合言葉。無ければ手元のファイル（<code>state.json</code> / <code>output/index.html</code>）を使う（開発用）</td></tr>
 <tr><td>入力</td><td><code>templates/list.html</code> / <code>list.css</code></td><td>一覧ページの見た目</td></tr>
 <tr><td>出力</td><td>Slack</td><td>新着の通知、停止の警告</td></tr>
 <tr><td>出力</td><td>保管庫の <code>/state</code> と <code>/list</code></td><td>前回の状態（JSON）と一覧ページ（HTML）</td></tr>

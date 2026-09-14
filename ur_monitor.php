@@ -20,8 +20,9 @@ define('CONFIG_FILE',  BASE_DIR . '/config.json');
 define('STATE_FILE',   BASE_DIR . '/state.json');
 define('LOG_FILE',     BASE_DIR . '/monitor.log');
 // 保管先（STORE_URL）が未設定のときだけ使う、開発用の一覧の書き出し先。
-// 本番の一覧は Worker の KV に置く。docs/ は Pages の公開ディレクトリなのでコミットしないこと。
-define('RESULTS_FILE', BASE_DIR . '/docs/index.html');
+// 本番の一覧は Worker の KV に置く。docs/ は Pages の公開ディレクトリで、docs/index.html は
+// 資料の入口なので、そこへは書かない（output/ は .gitignore 済み）。
+define('RESULTS_FILE', BASE_DIR . '/output/index.html');
 // 一覧ページの見た目（HTML と CSS）。見た目だけ直すときはコードではなくここを触る。
 define('TEMPLATE_DIR', BASE_DIR . '/templates');
 
@@ -737,7 +738,7 @@ function render_template(string $file, array $vars): string
 }
 
 /**
- * 空き部屋の一覧ページを作って書き出す（保管先があれば保管先、無ければ docs/index.html）。
+ * 空き部屋の一覧ページを作って書き出す（保管先があれば保管先、無ければ output/index.html）。
  * 見た目は templates/list.html と templates/list.css。書けなければ終了コード1。
  * [FLOW 2.13]
  *
@@ -862,7 +863,8 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
     $docNav   = '';
     if ($docsBase !== '') {
         $b = htmlspecialchars($docsBase, ENT_QUOTES, 'UTF-8');
-        foreach ([['guide.html', '使い方ガイド'],
+        foreach ([['', '資料一覧'],
+                  ['guide.html', '使い方ガイド'],
                   ['setup.html', 'セットアップ手順書'],
                   ['architecture.html', '仕組みの技術資料']] as [$file, $label]) {
             $docNav .= "      <span class=\"sep\">│</span>\n"
@@ -895,7 +897,7 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
     }
 
     // 保管先が未設定のときはローカルに書く。開発中に見た目を確かめるための逃げ道で、
-    // docs/ は Pages の公開ディレクトリなので **この出力をコミットしないこと。**
+    // 中身は UR から取ったデータなので **この出力をコミットしないこと。**
     $dir = dirname(RESULTS_FILE);
     if (!is_dir($dir)) {
         @mkdir($dir, 0777, true);
@@ -1225,7 +1227,7 @@ function run_monitor(array $config, bool $dryRun = false): void
 
     // [FLOW 2.2] ランダムに待つ
     if ($dryRun) {
-        log_msg('INFO', "dry-run: Slack 通知と state.json / docs/index.html の更新は行いません");
+        log_msg('INFO', "dry-run: Slack 通知と state / 一覧の更新は行いません");
     }
 
     // Cloudflare からの起動は毎回きっかり同じ秒に来るので、その規則性を消すためのランダム待機。
@@ -1407,7 +1409,7 @@ function run_monitor(array $config, bool $dryRun = false): void
 
     // [FLOW 2.12] --dry-run ならここで終わる
     if ($dryRun) {
-        log_msg('INFO', "dry-run: ここで state.json / docs/index.html を更新するところを省略しました");
+        log_msg('INFO', "dry-run: ここで state / 一覧を更新するところを省略しました");
         return;
     }
 
