@@ -40,6 +40,10 @@ id = "ここに KV の ID を入れる"
 [observability]
 enabled = true
 
+# 版ごとのプレビュー用 URL を出さない。書いていないと既定で有効になり、一覧を配る入口が
+# workers.dev の本来の URL 以外にも増える（中身は Basic 認証で守られているが、使わない入口は閉じておく）。
+preview_urls = false
+
 # Secret（wrangler では設定しない。画面の Settings → Variables and Secrets で
 # **必ず Secret 種別で**入れる。Text にすると画面を開いた人に中身が見える）
 #   GITHUB_TOKEN   … workflow_dispatch を叩き、詰まった実行をキャンセルするためのトークン
