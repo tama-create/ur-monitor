@@ -31,3 +31,7 @@ tools/.setup-state.json
 # ここへ出力を逃がしている。進捗の記録も本番とは別ファイルにしてある。
 tools/.mock-run/
 tools/.setup-state.mock.json
+
+# 手元だけの記録（障害時のスクリーンショット・会話の控えなど）。
+# Slack の画面には UR から取った物件名・家賃が写るため、公開リポジトリに入れない。
+private/
