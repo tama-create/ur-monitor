@@ -30,6 +30,9 @@ on:
 permissions:
   contents: read
 
+# ある回がランナー待ちのまま固まると、この枠を握り続けて後続（schedule も含む）が
+# すべてキャンセルされる。timeout-minutes は開始後しか効かないため、詰まった回の
+# 片付けは trigger/worker.js が行う（2026-09-13 に約24時間止まった）。
 concurrency:
   group: ur-monitor
   cancel-in-progress: false  # 前回実行が保管先へ書き込み中なら待つ
