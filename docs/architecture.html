@@ -313,7 +313,9 @@
     <li><a href="#a5">通知するかの判定</a></li>
     <li><a href="#a6">時刻の扱い（UTC と JST）</a></li>
     <li><a href="#a7">状態は Cloudflare に預ける</a></li>
-    <li><a href="#a8">止まったときに気づく仕組み</a></li>
+    <li><a href="#a8">止まったときに気づく仕組み</a>
+      <ol><li><a href="#a8-1">GitHub の外からも見張る</a></li></ol>
+    </li>
     <li><a href="#a9">数字のまとめ</a></li>
     <li><a href="#a10">おかしいときにどこを見るか</a></li>
   </ol>
@@ -342,7 +344,7 @@
 
   <rect x="20" y="40" width="220" height="110" rx="10" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
   <text x="130" y="70" class="t1">☁️ Cloudflare Workers</text>
-  <text x="130" y="94" class="t2">時計。5分ごとに叩くだけ</text>
+  <text x="130" y="94" class="t2">時計・見張り・保管庫の番</text>
   <text x="130" y="116" class="t2">UR には一切さわらない</text>
   <text x="130" y="138" class="t3">trigger/worker.js</text>
 
@@ -355,7 +357,7 @@
   <rect x="600" y="40" width="220" height="110" rx="10" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
   <text x="710" y="70" class="t1">🐘 PHP + Chrome</text>
   <text x="710" y="94" class="t2">作業者です。全処理がここ</text>
-  <text x="710" y="116" class="t2">約950行の1ファイル</text>
+  <text x="710" y="116" class="t2">約1,500行の1ファイル</text>
   <text x="710" y="138" class="t3">ur_monitor.php</text>
 
   <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m1)">
@@ -379,7 +381,7 @@
 <table>
 <thead><tr><th>役割</th><th>やること</th><th>やらないこと</th></tr></thead>
 <tbody>
-<tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く</td><td>UR は見ません。データも持ちません</td></tr>
+<tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く。ついでに詰まった実行を片付け、止まっていれば Slack に知らせる。保管庫（KV）の出し入れと、一覧の閲覧の認証も受け持つ</td><td>UR は見ません</td></tr>
 <tr><td>GitHub Actions</td><td>PHP を動かす箱を用意する</td><td>時刻を守れない（下記 2 章）</td></tr>
 <tr><td>PHP + Chrome</td><td>取得・比較・通知・書き出し</td><td>常駐しません。毎回終了します</td></tr>
 </tbody>
@@ -390,7 +392,8 @@
 <table>
 <thead><tr><th>技術</th><th>役割</th></tr></thead>
 <tbody>
-<tr><td><strong>Cloudflare Workers</strong></td><td>時計。5分ごとに GitHub を叩くだけの小さなプログラムを、Cloudflare のサーバー上で動かす仕組み</td></tr>
+<tr><td><strong>Cloudflare Workers</strong></td><td>小さなプログラムを Cloudflare のサーバー上で動かす仕組みです。ここでは時計（5分ごとに GitHub を叩く）と見張り、保管庫の番をしています</td></tr>
+<tr><td><strong>Cloudflare KV</strong></td><td>Worker から読み書きできる保管庫です。前回の状態と一覧の HTML を置きます</td></tr>
 <tr><td><strong>GitHub Actions</strong></td><td>プログラムを自動実行する仕組みです。パソコンを起動しなくても動く理由がこれ</td></tr>
 <tr><td><strong>PHP</strong></td><td>本体の言語です。<code>ur_monitor.php</code> の1ファイルだけで動いています</td></tr>
 <tr><td><strong>Headless Chrome</strong></td><td>画面のない Chrome です。UR は物件情報を後から JavaScript で表示するため、本物のブラウザで開いて描画を待つ必要があります</td></tr>
@@ -408,7 +411,8 @@
 </div>
 <h2 id="a2">1回の実行で何が起きるか</h2>
 
-<p>2026年8月28日 15:15 の実行（run #114）の実測です。<strong>秒数は実際のログから取っています。</strong></p>
+<p>2026年8月28日 15:15 の実行（run #114）の実測です。<strong>秒数は実際のログから取っています。</strong>
+この時点の監視 URL は3本でした（いまは4本なので、取得の段が1つ増えます）。</p>
 
 <figure class="fig">
 <svg viewBox="0 0 840 560" role="img" aria-label="Cloudflareの発火から62秒で完了するまでの時系列">
@@ -425,7 +429,7 @@
     <text x="76" y="61" class="t3" style="text-anchor:end">0秒</text>
     <rect x="120" y="34" width="700" height="44" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
     <text x="136" y="52" class="t1" style="text-anchor:start">Cloudflare の cron が発火</text>
-    <text x="136" y="70" class="t2" style="text-anchor:start">JST の時を計算 → 8〜21時なら続行 → GitHub に workflow_dispatch を POST → 204 が返れば成功</text>
+    <text x="136" y="70" class="t2" style="text-anchor:start">JST の時を計算 → 8〜21時なら、詰まった実行の片付けと止まりの見張り（8章）→ workflow_dispatch を POST → 204 で成功</text>
   </g>
 
   <g>
@@ -441,7 +445,7 @@
     <text x="76" y="173" class="t3" style="text-anchor:end">4〜10秒</text>
     <rect x="120" y="146" width="700" height="44" rx="8" fill="#e8f0fb" stroke="#005bac"/>
     <text x="136" y="164" class="t1" style="text-anchor:start">準備</text>
-    <text x="136" y="182" class="t2" style="text-anchor:start">リポジトリ取得 1秒 → PHP 8.1 導入 4秒 → composer 1秒 → Chrome の場所確認</text>
+    <text x="136" y="182" class="t2" style="text-anchor:start">リポジトリ取得 1秒 → PHP 導入 4秒 → composer 1秒 → Chrome の場所確認</text>
   </g>
 
   <g>
@@ -497,9 +501,11 @@
 </figure>
 
 <div class="note">
-<p><strong>push がぶつかることがあります。</strong>前の実行のコミットと重なると弾かれるので、
-<code>git fetch</code> → <code>rebase -X theirs</code> → 再push を最大3回試します。
-5分間隔・実行62秒なので通常は重なりませんが、手作業のコミットとは重なり得ます。</p>
+<p><strong>リポジトリには何も書き戻しません。</strong>以前は実行のたびに一覧をコミットしていたため
+push の衝突に備えていましたが、状態と一覧を Cloudflare に預けるようになってからは
+<code>permissions: contents: read</code> で動いており、衝突は起きません。</p>
+<p><strong>同時に走るのは1本だけです</strong>（<code>concurrency</code>）。前の実行が保管庫へ書き込んでいる途中に
+次が始まって、古い状態で上書きするのを防ぐためです。この仕組みが裏目に出た件は8章にあります。</p>
 </div>
 <h2 id="a3">PHP の中の流れ</h2>
 
@@ -641,7 +647,7 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 <h2 id="a5">通知するかの判定</h2>
 
 <figure class="fig">
-<svg viewBox="0 0 840 240" role="img" aria-label="今回の部屋と前回の部屋を比べて新着を見つけ、watch条件に合えばSlackへ送る流れ">
+<svg viewBox="0 0 840 240" role="img" aria-label="今回の部屋と前回の部屋を比べて新着を見つけ、その部屋のグループが通知対象で間取りも合えばSlackへ送る流れ">
   <defs>
     <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -660,8 +666,8 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
   <text x="350" y="126" class="t2">前回に無い URL＝新着</text>
 
   <rect x="500" y="78" width="180" height="64" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
-  <text x="590" y="104" class="t1">watch と照合</text>
-  <text x="590" y="126" class="t2">建物名・間取り</text>
+  <text x="590" y="104" class="t1">グループで判定</text>
+  <text x="590" y="126" class="t2">notify・間取り</text>
 
   <rect x="720" y="78" width="100" height="64" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
   <text x="770" y="104" class="t1">💬 Slack</text>
@@ -679,17 +685,22 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 <table>
 <thead><tr><th>項目</th><th>動き</th></tr></thead>
 <tbody>
-<tr><td>照合のしかた</td><td><strong>部分一致</strong>（<code>str_contains</code>）です。完全一致ではありません</td></tr>
-<tr><td>空文字を書いたとき</td><td>「その条件は問わない」の意味になる</td></tr>
-<tr><td><code>notify_all_new</code></td><td>既定は<strong>オフ</strong>です。オンにすると条件に関係なく全新着が飛びます（スパム防止のため既定オフ）</td></tr>
+<tr><td>判定の単位</td><td><code>config.json</code> の <code>groups</code> ごとです（<code>room_notifies()</code>）。<code>notify: false</code> のグループは一覧に出すだけで黙ります</td></tr>
+<tr><td>間取りの照合</td><td><code>madori</code> のどれかに<strong>部分一致</strong>（<code>str_contains</code>）すれば通知します。<code>[]</code> なら間取りを問いません</td></tr>
+<tr><td>同じ部屋が複数のグループに出たとき</td><td><strong>上に書いたグループが勝ちます</strong>。団地ページを第一希望、それを含む地域ページを参考に置いても、本命の部屋は第一希望として通知されます</td></tr>
 <tr><td>Webhook URL</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code> から渡します。<strong>設定ファイルに実値を書かないでください</strong></td></tr>
 </tbody>
 </table>
 
 <div class="warn">
-<p><strong>建物名の全角スペースは意味を持ちます。</strong>
-「プラザシティ新所沢　けやき通り」の空白は全角（U+3000）で、半角にすると一致しません。
-UR のページからそのままコピーするのが確実です。</p>
+<p><strong>「上が勝つ」を「後勝ち」に変えないでください。</strong>本命の部屋が参考扱いになり、<strong>通知が黙ります</strong>。</p>
+</div>
+
+<div class="note">
+<p><strong>旧形式（<code>search_urls</code> + <code>watch</code>）も読めます。</strong>こちらは建物名と間取りの部分一致で、
+空文字は「その条件を問わない」の意味です。<code>notify_all_new</code>（既定オフ）と
+<code>highlight_keywords</code> は旧形式のときだけ効きます。建物名の空白は全角（U+3000）で、
+半角にすると一致しないので、UR のページからそのままコピーしてください。</p>
 </div>
 
 <h2 id="a6">時刻の扱い（UTC と JST）</h2>
@@ -854,6 +865,73 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 だから GitHub 側の <code>schedule</code> を完全には外さず、<strong>1日4回の心拍</strong>として残してあります。
 外部トリガーが死んだときの保険と、見張りを兼ねています。<strong>この4回を「間隔」として当てにしないでください。</strong></p>
 </div>
+
+<h3 id="a8-1">GitHub の外からも見張る</h3>
+
+<p>
+心拍だけでは足りませんでした。2026年9月13日 13:10 の実行がランナーを割り当ててもらえず、
+<strong>「待ち」のまま固まりました</strong>（run 34737267050。ステップ0件）。
+同時に1本しか走らせない設定（<code>concurrency</code>）なので、この1本が枠を握ったまま、
+後から来た実行は <code>schedule</code> の心拍も含めて約290回すべてキャンセルされました。
+<code>timeout-minutes</code> はジョブが始まってからしか効かず、GitHub が24時間後に打ち切るまで
+<strong>誰も気づけませんでした</strong>。見張りが Actions の中にあったため、見張りごと止まっていたのです。
+</p>
+
+<figure class="fig">
+<svg viewBox="0 0 840 250" role="img" aria-label="Cloudflare の Worker が起動のたびに、詰まった実行を取り消し、最後の成功から30分空いていれば Slack に知らせ、そのあと起動を依頼する流れ">
+  <text x="420" y="24" class="t4">Cloudflare の起動のたびに、起動を頼む前に2つ見回る</text>
+
+  <rect x="20" y="46" width="170" height="70" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
+  <text x="105" y="74" class="t1">⏰ cron 発火</text>
+  <text x="105" y="96" class="t2">5分おき・8〜21時</text>
+
+  <rect x="230" y="46" width="180" height="70" rx="8" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
+  <text x="320" y="68" class="tn">見回り 1</text>
+  <text x="320" y="90" class="t1">詰まりを片付ける</text>
+  <text x="320" y="108" class="t2">20分超で取消・40分超で強制</text>
+
+  <rect x="450" y="46" width="180" height="70" rx="8" fill="#e8f0fb" stroke="#005bac" stroke-width="2"/>
+  <text x="540" y="68" class="tn">見回り 2</text>
+  <text x="540" y="90" class="t1">止まりを見張る</text>
+  <text x="540" y="108" class="t2">最後の成功から30分</text>
+
+  <rect x="670" y="46" width="150" height="70" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="745" y="74" class="t1">起動を依頼</text>
+  <text x="745" y="96" class="t2">必ず出す</text>
+
+  <rect x="450" y="150" width="180" height="56" rx="8" fill="#ffebe9" stroke="#cf222e"/>
+  <text x="540" y="172" class="t1">🚨 Slack へ</text>
+  <text x="540" y="192" class="t2">「監視が止まっています」</text>
+
+  <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m6)">
+    <path d="M190,81 H226"/><path d="M410,81 H446"/><path d="M630,81 H666"/>
+  </g>
+  <path d="M540,116 V144" fill="none" stroke="#cf222e" stroke-width="2" marker-end="url(#m6)"/>
+  <text x="420" y="236" class="t3">見回りが失敗してもログに残すだけで、起動は止めない（本業を巻き添えにしないため）</text>
+</svg>
+</figure>
+
+<table>
+<thead><tr><th>見回り</th><th>中身</th><th>理由</th></tr></thead>
+<tbody>
+<tr><td>詰まりの片付け</td><td>queued / in_progress / pending / waiting の実行のうち、作成から<strong>20分</strong>を過ぎたものを cancel、<strong>40分</strong>を過ぎたものは force-cancel</td><td>正常な実行は2分以内に終わります（<code>timeout-minutes</code> は10分）。普通の取り消しを受け付けない実行があるため、2段にしています</td></tr>
+<tr><td>止まりの見張り</td><td>最後に成功した実行から、稼働時間帯で<strong>30分</strong>以上空いたら Slack へ1回だけ送る</td><td>5分おきなので6回ぶんの取りこぼしにあたり、1〜2回の一時的な失敗では鳴りません。連投しないよう、警告済みの run id を KV の <code>stale_alerted</code> に置きます</td></tr>
+</tbody>
+</table>
+
+<table>
+<thead><tr><th>Slack に届く文面</th><th>送り手</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>🚨 監視が止まっています</td><td>Cloudflare（<code>worker.js</code>）</td><td>いま止まっている。最後の成功から30分以上</td></tr>
+<tr><td>⚠️ 監視が止まっていました</td><td>監視ジョブ（<code>warn_if_stale</code>）</td><td>もう再開した。前回の実行から3時間以上空いていた</td></tr>
+</tbody>
+</table>
+
+<div class="stop">
+<p><strong>見張りを Actions の中だけに置かないでください。</strong>止まるときは見張りごと止まります。
+なお Worker に <code>SLACK_WEBHOOK_URL</code> が無ければ見張りだけ黙り、KV が結び付いていなければ
+連投防止が効かず5分おきに届きます（黙るよりは鳴るほうを選んでいます）。</p>
+</div>
 <h2 id="a9">数字のまとめ</h2>
 
 <table>
@@ -869,8 +947,10 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <tr><td>取り直しの待機</td><td>5秒・1回だけ</td><td>失敗対策の1段目</td></tr>
 <tr><td>怪しいと判断する減り方</td><td>前回の <strong>0.7 倍</strong>未満</td><td><code>shrink_guard_ratio</code></td></tr>
 <tr><td>粘る回数</td><td><strong>18回</strong>（＝約90分）</td><td><code>zero_streak_limit</code></td></tr>
-<tr><td>止まったと判断する空白</td><td>3時間</td><td><code>stale_warning_hours</code></td></tr>
-<tr><td>UR へのアクセス</td><td>平均 100秒に1回（稼働時間帯のみ）</td><td>3URL × 168回</td></tr>
+<tr><td>「止まっていました」を出す空白</td><td>3時間</td><td><code>stale_warning_hours</code>（監視ジョブ）</td></tr>
+<tr><td>「止まっています」を出す空白</td><td>30分</td><td><code>STALE_ALERT_MINUTES</code>（<code>worker.js</code>）</td></tr>
+<tr><td>詰まったとみなして取り消す</td><td>20分（40分で強制）</td><td><code>STUCK_MINUTES</code> / <code>FORCE_CANCEL_MINUTES</code>（<code>worker.js</code>）</td></tr>
+<tr><td>UR へのアクセス</td><td>平均 75秒に1回（稼働時間帯のみ）</td><td>4URL × 168回</td></tr>
 </tbody>
 </table>
 
@@ -887,14 +967,14 @@ UR 側の一時的な不調に耐えられる時間になります。5分に詰�
 <tr><td>Cloudflare Workers のリクエスト</td><td>168回／日</td><td>10万回／日</td></tr>
 <tr><td>Cloudflare の Cron Triggers</td><td>1本</td><td>5本／アカウント（有料は250本）</td></tr>
 <tr><td>GitHub Actions（公開リポジトリ）</td><td>—</td><td><strong>無制限に無料</strong></td></tr>
-<tr><td>GitHub Actions（非公開に戻した場合）</td><td>月およそ7,500分</td><td>月2,000分 → <strong>大幅超過</strong></td></tr>
+<tr><td>GitHub Actions（非公開に戻した場合）</td><td>月5,000〜10,000分（1回1〜2分に切り上げ × 月約5,000回）</td><td>月2,000分 → <strong>大幅超過</strong></td></tr>
 </tbody>
 </table>
 
 <div class="warn">
 <p><strong>非公開リポジトリに戻すなら、実行間隔も戻す必要があります。</strong>
 また非公開にすると GitHub Pages が使えなくなり（GitHub Free では公開リポジトリのみ）、
-一覧ページの公開もできなくなります。</p>
+資料ページは公開できなくなります。空き部屋一覧は Cloudflare から配っているので影響を受けません。</p>
 </div>
 
 <h2 id="a10">おかしいときにどこを見るか</h2>
@@ -903,10 +983,11 @@ UR 側の一時的な不調に耐えられる時間になります。5分に詰�
 <thead><tr><th>症状</th><th>まず見る場所</th><th>ありがちな原因</th></tr></thead>
 <tbody>
 <tr><td>通知が来ない・実行が少ない</td><td>Cloudflare の <strong>Observability</strong></td><td>トークン切れ（401）、権限不足（403）</td></tr>
-<tr><td>いつ動いたか知りたい</td><td>リポジトリの <strong>コミット履歴</strong></td><td>—（履歴が全実行記録になっている）</td></tr>
+<tr><td>「監視が止まっています」が届いた</td><td>Actions タブの実行一覧</td><td>「待ち」のまま固まった実行（20分で自動的に取り消されます）、GitHub の障害</td></tr>
+<tr><td>いつ動いたか知りたい</td><td>Actions タブの <strong>実行一覧</strong></td><td>—（コミットはしなくなったので、コミット履歴には残りません）</td></tr>
 <tr><td>全 URL が0件になる</td><td><strong>まず環境</strong>を疑う</td><td>Chrome がそもそも到達できていない</td></tr>
 <tr><td>件数が中途半端</td><td>ログの <code>前回状態を維持</code></td><td>正常動作です。3段構えが効いています</td></tr>
-<tr><td>実行が赤い</td><td>Actions のログ</td><td>依存の更新、push の衝突</td></tr>
+<tr><td>実行が赤い</td><td>Actions のログ</td><td>依存の更新、<code>config.json</code> の書き間違い、保管庫への書き込み失敗（<code>HTTP 0</code> などの一時的なもの）</td></tr>
 </tbody>
 </table>
 
@@ -926,6 +1007,10 @@ robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome �
 <tr><td><code>起動に失敗: 401 Bad credentials</code></td><td>トークンが認識されていません。作り直して入れ直してください</td></tr>
 <tr><td><code>起動に失敗: 403 ...</code></td><td>権限が足りません。Actions を Read and write にしてください</td></tr>
 <tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
+<tr><td><code>詰まった実行をキャンセル: run ...</code></td><td>正常。見回り1が働いた</td></tr>
+<tr><td><code>止まりを警告した（最後の成功 run ...）</code></td><td>見回り2が Slack に送った</td></tr>
+<tr><td><code>SLACK_WEBHOOK_URL が未設定のため止まりの見張りを省略</code></td><td>Worker に Secret が無い。起動と片付けは動いている</td></tr>
+<tr><td><code>詰まった実行の片付けに失敗</code> / <code>止まりの見張りに失敗</code></td><td>見回りだけが失敗。起動は続いている。403 なら権限不足</td></tr>
 </tbody>
 </table>
 
@@ -938,7 +1023,7 @@ robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome �
   </div>
   <div class="author-updated">
     <p class="lbl">Last updated</p>
-    <p class="val"><time datetime="2026-08-28">2026年8月28日</time></p>
+    <p class="val"><time datetime="2026-09-14">2026年9月14日</time></p>
   </div>
 </div>
 <p>

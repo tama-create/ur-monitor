@@ -28,7 +28,7 @@ php -l ur_monitor.php          # 構文チェック
 
 ## 構成
 
-`ur_monitor.php` 1ファイル（約900行）に全処理があり、フレームワークは使っていない。
+`ur_monitor.php` 1ファイル（約1,500行）に全処理があり、フレームワークは使っていない。
 分割していないのは、フォークした人が中身を1ファイルで追え、テストが無いまま
 ファイルを跨いだ整合性を気にせずに済むため。増やすなら `// ──` で区切ってある
 既存の節（ユーティリティ / robots / スクレイピング / HTML出力 / Slack / メイン）が
@@ -37,7 +37,7 @@ php -l ur_monitor.php          # 構文チェック
 コードにハードコードされていない**ため、UR のサイト構造が変わったときに触るのは
 原則 `config.json` の `selectors` であってコードではない。
 
-主要な流れは `run_monitor()`（`ur_monitor.php:632`）に集約されている。
+主要な流れは `run_monitor()`（`ur_monitor.php:1215`）に集約されている。
 
 ```
 config.json ──> run_monitor()
@@ -181,7 +181,7 @@ Slack の Webhook URL は `SLACK_WEBHOOK_URL` 環境変数から渡す。`config
 やめたのは、この境界を跨ぎにくくする意味もある。
 
 1回あたりの実測は45〜85秒。課金はジョブごとに分単位へ切り上げられるので、
-**設定上は**1日53回・月約1,600回で月およそ2,400分になり、private の無料枠を超える。
+**設定上は**1日168回・月約5,000回で月5,000〜10,000分になり、private の無料枠を大きく超える。
 **public のうちは無制限に無料なので問題にならない**が、private に戻すなら間隔を戻すこと。
 （なお下記のとおり実際の実行回数は設定より大幅に少ないため、実測はこれより小さくなる。）
 
@@ -289,8 +289,9 @@ Bearer、閲覧は `VIEW_USER` / `VIEW_PASSWORD` の Basic。**片方だけ合�
 
 | URL | 中身 |
 |---|---|
-| `https://<ユーザー名>.github.io/ur-monitor/` | 入口（資料への案内） |
+| `https://<ユーザー名>.github.io/ur-monitor/guide.html` | 使い方ガイド |
 | `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
+| `https://<ユーザー名>.github.io/ur-monitor/architecture.html` | 技術資料 |
 
 **`docs/` は GitHub Pages の公開ディレクトリそのもの**で、ここに置いたファイルは
 すべて `https://<ユーザー名>.github.io/ur-monitor/<ファイル名>` で配信される。

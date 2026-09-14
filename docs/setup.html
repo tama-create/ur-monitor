@@ -400,7 +400,7 @@
         <li><a href="#s8b-5">動いているか確かめる</a></li>
       </ol>
     </li>
-    <li><a href="#s10">空き部屋一覧を自分だけ見られるようにする <span class="opt">（任意）</span></a>
+    <li><a href="#s10">保管庫を用意して一覧を見られるようにする</a>
       <ol>
         <li><a href="#s10-1">保管庫（KV）を作る</a></li>
         <li><a href="#s10-2">合言葉を3つ決めて Worker に預ける</a></li>
@@ -415,6 +415,7 @@
         <li><a href="#s11-2">「前回状態を維持」と出る</a></li>
         <li><a href="#s11-3">実行が赤いバツになる</a></li>
         <li><a href="#s11-4">1件も部屋が取れない</a></li>
+        <li><a href="#s11-5">Slack に「監視が止まって…」と届いた</a></li>
       </ol>
     </li>
   </ol>
@@ -464,7 +465,7 @@ UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あ
 <h3 id="s1-1">全体の流れ</h3>
 
 <figure class="fig">
-<svg viewBox="0 0 840 300" role="img" aria-label="5分おきにURのサイトを見に行き、前回と比較して、条件に合う新着をSlackへ通知し、一覧をWebページに公開する流れ">
+<svg viewBox="0 0 840 300" role="img" aria-label="5分おきにURのサイトを見に行き、前回と比較して、条件に合う新着をSlackへ通知し、状態と一覧を保管庫へ預ける流れ">
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -488,8 +489,8 @@ UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あ
     <text x="750" y="82" class="t1">💬 Slack へ通知</text>
     <text x="750" y="104" class="t2">条件に合えば</text>
     <rect x="680" y="175" width="140" height="70" rx="8" fill="#f6f8fa" stroke="#8c959f"/>
-    <text x="750" y="202" class="t1">🌐 Web に公開</text>
-    <text x="750" y="224" class="t2">任意</text>
+    <text x="750" y="202" class="t1">📦 保管庫へ</text>
+    <text x="750" y="224" class="t2">一覧も見られる</text>
   </g>
   <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#ar)">
     <path d="M150,90 H236"/><path d="M370,90 H456"/>
@@ -557,8 +558,8 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
 </div>
 
 <div class="note">
-<p>実際に何分おきに動いたかは、リポジトリの <strong>Commits</strong>（コミット履歴）で確かめられます。
-実行のたびに記録が残るためです。<br>
+<p>実際に何分おきに動いたかは、リポジトリの <strong>Actions</strong> タブの実行一覧で確かめられます。
+（以前は実行のたびにコミットしていましたが、いまはリポジトリに何も書き込まないので、コミット履歴には残りません。）<br>
 なぜ GitHub が間引くのか、Cloudflare がどう叩いているのかは
 <a href="architecture.html">技術資料</a>に詳しく書いてあります。</p>
 </div>
@@ -584,14 +585,14 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
 <h3 id="s2-2">セットアップの全体像</h3>
 
 <figure class="fig">
-<svg viewBox="0 0 840 430" role="img" aria-label="第3章から第9章までが必須で第9章のCloudflareまでやると完成、第10章のWeb公開は任意という全体像">
+<svg viewBox="0 0 840 430" role="img" aria-label="第3章から第10章までがすべて必須で、第9章で時計を用意し、第10章で保管庫を用意すると完成する全体像">
   <defs>
     <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
     </marker>
   </defs>
 
-  <text x="20" y="24" class="t4">必須（ここまでで5分おきの Slack 通知が動きます）</text>
+  <text x="20" y="24" class="t4">必須（ここまでで5分おきに動くようになります）</text>
   <rect x="14" y="34" width="812" height="250" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
 
   <g>
@@ -620,10 +621,10 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
     <text x="89" y="224" class="t1">動かす</text>
     <text x="89" y="244" class="t2">まず1回</text>
 
-    <rect x="188" y="176" width="158" height="86" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
+    <rect x="188" y="176" width="158" height="86" rx="8" fill="#fff" stroke="#005bac" stroke-width="2"/>
     <text x="267" y="200" class="tn">第 9 章</text>
     <text x="267" y="224" class="t1">Cloudflare</text>
-    <text x="267" y="244" class="t2">ここで完成 ✓</text>
+    <text x="267" y="244" class="t2">時計を用意</text>
   </g>
 
   <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#ar2)">
@@ -634,13 +635,13 @@ GitHub は「決まった時刻に自分で動く」のは苦手ですが、<str
 
   <text x="596" y="224" class="t2">Cloudflare が「5分おきに動け」と GitHub に指示する時計になります</text>
 
-  <text x="20" y="316" class="t4">任意（やらなくても通知は動きます）</text>
+  <text x="20" y="316" class="t4">必須（これが無いと、同じ部屋が5分おきに通知されます）</text>
   <rect x="14" y="326" width="812" height="88" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-dasharray="5 4"/>
-  <rect x="188" y="340" width="158" height="60" rx="8" fill="#fff" stroke="#8c959f" stroke-width="2"/>
+  <rect x="188" y="340" width="158" height="60" rx="8" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
   <text x="267" y="362" class="tn">第 10 章</text>
-  <text x="267" y="384" class="t1">Web に公開</text>
-  <path d="M267,262 V336" fill="none" stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
-  <text x="590" y="376" class="t2">Cloudflare に置いて、空き部屋一覧を自分だけ見られるようにする</text>
+  <text x="267" y="384" class="t1">保管庫 ✓ 完成</text>
+  <path d="M267,262 V336" fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#ar2)"/>
+  <text x="590" y="376" class="t2">前回の状態を Cloudflare に預け、一覧を自分だけ見られるようにする</text>
 </svg>
 </figure>
 
@@ -662,11 +663,10 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
 </p>
 
 <div class="warn">
-<p><strong>公開すると、あなたの設定と監視結果は誰でも読めます。</strong>
-どの物件を狙っているか（設定ファイルの中身）も、いま空いている部屋の一覧も、
-リポジトリを見れば分かります。<br>
-<strong>Slack に届く通知の中身は公開されません。</strong>公開されるのは、リポジトリに置いた
-設定と結果のファイルです。</p>
+<p><strong>公開すると、あなたの設定は誰でも読めます。</strong>
+どの物件を狙っているか（<code>config.json</code> の中身）は、リポジトリを見れば分かります。<br>
+<strong>取得した空き部屋の一覧と Slack の通知は公開されません。</strong>一覧は第10章で用意する
+Cloudflare の保管庫に置き、ID とパスワードを知っている人しか開けません。</p>
 </div>
 
 <p>
@@ -675,7 +675,7 @@ Slack も無料枠の範囲で収まります。第 9 章で使う Cloudflare �
 
 <table>
   <tr><th>項目</th><th>公開（Public）</th><th>非公開（Private）</th></tr>
-  <tr><td>自動実行の費用</td><td>無制限に無料</td><td>月2,000分まで無料です。<strong>この設定（5分おき）だと月およそ5,000分</strong>になり超過します</td></tr>
+  <tr><td>自動実行の費用</td><td>無制限に無料</td><td>月2,000分まで無料です。<strong>この設定（5分おき）だと月5,000分以上</strong>になり超過します</td></tr>
   <tr><td>空き部屋一覧を自分だけ見る</td><td colspan="2">どちらでもできる（Cloudflare に置くため）</td></tr>
   <tr><td>資料ページの公開</td><td>できる</td><td><strong>できない</strong>（GitHub Free の場合）</td></tr>
   <tr><td>設定（監視URLと通知条件）が他人に見えるか</td><td>見える</td><td>見えない</td></tr>
@@ -937,7 +937,7 @@ Git Bash を使います。git を入れると一緒に入っています）。<
 
 <h3 id="s6-4">アプリをチャンネルに招待する</h3>
 
-<p>Slack に戻り、7.2 で作ったチャンネルで次を入力して送信します。</p>
+<p>Slack に戻り、6.2 で作ったチャンネルで次を入力して送信します。</p>
 
 <pre><code>/invite @UR空室監視</code></pre>
 
@@ -951,7 +951,7 @@ Git Bash を使います。git を入れると一緒に入っています）。<
 <ol>
   <li>api.slack.com の <strong>Incoming Webhooks</strong> の画面に戻る</li>
   <li>下部の <strong>Add New Webhook to Workspace</strong> を押す</li>
-  <li>投稿先で 7.2 のチャンネルを選ぶ → <strong>許可する</strong></li>
+  <li>投稿先で 6.2 のチャンネルを選ぶ → <strong>許可する</strong></li>
   <li>表に追加された URL の <strong>Copy</strong> を押す</li>
 </ol>
 
@@ -1007,7 +1007,7 @@ Git Bash を使います。git を入れると一緒に入っています）。<
 <table>
   <tr><th>欄</th><th>入力するもの</th></tr>
   <tr><td>Name</td><td><code>SLACK_WEBHOOK_URL</code></td></tr>
-  <tr><td>Secret</td><td>7.5 でコピーした URL</td></tr>
+  <tr><td>Secret</td><td>6.5 でコピーした URL</td></tr>
 </table>
 
 <div class="warn">
@@ -1045,6 +1045,8 @@ Git Bash を使います。git を入れると一緒に入っています）。<
 <div class="ok">
 <p><strong>ここまでで監視そのものは動きます。</strong>
 ただしこのままだと動く回数がごく少ないので、次の章で時計を用意します。</p>
+<p>また、この時点では<strong>前回の状態を覚えておく場所がありません</strong>。GitHub の実行環境は毎回まっさらなので、
+実行するたびに条件に合う部屋が「新着」として届きます。これは第10章で保管庫を用意すると止まります。</p>
 </div>
 
 <h2 id="s8b">Cloudflare で時計を用意する <span class="step-time">（15分）</span></h2>
@@ -1103,6 +1105,9 @@ Git Bash を使います。git を入れると一緒に入っています）。<
   <li>GitHub の <strong>Settings</strong> → <strong>Developer settings</strong> →
       <strong>Personal access tokens</strong> → <strong>Fine-grained tokens</strong></li>
   <li><strong>Generate new token</strong></li>
+  <li><strong>Expiration</strong>（有効期限）は <strong>No expiration</strong> を選ぶ。
+      期限付きにすると、切れた日に黙って止まります（Slack に「監視が止まっています」が届き、
+      Cloudflare のログに <code>401</code> が出ます）</li>
   <li><strong>Repository access</strong> で、このツールのリポジトリだけを選ぶ</li>
   <li><strong>Permissions</strong> → <strong>Repository permissions</strong> →
       <strong>Actions</strong> を <strong>Read and write</strong> にする</li>
@@ -1179,6 +1184,9 @@ Secret にすると、あとから画面上でも中身を読み出せなくな�
 <tr><td><code>起動に失敗: 401 ...</code></td><td>トークンが違います。貼り直してください</td></tr>
 <tr><td><code>起動に失敗: 403 ...</code></td><td>トークンの権限が足りません。Actions を Read and write にしてください</td></tr>
 <tr><td><code>JST 3時は稼働時間外のため起動しない</code></td><td>正常（夜間）</td></tr>
+<tr><td><code>SLACK_WEBHOOK_URL が未設定のため止まりの見張りを省略</code></td><td>正常。止まったときの知らせは<a href="#s10-2">第10章</a>で設定します</td></tr>
+<tr><td><code>詰まった実行をキャンセル: run ...</code></td><td>正常。終わらないまま残っていた実行を自動で片付けました（<a href="#s11-5">詳しく</a>）</td></tr>
+<tr><td><code>詰まった実行の片付けに失敗: 403 ...</code></td><td>トークンの権限が足りません。Actions を Read and write にしてください。起動そのものは続きます</td></tr>
 </tbody>
 </table>
 
@@ -1187,15 +1195,21 @@ GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完�
 </p>
 
 <div class="ok">
-<p><strong>ここまで来れば完成です。</strong>
-以降は 8:00〜21:00 の間、5分おきに自動で動き続けます。もう何もしなくて構いません。</p>
+<p><strong>これで 8:00〜21:00 の間、5分おきに自動で動きます。</strong>
+残りは次の第10章だけです。</p>
 </div>
 
-<h2 id="s10">空き部屋一覧を自分だけ見られるようにする <span class="step-time">（任意・15分）</span></h2>
+<h2 id="s10">保管庫を用意して一覧を見られるようにする <span class="step-time">（15分）</span></h2>
+
+<div class="stop">
+<p><strong>この章は飛ばさないでください。</strong>
+GitHub の実行環境は毎回まっさらで、前回どの部屋が出ていたかを覚えていません。
+保管庫が無いと毎回「前回は0件」から比べることになり、<strong>条件に合う部屋が5分おきに何度でも通知されます</strong>。</p>
+</div>
 
 <p>
-空き部屋の一覧を、スマホからも見られる Web ページとして持てます。
-<strong>この章はやらなくても Slack 通知は動きます。</strong>不要なら飛ばしてください。
+この章で、前回の状態を Cloudflare の保管庫に預けます。ついでに、空き部屋の一覧を
+スマホからも見られる Web ページとして持てるようになります（ID とパスワードで自分だけが開けます）。
 </p>
 
 <div class="warn">
@@ -1276,6 +1290,12 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
 文字コードの扱いが変わり、正しく入力しても弾かれることがあります。</p>
 </div>
 
+<div class="note">
+<p><strong><code>SLACK_WEBHOOK_URL</code> をこの章で入れるのは、保管庫（KV）と組み合わせて使うためです。</strong>
+「同じ停止について知らせるのは1回だけ」という印を保管庫に置いています。保管庫が無いまま入れると、
+止まっているあいだ5分おきに同じ知らせが届きます。</p>
+</div>
+
 <h3 id="s10-3">Worker を保存し直す</h3>
 
 <p>
@@ -1285,7 +1305,7 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
 をもう一度コピーして貼り直してください。
 </p>
 
-<p>Worker の URL（第9章で確認したもの）をブラウザで開くと、<strong>ID とパスワードの入力欄</strong>が出れば成功です。</p>
+<p>Worker の URL（Worker の画面に出ている <code>https://ur-monitor-trigger.<var>あなたのサブドメイン</var>.workers.dev</code>）をブラウザで開き、<strong>ID とパスワードの入力欄</strong>が出れば成功です。</p>
 
 <h3 id="s10-4">GitHub 側に2つ登録する</h3>
 
@@ -1305,6 +1325,11 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
 保管庫が空だと「前回は0件だった」ことになるためです。</p>
 <p>（安全のため、監視スクリプトは保管庫が空のときは通知せずに止まるようにしてあります。
 下の手順を踏むまで動きません。）</p>
+</div>
+
+<div class="note">
+<p>この手順は保管庫に「空の状態」を置くものです。そのため<strong>直後の1回だけは</strong>、いま出ている
+条件に合う部屋がまとめて通知されます。2回目からは新しく出た部屋だけが届きます。</p>
 </div>
 
 <ol>
@@ -1372,6 +1397,56 @@ UR のサイトの作りが変わった可能性があります。その場合�
 リポジトリの Issues から相談してみてください。
 </p>
 
+<h3 id="s11-5">Slack に「監視が止まって…」と届いた</h3>
+
+<p>止まったことを知らせる通知は2種類あり、送り手が違います。</p>
+
+<table>
+  <tr><th>届いた文面</th><th>送り手</th><th>意味</th></tr>
+  <tr>
+    <td>🚨 <strong>監視が止まっています</strong></td>
+    <td>Cloudflare（GitHub の外）</td>
+    <td><strong>いま止まっています。</strong>最後に成功した実行から、稼働時間帯で30分以上空きました。同じ停止については1回だけ届きます</td>
+  </tr>
+  <tr>
+    <td>⚠️ <strong>監視が止まっていました</strong></td>
+    <td>GitHub Actions（監視ジョブ）</td>
+    <td><strong>すでに動き出しています。</strong>再開した最初の実行が、前回から3時間以上空いていたことを報告しています</td>
+  </tr>
+</table>
+
+<p>
+「止まっています」が届いても、<strong>多くは何もしなくて構いません。</strong>
+GitHub では、実行がマシンを割り当ててもらえず「待ち」のまま固まることがあります。
+このツールは同時に1つしか実行しないため、固まった1つが残ると、後から来た実行が
+すべて取り消されてしまいます。Cloudflare は5分おきに見回り、<strong>20分たっても終わらない実行を
+自動で取り消します</strong>（40分を過ぎたら強制的に取り消します）。
+</p>
+
+<p>
+「止まっています」は同じ停止について1回しか届きません。再開したかどうかは、Actions タブに
+<strong>緑のチェックの実行が5分おきに並び直したか</strong>で確かめてください
+（「止まっていました」は3時間以上止まったときだけ届くので、短い停止では来ません）。
+1時間ほどたっても並び直さないときは、次を確かめてください。
+</p>
+
+<ol>
+  <li>GitHub の <strong>Actions</strong> タブで、黄色い「待ち」のまま残っている実行が無いか。あれば開いて <strong>Cancel workflow</strong> を押す</li>
+  <li>Cloudflare の Worker の <strong>Observability</strong> に <code>起動に失敗</code> や <code>片付けに失敗</code> が出ていないか（<a href="#s8b-5">ログの読み方</a>）。401 ならトークンの期限切れなので、<a href="#s8b-1">作り直して</a>貼り替える</li>
+  <li><a href="https://www.githubstatus.com/" target="_blank" rel="noopener">GitHub の稼働状況</a>で Actions に障害が出ていないか</li>
+</ol>
+
+<div class="note">
+<p><strong>2026年9月14日より前にセットアップした方へ。</strong>
+自動の取り消しと「止まっています」の知らせは、この日に <code>worker.js</code> へ加えました。
+使うには、<a href="https://github.com/tama-create/ur-monitor/blob/main/trigger/worker.js">worker.js</a>
+を貼り直して <strong>Deploy</strong> し（先頭の <code>OWNER</code> の書き換えを忘れずに）、
+<a href="#s10-2">第10章</a>の表にある <code>SLACK_WEBHOOK_URL</code> を Worker に追加してください。
+トークンの権限はそのままで足ります。</p>
+<p>きっかけは、1つの実行が「待ち」のまま固まり、<strong>約24時間止まったのに誰も気づけなかった</strong>ことです。
+それまでの見張り（「止まっていました」）は監視ジョブの中にあったため、ジョブが動けないと一緒に止まっていました。</p>
+</div>
+
 <footer>
 
 <div class="note">
@@ -1389,7 +1464,7 @@ Slack に通知が届くまで、内部で何が起きているかを図と表�
   </div>
   <div class="author-updated">
     <p class="lbl">Last updated</p>
-    <p class="val"><time datetime="2026-08-28">2026年8月28日</time></p>
+    <p class="val"><time datetime="2026-09-14">2026年9月14日</time></p>
   </div>
 </div>
 

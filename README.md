@@ -84,7 +84,7 @@ Slack に通知が届くまで、**内部で何が起きているか**を図と�
 - GitHub アカウントの用意 → フォーク → 監視条件の設定
 - Slack の通知先の作り方（アプリ作成・チャンネル・Webhook 発行）
 - 動作確認のしかた
-- 空き部屋一覧を自分だけ見られるようにする（任意）
+- 保管庫を用意して空き部屋一覧を自分だけ見られるようにする（**必須**。無いと前回の状態が残らず、同じ部屋が毎回通知されます）
 - うまくいかないときの対処と、使っている技術の説明
 
 以降のこの README は、**フォークして自分の設定に変える方・コードを読む方向け**の参照情報です。
@@ -137,16 +137,21 @@ config.json           監視URL・通知条件・セレクター。振る舞い�
 composer.json / .lock 依存は chrome-php/chrome のみ
 
 docs/                 ＝ GitHub Pages の公開ディレクトリ。置いたものは全部 Web に出る
-  index.html          サイトの入口（資料への案内）。**空き部屋一覧はここに置かない**
+  guide.html          使い方ガイド
   setup.html          セットアップ手順書
+  architecture.html   技術資料（内部の動き）
   .nojekyll           Jekyll の変換を止める空ファイル。消さないこと
+                      （空き部屋一覧は置かない。ローカル実行で docs/index.html が
+                        生成されることがあるが、コミットしないこと）
 
-trigger/              起動トリガー（Cloudflare Workers）
-  worker.js           稼働時間帯に5分おきで workflow_dispatch を叩く。監視処理は持たない
-  wrangler.toml       cron の設定
+trigger/              Cloudflare Workers。監視処理（UR の取得）は持たない
+  worker.js           稼働時間帯に5分おきで workflow_dispatch を叩く。詰まった実行の片付け、
+                      止まりの見張り、保管庫（KV）の出し入れと一覧の閲覧も受け持つ
+  wrangler.toml       cron と KV の設定
   README.md           セットアップ手順
 
 tools/
+  setup.sh / setup.mjs  セットアップウィザード（git / gh / Node.js が使える人向け）
   cloud-setup.sh      Claude Code on the web 用のセットアップスクリプト（開発用）
 
 .github/workflows/
@@ -176,6 +181,7 @@ php ur_monitor.php --dry-run
 |---|---|
 | `php ur_monitor.php --dry-run` | 開発用です。副作用なしで動作確認 |
 | `php ur_monitor.php` | 本番と同じ動作（通常はローカルで実行しない） |
+| `php ur_monitor.php --seed-state` | 保管先を作った直後に1回だけ。state を保管先へ置く |
 | `php ur_monitor.php --setup` | セレクター確認用です。ブラウザを表示し `debug_page.html` と `debug_*.png` を保存 |
 | `php ur_monitor.php --check-robots` | robots.txt の確認のみ |
 
@@ -266,7 +272,7 @@ Settings → Pages → Build and deployment を次のように設定します。
 アンダースコアで始まるファイルが無視されたりします。**消さないでください。**
 
 **GitHub Free では公開リポジトリのみ**この機能を使えます。private のままにしたい場合は
-Web 公開を諦め、Slack 通知だけを使ってください。
+資料ページの Web 公開を諦めてください。空き部屋一覧は Cloudflare から配るので、private でも使えます。
 
 ## 8. 設定（config.json）
 
@@ -399,6 +405,7 @@ Basic 認証の内側に限っています。UR の利用規約や、この判�
 |---|---|---|
 | Worker の Secret | `API_TOKEN` | 監視ジョブが書き込むときの合言葉 |
 | Worker の Secret | `VIEW_USER` / `VIEW_PASSWORD` | 一覧を開くときの ID とパスワード（**英数字で**） |
+| Worker の Secret | `SLACK_WEBHOOK_URL` | 止まりの見張りが Slack へ送る先（GitHub 側と同じ値。無ければ見張りだけ黙る） |
 | Worker の KV 結び付け | `STORE` | 保管庫です。**この名前ちょうど**でないとコードが見つけられない |
 | GitHub Secrets | `STORE_URL` | Worker の URL（末尾の `/` なし） |
 | GitHub Secrets | `STORE_TOKEN` | `API_TOKEN` と同じ文字列 |
@@ -427,10 +434,10 @@ Actions からは、監視ワークフローを手動実行して `seed_state` �
 
 資料ページ（`docs/*.html`）の上部メニュー左端に「空き部屋一覧」を置いてあります。行き先は
 **自分の Worker の URL** です（Basic 認証の内側）。資料は生成物ではなく手で書いた HTML なので、
-`config.json` の値は使えず、**4ファイルに直接書いてあります**。
+`config.json` の値は使えず、**3ファイルに直接書いてあります**。
 
 ```
-docs/index.html  docs/guide.html  docs/setup.html  docs/architecture.html
+docs/guide.html  docs/setup.html  docs/architecture.html
 ```
 
 フォークしたら `ur-monitor-trigger.<自分>.workers.dev` に置き換えてください。書き換えなくても
@@ -440,7 +447,6 @@ docs/index.html  docs/guide.html  docs/setup.html  docs/architecture.html
 
 | URL | 中身 |
 |---|---|
-| `https://<ユーザー名>.github.io/ur-monitor/` | 入口（資料への案内） |
 | `https://<ユーザー名>.github.io/ur-monitor/guide.html` | 使い方ガイド |
 | `https://<ユーザー名>.github.io/ur-monitor/setup.html` | セットアップ手順書 |
 | `https://<ユーザー名>.github.io/ur-monitor/architecture.html` | 技術資料（内部の動き） |
@@ -480,6 +486,11 @@ UR 側の一時的な不調に耐えられる時間が同じ割合で変わっ�
 外部トリガーの停止・トークンの期限切れ・GitHub の遅延は、症状がすべて「黙って止まる」に
 なります。実際に4日間気づかなかったことがあります。そのため実行のたびに稼働時間帯の中の
 空白を数え、`stale_warning_hours`（既定3時間）以上空いていたら Slack に警告を出します。
+
+ただしこの警告は実行が成功しないと出せません。2026-09-13 には1つの実行が「待ち」のまま固まり、
+後続がすべてキャンセルされて約24時間止まったのに誰も気づけませんでした。そこで Cloudflare の
+`worker.js` が起動のたびに、20分以上終わらない実行を取り消し、最後の成功から稼働時間帯で
+30分空いたら **GitHub の外から** Slack に知らせます（Worker の Secret に `SLACK_WEBHOOK_URL` が必要）。
 仕組みの詳細は[技術資料](https://tama-create.github.io/ur-monitor/architecture.html#a8)を
 ご覧ください。
 
