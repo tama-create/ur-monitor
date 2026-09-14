@@ -24,8 +24,8 @@ define('BASE_DIR', __DIR__);
 define('CONFIG_FILE',  BASE_DIR . '/config.json');
 define('STATE_FILE',   BASE_DIR . '/state.json');
 define('LOG_FILE',     BASE_DIR . '/monitor.log');
-// GitHub Pages が main の /docs を配信するため、一覧はそこへ直接書き出す。
-// index.html にしているのは、サイトのトップがそのまま一覧になるように。
+// 保管先（STORE_URL）が未設定のときだけ使う、開発用の一覧の書き出し先。
+// 本番の一覧は Worker の KV に置く。docs/ は Pages の公開ディレクトリなのでコミットしないこと。
 define('RESULTS_FILE', BASE_DIR . '/docs/index.html');
 
 // ──────────────────────────────────────────
@@ -1230,9 +1230,10 @@ function run_monitor(array $config, bool $dryRun = false): void
         log_msg('INFO', "dry-run: Slack 通知と state.json / docs/index.html の更新は行いません");
     }
 
-    // 実行が毎時 :00/:30 ちょうどに揃う規則性を消すためのランダム待機。
+    // Cloudflare からの起動は毎回きっかり同じ秒に来るので、その規則性を消すためのランダム待機。
     // jitter_max_seconds で調整可（0 で無効）。開発時は待たされると煩わしいので dry-run では省く。
-    $jitterMax = $dryRun ? 0 : (int)($config['jitter_max_seconds'] ?? 120);
+    // 省略時の値は README / config.json の既定（40）と揃えてある。
+    $jitterMax = $dryRun ? 0 : (int)($config['jitter_max_seconds'] ?? 40);
     if ($jitterMax > 0) {
         $jitter = random_int(0, $jitterMax);
         if ($jitter > 0) {
@@ -1261,7 +1262,8 @@ function run_monitor(array $config, bool $dryRun = false): void
     // 何回連続で信用できない結果が続いたら「本当にそうなった」と認めるか。
     // これは回数であって時間ではないため、実行間隔を変えたらここも合わせること。
     // 実行間隔 × この回数 が、UR 側の一時的な不調に耐えられる時間になる。
-    $zeroLimit = max(1, (int)($config['zero_streak_limit'] ?? 6));
+    // 省略時の 18 は 5分間隔 × 18回 = 約90分（README / config.json の既定と同じ）。
+    $zeroLimit = max(1, (int)($config['zero_streak_limit'] ?? 18));
 
     // 前回のこの割合を下回ったら部分取得を疑う。1.0 で無効（0 件だけを見る）。
     $shrinkRatio = min(1.0, max(0.0, (float)($config['shrink_guard_ratio'] ?? 0.7)));
