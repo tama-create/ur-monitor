@@ -860,26 +860,27 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
     // 相対パスだと Worker 側の存在しない URL を指してしまう。行き先が分かるとき
     // （config.json の docs_base_url）だけ絶対 URL で出し、無ければリンク自体を出さない。
     $docsBase = rtrim((string)($config['docs_base_url'] ?? ''), '/');
-    // 並びと名前は資料ページの上部メニューと同じ（資料の入口 → 空き部屋一覧 → 使い方ガイド → …）。
-    // 入口だけは「いま見ているページ」の印より前に出すので、別に組み立てる。
-    $docHome  = '';
-    $docNav   = '';
+    // 並びと名前は資料ページの上部メニューと同じ（作業する順：資料の入口 → 使い方ガイド →
+    // セットアップ手順書 → 空き部屋一覧 → 技術資料）。一覧は4番目なので、「いま見ているページ」の
+    // 印より前に置くリンクと、後ろに置くリンクを分けて組み立てる。
+    $docBefore = '';
+    $docAfter  = '';
     if ($docsBase !== '') {
         $b = htmlspecialchars($docsBase, ENT_QUOTES, 'UTF-8');
-        $docHome = "      <a href=\"{$b}/\">資料の入口</a>\n"
-                 . "      <span class=\"sep\">│</span>\n";
-        foreach ([['guide.html', '使い方ガイド'],
-                  ['setup.html', 'セットアップ手順書'],
-                  ['architecture.html', '技術資料']] as [$file, $label]) {
-            $docNav .= "      <span class=\"sep\">│</span>\n"
-                     . "      <a href=\"{$b}/{$file}\">{$label}</a>\n";
+        foreach ([['', '資料の入口'],
+                  ['guide.html', '使い方ガイド'],
+                  ['setup.html', 'セットアップ手順書']] as [$file, $label]) {
+            $docBefore .= "      <a href=\"{$b}/{$file}\">{$label}</a>\n"
+                        . "      <span class=\"sep\">│</span>\n";
         }
+        $docAfter = "      <span class=\"sep\">│</span>\n"
+                  . "      <a href=\"{$b}/architecture.html\">技術資料</a>\n";
     }
 
     $html = render_template('list.html', [
         'style'    => render_template('list.css', []),
-        'doc_home' => $docHome,
-        'doc_nav'  => $docNav,
+        'doc_before' => $docBefore,
+        'doc_after'  => $docAfter,
         'count'    => (string)$count,
         'tiles'    => $newTile . $hotTile,
         'updated'  => $ts,

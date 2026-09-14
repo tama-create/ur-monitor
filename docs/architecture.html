@@ -83,8 +83,8 @@
     background: rgba(255,255,255,.16);
     padding: 2px 10px; border-radius: 999px;
   }
-  /* 並びは資料の入口のカードと同じ「入口 → 使う人向け（空き部屋一覧・使い方ガイド・セットアップ手順書）
-     → 開発する人向け（技術資料）」の順。名前も各ページの見出しと揃える（違うと、どこへ移ったのか分かりにくい）。
+  /* 並びは作業する順（入口 → 使い方ガイド → セットアップ手順書 → 空き部屋一覧 → 技術資料）で、
+     資料の入口のカードの順と同じ。左から開いていけば迷わないようにしている。名前も各ページの見出しと揃える（違うと、どこへ移ったのか分かりにくい）。
      空き部屋一覧の行き先は Cloudflare の Worker で、Basic 認証の
      内側にある。URL は人それぞれになるので、フォークしたら自分のものに書き換えること。
      右へ寄せるのはサイトの外へ出る先だけ。
@@ -296,11 +296,11 @@
       <span class="grp">
         <a href="./">資料の入口</a>
         <span class="sep">│</span>
-        <a href="https://ur-monitor-trigger.tsutao.workers.dev/">空き部屋一覧</a>
-        <span class="sep">│</span>
         <a href="guide.html">使い方ガイド</a>
         <span class="sep">│</span>
         <a href="setup.html">セットアップ手順書</a>
+        <span class="sep">│</span>
+        <a href="https://ur-monitor-trigger.tsutao.workers.dev/">空き部屋一覧</a>
         <span class="sep">│</span>
         <span class="current" aria-current="page">技術資料</span>
       </span>
