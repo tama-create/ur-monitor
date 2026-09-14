@@ -133,6 +133,8 @@ UR の `robots.txt` に `Crawl-delay` の指定はありません（2026-08-28 �
 
 ```
 ur_monitor.php        監視スクリプト本体。処理はすべてここにある
+FLOW.md               処理の流れとフローチャート（コードを読まずに全体を把握するための資料）
+templates/            一覧ページの見た目（list.html と list.css）
 config.json           監視URL・通知条件・セレクター。振る舞いはここで決まる
 composer.json / .lock 依存は chrome-php/chrome のみ
 

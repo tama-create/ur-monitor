@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Basic 認証の内側に置くので本来は不要だが、取り違えて公開したときの保険。
+     狙っている物件がグループ名と見出しから読み取れるため。 -->
+<meta name="robots" content="noindex, nofollow">
+<title>UR賃貸 空き部屋一覧</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23005bac%22%2F%3E%3Cpath%20d%3D%22M25%2010L48%2029H41V52H9V29H2Z%22%20fill%3D%22%23fff%22%2F%3E%3Cg%20stroke%3D%22%23005bac%22%20stroke-width%3D%229%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2239%22%20r%3D%2213%22%20fill%3D%22%23fff%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%226%22%2F%3E%3Cpath%20d%3D%22M50%2048L59%2057%22%20stroke%3D%22%23ffc233%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<style>
+{{style}}</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-head">
+      <span class="hero-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#005bac"/><path d="M25 10L48 29H41V52H9V29H2Z" fill="#fff"/><g stroke="#005bac" stroke-width="9" stroke-linecap="round" fill="none"><path d="M50 48L59 57"/><circle cx="41" cy="39" r="13"/></g><circle cx="41" cy="39" r="13" fill="#fff" stroke="#ffc233" stroke-width="6"/><path d="M50 48L59 57" stroke="#ffc233" stroke-width="7" stroke-linecap="round"/></svg></span>
+      <div>
+        <p class="hero-kicker">UR賃貸 空き部屋 監視ツール</p>
+        <h1>空き部屋一覧</h1>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="topbar" aria-label="ページ切り替え">
+  <p class="nav">
+    <span class="grp">
+      <span class="current" aria-current="page">空き部屋一覧</span>
+{{doc_nav}}    </span>
+    <span class="grp grp-right">
+      <a href="https://github.com/tama-create/ur-monitor" target="_blank" rel="noopener">リポジトリ</a>
+    </span>
+  </p>
+</nav>
+
+<div class="wrap">
+
+<div class="tiles">
+  <div class="tile"><p class="t-num">{{count}}</p><p class="t-lbl">空き部屋</p></div>
+{{tiles}}</div>
+<p class="updated">最終更新 {{updated}}　／　8:00〜21:00 の間、5分おきに自動更新</p>
+
+{{sections}}
+</div>
+
+<footer>
+<p>このページは自動生成されています。内容は取得時点のもので、実際の募集状況は
+<a href="https://www.ur-net.go.jp/chintai/" target="_blank" rel="noopener">UR賃貸住宅の公式サイト</a>でご確認ください。</p>
+</footer>
+
+</body>
+</html>
