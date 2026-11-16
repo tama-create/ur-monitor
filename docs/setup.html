@@ -489,7 +489,7 @@ UR賃貸のサイトを<strong>5分おきに自動で見に行き</strong>、あ
   <g>
     <rect x="20" y="55" width="130" height="70" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
     <text x="85" y="82" class="t1">⏰ 5分おき</text>
-    <text x="85" y="104" class="t2">8:00〜21:00</text>
+    <text x="85" y="104" class="t2">8:00〜21:55</text>
     <rect x="240" y="55" width="130" height="70" rx="8" fill="#e8f0fb" stroke="#005bac"/>
     <text x="305" y="82" class="t1">🏠 UR を見る</text>
     <text x="305" y="104" class="t2">空き部屋を取得</text>
@@ -876,6 +876,8 @@ Git Bash を使います。git を入れると一緒に入っています）。<
 <p><strong>建物名を書く欄はありません。</strong>入りたい団地が決まっているなら、
 その団地のページの URL を <code>urls</code> に入れてください。名前の打ち間違いで
 取りこぼす心配が無くなります。</p>
+<p><strong>通知は部屋ごとに1回です。</strong>あとから間取りを足したり、<code>notify</code> を <code>true</code> に
+変えたりすると、いま出ている該当の部屋が次の実行で1回通知されます。</p>
 </div>
 
 <h2 id="s6">Slack の通知先を用意する <span class="step-time">（15分）</span></h2>
@@ -1202,6 +1204,9 @@ Secret にすると、あとから画面上でも中身を読み出せなくな�
 <tr><td><code>前回の「止まりの疑い」は解消した</code></td><td>正常。前回の疑いは一時的なものでした</td></tr>
 <tr><td><code>止まりを警告した（最後の成功 run ...）</code></td><td>Slack に「監視が止まっています」を送りました（<a href="#s11-5">詳しく</a>）</td></tr>
 <tr><td><code>止まりの見張りに失敗: ...</code></td><td>見張りだけが失敗しました。起動そのものは続きます。403 なら権限不足です</td></tr>
+<tr><td><code>ワークフローの無効を警告した（...）</code></td><td>Slack に「監視のワークフローが無効になっています」を送りました（<a href="#s11-5">詳しく</a>）</td></tr>
+<tr><td><code>ワークフローは有効に戻った</code></td><td>正常。無効にされていたワークフローが有効に戻りました</td></tr>
+<tr><td><code>無効の見張りに失敗: ...</code></td><td>見張りだけが失敗しました。起動そのものは続きます</td></tr>
 </tbody>
 </table>
 
@@ -1210,7 +1215,7 @@ GitHub の <strong>Actions</strong> タブに実行が5分おきに並べば完�
 </p>
 
 <div class="ok">
-<p><strong>これで 8:00〜21:00 の間、5分おきに自動で動きます。</strong>
+<p><strong>これで 8:00〜21:55 の間、5分おきに自動で動きます。</strong>
 残りは次の第10章だけです。</p>
 </div>
 
@@ -1379,6 +1384,11 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
     <td>ログに「新着なし」と出ていれば正常です。空きが出るまで通知は来ません</td>
   </tr>
   <tr>
+    <td>ログに「新着はあるが、通知対象のグループには無し」と出ていないか</td>
+    <td>正常です。新着は <code>notify</code> が <code>false</code> のグループの部屋か、<code>madori</code> に合わない部屋でした。
+    それも知りたいときは、そのグループの <code>notify</code> を <code>true</code> にするか、<code>madori</code> に間取りを足してください</td>
+  </tr>
+  <tr>
     <td>間取りの指定が合っているか</td>
     <td><code>madori</code> が UR の表記と一致しているか確かめてください（<code>2DK</code> と <code>2LDK</code> は別物です）。
     何でも通知したいときは <code>[]</code> にしてください</td>
@@ -1412,6 +1422,12 @@ Worker のコードがこの名前で保管庫を探します。違う名前だ�
 
 <p>よくある原因は、<code>config.json</code> の書き間違いです。カンマの付け忘れや、括弧の対応が合っていないと止まります。</p>
 
+<div class="note">
+<p><strong>赤いバツが1回だけで、次の実行が緑なら、何もしなくて構いません。</strong>
+GitHub の実行環境で Chrome が起動できなかったり、保管庫との通信が一瞬切れたりすると、その回だけ失敗します
+（ログには <code>Chrome 起動失敗</code> や <code>HTTP 0</code> と出ます）。5分後の実行が、前回の状態からそのまま続けます。</p>
+</div>
+
 <h3 id="s11-4">1件も部屋が取れない</h3>
 
 <p>
@@ -1422,7 +1438,7 @@ UR のサイトの作りが変わった可能性があります。その場合�
 
 <h3 id="s11-5">Slack に「監視が止まって…」と届いた</h3>
 
-<p>止まったことを知らせる通知は2種類あり、送り手が違います。</p>
+<p>止まったことを知らせる通知は3種類あります。</p>
 
 <table>
   <tr><th>届いた文面</th><th>送り手</th><th>意味</th></tr>
@@ -1435,6 +1451,13 @@ UR のサイトの作りが変わった可能性があります。その場合�
     <td>⚠️ <strong>監視が止まっていました</strong></td>
     <td>GitHub Actions（監視ジョブ）</td>
     <td><strong>すでに動き出しています。</strong>再開した最初の実行が、前回から3時間以上空いていたことを報告しています</td>
+  </tr>
+  <tr>
+    <td>🚨 <strong>監視のワークフローが無効になっています</strong></td>
+    <td>Cloudflare（GitHub の外）</td>
+    <td><strong>GitHub が自動実行を止めました。</strong>リポジトリに60日間動きが無い（何もコミットしていない）と、GitHub が自動で止めます。
+    <strong>この通知だけは、自分で戻す必要があります。</strong>リポジトリの <strong>Actions</strong> タブ → <strong>UR賃貸監視</strong> →
+    <strong>Enable workflow</strong> を押してください。同じ状態のあいだは1回だけ届きます</td>
   </tr>
 </table>
 
@@ -1513,7 +1536,7 @@ Slack に通知が届くまで、内部で何が起きているかを図と表�
   </div>
   <div class="author-updated">
     <p class="lbl">Last updated</p>
-    <p class="val"><time datetime="2026-09-14">2026年9月14日</time></p>
+    <p class="val"><time datetime="2026-11-16">2026年11月16日</time></p>
   </div>
 </div>
 

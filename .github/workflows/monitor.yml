@@ -1,7 +1,7 @@
 name: UR賃貸監視
 
 on:
-  # 15分間隔の起動は Cloudflare Workers から workflow_dispatch で行う（trigger/ を参照）。
+  # 5分間隔の起動は Cloudflare Workers から workflow_dispatch で行う（trigger/ を参照）。
   # GitHub の schedule は遅延・欠落するため、間隔を守る用途には使えないと判断した。
   # 30分間隔での実測は46〜64分、15分に詰めたあとも1日2回まで落ちた（2026-08-27〜28）。
   #

@@ -181,7 +181,7 @@ function load_state(): array
 
 /**
  * 今回の状態を書き出す（保管先があれば保管先、無ければ state.json）。書けなければ終了コード1。
- * [FLOW 2.14]
+ * [FLOW 2.15]
  *
  * @param array $state rooms / zero_streak / last_checked
  */
@@ -238,7 +238,7 @@ function robots_rule_matches(string $rule, string $target): bool
 
 /**
  * robots.txt がこの URL へのアクセスを許可しているかを確かめる。取得できなければ許可とみなす。
- * [FLOW 2.7.2 / 5.2]
+ * [FLOW 2.8.2 / 5.2]
  *
  * @param string $url 確認する URL
  * @return bool 許可なら true
@@ -385,7 +385,7 @@ function detect_chrome_path(array $config): ?string
 /**
  * Chrome を閉じる。閉じるときの例外は無視する
  * （Chrome 側がソケットを先に閉じると例外が飛ぶことがあるが、結果には影響しない）。
- * [FLOW 2.8]
+ * [FLOW 2.9]
  *
  * @param object $browser chrome-php の Browser
  */
@@ -435,8 +435,8 @@ function configured_chrome_flags(array $config): array
 }
 
 /**
- * Chrome を起動する。失敗したらプロファイルを作り直して1回だけやり直す。
- * [FLOW 2.6 / 4.2]
+ * Chrome を起動する。失敗したらプロファイルを替えて、間をあけて2回までやり直す。
+ * [FLOW 2.7 / 4.2]
  *
  * @param array $config   設定
  * @param bool  $headless false なら画面あり（--setup 用）
@@ -471,15 +471,25 @@ function create_browser(array $config, bool $headless = true): object
         'customFlags' => $flags,
     ];
 
-    $factory = new BrowserFactory(detect_chrome_path($config));
-    try {
-        return $factory->createBrowser($options);
-    } catch (\Throwable $e) {
-        // 強制終了やスリープでプロファイルが壊れると以降の起動が毎回失敗するため、
-        // 壊れたプロファイルを消して 1 回だけ再試行する（無人実行の自己回復）。
-        log_msg('WARNING', "Chrome 起動失敗。プロファイルを再作成して再試行: " . $e->getMessage());
-        remove_dir_recursive($profileDir);
-        return $factory->createBrowser($options);
+    $factory  = new BrowserFactory(detect_chrome_path($config));
+    $attempts = 3;
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            return $factory->createBrowser($options);
+        } catch (\Throwable $e) {
+            if ($attempt >= $attempts) {
+                throw $e;
+            }
+            // 強制終了やスリープでプロファイルが壊れると以降の起動が毎回失敗するため、消してやり直す
+            // （無人実行の自己回復）。やり直しでは別のプロファイルを使い、間もあける。起動が時間切れに
+            // なった Chrome が生き残って元のプロファイルを握っていると、同じ場所ではすぐまた失敗するため
+            // （2026-10-27・11-14・11-15 に、5秒後の1回だけのやり直しが3回とも失敗した）。
+            log_msg('WARNING', "Chrome 起動失敗（{$attempt}/{$attempts} 回目）。プロファイルを替えて再試行: " . $e->getMessage());
+            remove_dir_recursive($options['userDataDir']);
+            $options['userDataDir'] = "{$profileDir}-retry{$attempt}";
+            remove_dir_recursive($options['userDataDir']);
+            sleep(5 * $attempt);
+        }
     }
 }
 
@@ -533,7 +543,7 @@ function wait_for_rooms(object $page, array $selectors, int $timeoutSec = 20): b
 
 /**
  * 1つの URL を開いて、空き部屋の一覧を取り出す。例外は呼び出し側へ投げる。
- * [FLOW 2.7.3 / 4.2]
+ * [FLOW 2.8.3 / 4.2]
  *
  * @param object $browser  chrome-php の Browser
  * @param string $url      UR のページ
@@ -740,7 +750,7 @@ function render_template(string $file, array $vars): string
 /**
  * 空き部屋の一覧ページを作って書き出す（保管先があれば保管先、無ければ output/index.html）。
  * 見た目は templates/list.html と templates/list.css。書けなければ終了コード1。
- * [FLOW 2.13]
+ * [FLOW 2.14]
  *
  * @param array[]  $rooms   今回の部屋
  * @param string[] $newUrls 新着の部屋 URL
@@ -920,15 +930,16 @@ function save_html(array $rooms, array $newUrls, array $groups, array $config = 
 // ──────────────────────────────────────────
 
 /**
- * Slack へメッセージを1通送る。送り先が未設定なら何もしない。失敗しても止めない。
+ * Slack へメッセージを1通送る。失敗したら間をあけて2回までやり直す。それでも失敗したら止めずに false を返す。
  *
  * @param string $webhookUrl Webhook URL
  * @param string $text       本文
+ * @return bool 送れたら true（送り先が未設定のときも、送るものが無いので true）
  */
-function slack_send(string $webhookUrl, string $text): void
+function slack_send(string $webhookUrl, string $text): bool
 {
     if (!$webhookUrl || str_contains($webhookUrl, 'YOUR_')) {
-        return;
+        return true;
     }
     $payload = json_encode(['text' => $text], JSON_UNESCAPED_UNICODE);
     $ctx = stream_context_create(['http' => [
@@ -937,8 +948,19 @@ function slack_send(string $webhookUrl, string $text): void
         'content' => $payload,
         'timeout' => 10,
     ]]);
-    $res = @file_get_contents($webhookUrl, false, $ctx);
-    log_msg($res !== false ? 'INFO' : 'ERROR', $res !== false ? "Slack 通知完了" : "Slack 通知失敗");
+    // 一時的な通信の失敗で通知を失わないよう、間をあけてやり直す
+    $attempts = 3;
+    for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+        if (@file_get_contents($webhookUrl, false, $ctx) !== false) {
+            log_msg('INFO', "Slack 通知完了");
+            return true;
+        }
+        log_msg('ERROR', "Slack 通知失敗（{$attempt}/{$attempts} 回目）");
+        if ($attempt < $attempts) {
+            sleep(3 * $attempt);
+        }
+    }
+    return false;
 }
 
 /**
@@ -965,16 +987,17 @@ function room_matches_watch(array $r, array $watch): bool
 }
 
 /**
- * 通知対象の新着を、グループごとにまとめて Slack へ1通で送る。
- * [FLOW 2.11]
+ * 通知対象の部屋を、グループごとにまとめて Slack へ1通で送る。
+ * [FLOW 2.12]
  *
  * @param string  $webhookUrl Webhook URL
  * @param array[] $matched    通知する部屋
+ * @return bool 送れたら true
  */
-function notify_watch(string $webhookUrl, array $matched): void
+function notify_watch(string $webhookUrl, array $matched): bool
 {
     if (empty($matched)) {
-        return;
+        return true;
     }
     $lines = [":rotating_light: *【空き速報】新着 " . count($matched) . "件*", ""];
     // 希望順位ごとにまとめる。第一希望に出たのか参考に出たのかで動き方が
@@ -1002,7 +1025,7 @@ function notify_watch(string $webhookUrl, array $matched): void
         }
         $lines[] = "";
     }
-    slack_send($webhookUrl, implode("\n", $lines));
+    return slack_send($webhookUrl, implode("\n", $lines));
 }
 
 // ──────────────────────────────────────────
@@ -1079,13 +1102,35 @@ function warn_if_stale(array $state, string $webhookUrl, array $config): void
     ));
 }
 
+/**
+ * GitHub 側の保険の実行（schedule）が、稼働時間帯の外にずれ込んだものかを判定する。
+ * [FLOW 2.5]
+ *
+ * GitHub の schedule は数時間遅れることがあり、夜間に走る回が出る（2026年11月の実測で、1日4回のうち
+ * 2回が0時台・3時台）。夜間は UR を見に行かない方針なので、その回は取得せずに終える。
+ * Cloudflare からの起動と手動実行（どちらも workflow_dispatch）は対象にしない。
+ *
+ * @param array $config 設定
+ * @return bool 稼働時間帯の外で走った保険の実行なら true
+ */
+function is_off_hours_backup_run(array $config): bool
+{
+    if (getenv('GITHUB_EVENT_NAME') !== 'schedule') {
+        return false;
+    }
+    [$startHour, $endHour] = $config['monitoring_hours'] ?? [8, 21];
+    $hour = (int)date('G');
+    // trigger/worker.js と同じく、終わりの時（21時台）までを稼働時間帯とする
+    return $hour < (int)$startHour || $hour > (int)$endHour;
+}
+
 // ──────────────────────────────────────────
 // メイン処理
 // ──────────────────────────────────────────
 
 /**
  * 取得結果が怪しいかを判定する（前回あったのに0件、または前回5件以上から $ratio 倍未満に急減）。
- * [FLOW 2.7.3 / 2.7.5]
+ * [FLOW 2.8.3 / 2.8.5]
  *
  * 描画待ちが足りないと中途半端な件数で返ることがあり、素通しすると誤った新着通知が飛ぶ。
  * 実際に 18→12 件、19→7 件が起き、後者で誤通知が出た。0.7 はこの2件を捕まえ、本物の 20→19 件を通す値。
@@ -1180,7 +1225,7 @@ function group_url_map(array $groups): array
 
 /**
  * 部屋を Slack に通知すべきかを判定する（グループの notify と間取りで決める。旧形式は watch で決める）。
- * [FLOW 2.11]
+ * [FLOW 2.12]
  *
  * @param array $room   部屋
  * @param array $group  部屋のグループ
@@ -1257,7 +1302,14 @@ function run_monitor(array $config, bool $dryRun = false): void
         warn_if_stale($state, $webhookUrl, $config);
     }
 
-    // [FLOW 2.5] 取得の準備をする
+    // [FLOW 2.5] 稼働時間外にずれ込んだ保険の実行ならここで終わる
+    // 止まりの確認（上）だけは済ませる。外部トリガーが死んだときに、夜のうちに気づけるようにするため
+    if (!$dryRun && is_off_hours_backup_run($config)) {
+        log_msg('INFO', "稼働時間外にずれ込んだ保険の実行のため、取得せずに終わります");
+        return;
+    }
+
+    // [FLOW 2.6] 取得の準備をする
     $prevUrls   = array_keys($state['rooms'] ?? []);
     $currentMap = [];
     // 「取得できた結果を信用してよい URL」が1つでもあったか。
@@ -1277,11 +1329,11 @@ function run_monitor(array $config, bool $dryRun = false): void
     // 前回のこの割合を下回ったら部分取得を疑う。1.0 で無効（0 件だけを見る）。
     $shrinkRatio = min(1.0, max(0.0, (float)($config['shrink_guard_ratio'] ?? 0.7)));
 
-    // [FLOW 2.6] Chrome を起動する
+    // [FLOW 2.7] Chrome を起動する
     // Chrome を1回だけ起動してすべての URL を処理（高速化）
     $browser = create_browser($config, headless: true);
     try {
-        // [FLOW 2.7] URL ごとに取得する
+        // [FLOW 2.8] URL ごとに取得する
         foreach ($searchUrls as $i => $searchUrl) {
             if ($i > 0) {
                 sleep(3); // 連続アクセスを避けるため URL 間に 3 秒待機
@@ -1289,7 +1341,7 @@ function run_monitor(array $config, bool $dryRun = false): void
             $group = $urlGroup[$searchUrl];
             log_msg('INFO', sprintf('URL %d/%d を処理中（%s）', $i + 1, count($searchUrls), $group['name']));
 
-            // [FLOW 2.7.1] 前回この URL にあった部屋を取り出す
+            // [FLOW 2.8.1] 前回この URL にあった部屋を取り出す
             // 前回 state のうち、この検索URL 由来の分だけ取り出しておく（失敗時の引き継ぎ用）
             $prevForUrl = [];
             foreach ($state['rooms'] ?? [] as $prevUrl => $prevRoom) {
@@ -1298,7 +1350,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 }
             }
 
-            // [FLOW 2.7.2] robots.txt を確かめる
+            // [FLOW 2.8.2] robots.txt を確かめる
             // robots.txt が許可していない URL は取りに行かない。前回状態は引き継ぎ、
             // 一時的な取得失敗と同じ扱いにする（誤った「成約」通知を出さないため）。
             if (!check_robots_txt($searchUrl)) {
@@ -1306,7 +1358,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 continue;
             }
 
-            // [FLOW 2.7.3] ページを取得する（怪しければ1回だけ取り直す）
+            // [FLOW 2.8.3] ページを取得する（怪しければ1回だけ取り直す）
             try {
                 $rooms = scrape_url($browser, $searchUrl, $config);
 
@@ -1319,7 +1371,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                     $rooms = scrape_url($browser, $searchUrl, $config);
                 }
             } catch (\Throwable $e) {
-                // [FLOW 2.7.4] 取得に失敗したら引き継ぐ
+                // [FLOW 2.8.4] 取得に失敗したら引き継ぐ
                 // 1 URL の失敗で全体を巻き添えにしない。前回 state のこの URL 分を引き継ぎ、
                 // 一時的な取得失敗が誤った「成約」「新着」通知を生むのを防ぐ。
                 log_msg('ERROR', "URL の取得に失敗（前回状態を維持してスキップ）: {$searchUrl} — " . $e->getMessage());
@@ -1327,7 +1379,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 continue;
             }
 
-            // [FLOW 2.7.5] 怪しい結果が続くか数える
+            // [FLOW 2.8.5] 怪しい結果が続くか数える
             // 取り直しても怪しい。一時障害なら前回状態を維持したいが、本当に減った場合に
             // 古い部屋を永久に表示し続けてしまうため、一定回数続いたら実態として受け入れる。
             $reason = untrusted_result_reason($rooms, $prevForUrl, $shrinkRatio);
@@ -1341,7 +1393,7 @@ function run_monitor(array $config, bool $dryRun = false): void
                 }
                 log_msg('WARNING', "{$zeroLimit} 回連続で{$reason}のため、実態として受け入れます: {$searchUrl}");
             }
-            // [FLOW 2.7.6] 部屋を今回の一覧に加える
+            // [FLOW 2.8.6] 部屋を今回の一覧に加える
             unset($zeroStreak[$searchUrl]);
             $scrapedOk = true;
 
@@ -1361,20 +1413,21 @@ function run_monitor(array $config, bool $dryRun = false): void
             }
         }
     } finally {
-        // [FLOW 2.8] Chrome を閉じる
+        // [FLOW 2.9] Chrome を閉じる
         close_browser_safely($browser);
     }
 
-    // [FLOW 2.9] 信用できる結果が無ければ終わる
-    // 全 URL が引き継ぎ扱いで終わった＝結果を信用できないので、state も HTML も触らない。
+    // [FLOW 2.10] 信用できる結果が無ければ終わる
+    // 信用できる結果が1つも無く、引き継いだ部屋も無い＝書くものが無いので、state も HTML も触らない。
     // 逆に「ちゃんと取得できたうえで 0 件」なら、それは事実なので下へ進んで反映する。
-    // （ここで一律 return すると、3 回連続 0 件の判定が state に永久に書かれない）
+    // 引き継いだ部屋があるときも下へ進む（怪しい結果が続いた回数を state に残すため）。
+    // （ここで一律 return すると、zero_streak_limit 回連続の判定が state に永久に書かれない）
     if (empty($currentMap) && !$scrapedOk) {
         log_msg('WARNING', "部屋が1件も取得できませんでした。php ur_monitor.php --setup でセレクターを確認してください");
         return;
     }
 
-    // [FLOW 2.10] 前回と比べる
+    // [FLOW 2.11] 前回と比べる
     if (empty($currentMap)) {
         log_msg('WARNING', "空き部屋は 0 件でした（取得自体は成功しています）");
     } else {
@@ -1384,45 +1437,61 @@ function run_monitor(array $config, bool $dryRun = false): void
     $newUrls  = array_diff(array_keys($currentMap), $prevUrls);
     $goneUrls = array_diff($prevUrls, array_keys($currentMap));
 
-    // [FLOW 2.11] 新着を通知する
-    if (!empty($newUrls)) {
-        log_msg('INFO', "新着 " . count($newUrls) . " 件");
-        $newRooms = array_values(array_intersect_key($currentMap, array_flip($newUrls)));
+    // [FLOW 2.12] まだ知らせていない部屋を通知する
+    log_msg('INFO', empty($newUrls) ? "新着なし" : "新着 " . count($newUrls) . " 件");
 
-        // 通知するかはグループごとに決まる。希望順位の高いグループは通知し、
-        // 相場を見るためだけのグループは一覧に出すだけで黙っている。
-        $matched = array_values(array_filter(
-            $newRooms,
-            fn($r) => room_notifies($r, $urlGroup[$r['source_url'] ?? ''] ?? $groups[0], $config)
-        ));
-        if (!empty($matched)) {
-            if ($dryRun) {
-                log_msg('INFO', "dry-run: 通知対象の新着 " . count($matched) . " 件（通知は送りません）");
-            } else {
-                log_msg('INFO', "通知対象の新着 " . count($matched) . " 件 → Slack 通知");
-                notify_watch($webhookUrl, $matched);
-            }
-        } else {
-            log_msg('INFO', "新着はあるが、通知対象のグループには無し");
+    // 通知するのは「まだ知らせていない部屋」のうち、いまのグループと間取りで通知の対象になるもの。
+    // 通知するかはグループごとに決まる。希望順位の高いグループは通知し、相場を見るためだけの
+    // グループは一覧に出すだけで黙っている。
+    //
+    // 新着だけを見ないのは、第一希望のページの取得に失敗した回に、同じ部屋が参考のページから先に
+    // 入ることがあるため。その部屋は次の回には新着でなくなるので、新着だけを見ていると、第一希望の
+    // 部屋なのに一度も通知されない。知らせたかどうかは部屋ごとの notified に持つ。
+    // 印の無い部屋（この仕組みを入れる前の state）は知らせ済みとみなす。入れた直後に、いま出ている
+    // 部屋をまとめて通知しないため。
+    $matched = [];
+    foreach ($currentMap as $roomUrl => $r) {
+        $prevRoom    = $state['rooms'][$roomUrl] ?? null;
+        $wasNotified = $prevRoom !== null && ($prevRoom['notified'] ?? true);
+        $currentMap[$roomUrl]['notified'] = $wasNotified;
+        if (!$wasNotified && room_notifies($r, $urlGroup[$r['source_url'] ?? ''] ?? $groups[0], $config)) {
+            $matched[$roomUrl] = $r;
         }
-    } else {
-        log_msg('INFO', "新着なし");
+    }
+
+    if (!empty($matched)) {
+        $notNew = count(array_diff(array_keys($matched), $newUrls));
+        $label  = "通知対象 " . count($matched) . " 件"
+                . ($notNew > 0 ? "（うち {$notNew} 件は新着ではなく、まだ知らせていなかった部屋）" : '');
+        if ($dryRun) {
+            log_msg('INFO', "dry-run: {$label}（通知は送りません）");
+        } else {
+            log_msg('INFO', "{$label} → Slack 通知");
+            // 送れたときだけ知らせ済みにする。送れなければ印を付けず、次の回にもう一度送る
+            if (notify_watch($webhookUrl, array_values($matched))) {
+                foreach (array_keys($matched) as $roomUrl) {
+                    $currentMap[$roomUrl]['notified'] = true;
+                }
+            }
+        }
+    } elseif (!empty($newUrls)) {
+        log_msg('INFO', "新着はあるが、通知対象のグループには無し");
     }
 
     if (!empty($goneUrls)) {
         log_msg('INFO', "成約/非表示: " . count($goneUrls) . " 件");
     }
 
-    // [FLOW 2.12] --dry-run ならここで終わる
+    // [FLOW 2.13] --dry-run ならここで終わる
     if ($dryRun) {
         log_msg('INFO', "dry-run: ここで state / 一覧を更新するところを省略しました");
         return;
     }
 
-    // [FLOW 2.13] 一覧ページを書く
+    // [FLOW 2.14] 一覧ページを書く
     save_html(array_values($currentMap), array_values($newUrls), $groups, $config);
 
-    // [FLOW 2.14] 今回の状態を書く
+    // [FLOW 2.15] 今回の状態を書く
     save_state([
         'rooms'        => $currentMap,
         'zero_streak'  => $zeroStreak,

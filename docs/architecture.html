@@ -368,7 +368,7 @@
   <rect x="600" y="40" width="220" height="110" rx="10" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2"/>
   <text x="710" y="70" class="t1">🐘 PHP + Chrome</text>
   <text x="710" y="94" class="t2">作業者です。全処理がここ</text>
-  <text x="710" y="116" class="t2">約1,500行の1ファイル</text>
+  <text x="710" y="116" class="t2">約1,600行の1ファイル</text>
   <text x="710" y="138" class="t3">ur_monitor.php</text>
 
   <g fill="none" stroke="#8c959f" stroke-width="2" marker-end="url(#m1)">
@@ -393,7 +393,7 @@
 <thead><tr><th>役割</th><th>やること</th><th>やらないこと</th></tr></thead>
 <tbody>
 <tr><td>Cloudflare</td><td>5分ごとに GitHub を叩く。ついでに詰まった実行を片付け、止まっていれば Slack に知らせる。保管庫（KV）の出し入れと、一覧の閲覧の認証も受け持つ</td><td>UR は見ません</td></tr>
-<tr><td>GitHub Actions</td><td>PHP を動かす箱を用意する</td><td>時刻を守れない（下記 2 章）</td></tr>
+<tr><td>GitHub Actions</td><td>PHP を動かす箱を用意する</td><td>時刻を守れない（すぐ下の囲み）</td></tr>
 <tr><td>PHP + Chrome</td><td>取得・比較・通知・書き出し</td><td>常駐しません。毎回終了します</td></tr>
 </tbody>
 </table>
@@ -545,7 +545,7 @@ push の衝突に備えていましたが、状態と一覧を Cloudflare に預
 
 <p>ここでは1つの URL を処理するときの要点と理由だけを図にしています。コードの順番どおりの流れは
 <a href="https://github.com/tama-create/ur-monitor/blob/main/FLOW.md" target="_blank" rel="noopener">FLOW.md</a>
-にあり、この図は FLOW.md の 2.7 にあたります。</p>
+にあり、この図は FLOW.md の 2.8 にあたります。</p>
 
 <figure class="fig">
 <svg viewBox="0 0 840 430" role="img" aria-label="1つのURLを処理するときの流れ。robots確認、ページ取得、描画待ち、抽出、信用判定">
@@ -685,7 +685,7 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 <h2 id="a5">通知するかの判定</h2>
 
 <figure class="fig">
-<svg viewBox="0 0 840 240" role="img" aria-label="今回の部屋と前回の部屋を比べて新着を見つけ、その部屋のグループが通知対象で間取りも合えばSlackへ送る流れ">
+<svg viewBox="0 0 840 240" role="img" aria-label="今回の部屋と前回の部屋を比べて、まだ知らせていない部屋を見つけ、その部屋のグループが通知対象で間取りも合えばSlackへ送る流れ">
   <defs>
     <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8c959f"/>
@@ -700,8 +700,8 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
   <text x="110" y="174" class="t2">保管庫から読む</text>
 
   <rect x="260" y="78" width="180" height="64" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
-  <text x="350" y="104" class="t1">差を取る</text>
-  <text x="350" y="126" class="t2">前回に無い URL＝新着</text>
+  <text x="350" y="104" class="t1">未通知を探す</text>
+  <text x="350" y="126" class="t2">新着と、知らせていない部屋</text>
 
   <rect x="500" y="78" width="180" height="64" rx="8" fill="#fff8e5" stroke="#d4a72c"/>
   <text x="590" y="104" class="t1">グループで判定</text>
@@ -726,6 +726,9 @@ UR の記述は <code>Disallow: /chintai/*/result/?skcs=</code> のように <co
 <tr><td>判定の単位</td><td><code>config.json</code> の <code>groups</code> ごとです（<code>room_notifies()</code>）。<code>notify: false</code> のグループは一覧に出すだけで黙ります</td></tr>
 <tr><td>間取りの照合</td><td><code>madori</code> のどれかに<strong>部分一致</strong>（<code>str_contains</code>）すれば通知します。<code>[]</code> なら間取りを問いません</td></tr>
 <tr><td>同じ部屋が複数のグループに出たとき</td><td><strong>上に書いたグループが勝ちます</strong>。団地ページを第一希望、それを含む地域ページを参考に置いても、本命の部屋は第一希望として通知されます</td></tr>
+<tr><td>通知の回数</td><td><strong>部屋ごとに1回</strong>です。知らせたかどうかを、保管庫の状態に部屋ごとの印（<code>notified</code>）として持ちます</td></tr>
+<tr><td>新着でなくても通知する場合</td><td>まだ知らせていない部屋が、通知の対象になったときです。第一希望のページの取得に失敗した回に、同じ部屋が参考のページから先に入った場合がこれにあたります（次の回には新着でなくなるため、新着だけを見ていると通知されません）。<code>madori</code> や <code>notify</code> を広げたときも、いま出ている該当の部屋が1回通知されます</td></tr>
+<tr><td>Slack に送れなかったとき</td><td>間をあけて3回まで試します。それでも送れなければ印を付けず、次の回（5分後）にもう一度送ります</td></tr>
 <tr><td>Webhook URL</td><td>環境変数 <code>SLACK_WEBHOOK_URL</code> から渡します。<strong>設定ファイルに実値を書かないでください</strong></td></tr>
 </tbody>
 </table>
@@ -901,7 +904,9 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <div class="warn">
 <p><strong>警告は、実行できたときにしか出せません。</strong>
 だから GitHub 側の <code>schedule</code> を完全には外さず、<strong>1日4回の心拍</strong>として残してあります。
-外部トリガーが死んだときの保険と、見張りを兼ねています。<strong>この4回を「間隔」として当てにしないでください。</strong></p>
+外部トリガーが死んだときの保険と、見張りを兼ねています。<strong>この4回を「間隔」として当てにしないでください。</strong>
+2026年11月の実測では設定の時刻から数時間遅れて走り、4回のうち2回は夜間（0時台・3時台）にずれ込んでいます。
+夜間にずれ込んだ回は、止まりの確認だけして UR は見に行きません。</p>
 </div>
 
 <h3 id="a8-1">GitHub の外からも見張る</h3>
@@ -917,7 +922,7 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 
 <figure class="fig">
 <svg viewBox="0 0 840 250" role="img" aria-label="Cloudflare の Worker が起動のたびに、詰まった実行を取り消し、最後の成功から30分空いていれば Slack に知らせ、そのあと起動を依頼する流れ">
-  <text x="420" y="24" class="t4">Cloudflare の起動のたびに、起動を頼む前に2つ見回る</text>
+  <text x="420" y="24" class="t4">Cloudflare の起動のたびに、起動を頼む前に見回る（図の2つと、下の表の「無効の見張り」）</text>
 
   <rect x="20" y="46" width="170" height="70" rx="8" fill="#fff8e5" stroke="#d4a72c" stroke-width="2"/>
   <text x="105" y="74" class="t1">⏰ cron 発火</text>
@@ -952,8 +957,9 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <table>
 <thead><tr><th>見回り</th><th>中身</th><th>理由</th></tr></thead>
 <tbody>
-<tr><td>詰まりの片付け</td><td>queued / in_progress / pending / waiting の実行のうち、作成から<strong>20分</strong>を過ぎたものを cancel、<strong>40分</strong>を過ぎたものは force-cancel</td><td>正常な実行は2分以内に終わります（<code>timeout-minutes</code> は10分）。普通の取り消しを受け付けない実行があるため、2段にしています</td></tr>
+<tr><td>詰まりの片付け</td><td>queued / in_progress / pending / waiting の実行のうち、作成から<strong>20分</strong>を過ぎたものを cancel、<strong>40分</strong>を過ぎたものは force-cancel</td><td>正常な実行は1〜2分、長くても数分で終わります（<code>timeout-minutes</code> は10分）。普通の取り消しを受け付けない実行があるため、2段にしています</td></tr>
 <tr><td>止まりの見張り</td><td>直近50回の実行一覧から最後の成功を探し、稼働時間帯で<strong>30分</strong>以上空いていたら、<strong>次の見回り（5分後）でも同じだったとき</strong>に Slack へ1回だけ送る</td><td>5分おきなので6回ぶんの取りこぼしにあたり、1〜2回の一時的な失敗では鳴りません。2回続けて確かめるのは、GitHub の API がまれに古い結果を返して誤報になったためです（2026-09-14 19:40）。疑いの印は KV の <code>stale_suspect</code>、警告済みの印は <code>stale_alerted</code> に置きます</td></tr>
+<tr><td>無効の見張り</td><td>ワークフローの状態を見て、無効になっていたら Slack へ「監視のワークフローが無効になっています」を送る（同じ状態のあいだは1回だけ。印は KV の <code>disabled_alerted</code>）</td><td>GitHub は、公開リポジトリに60日間動きが無いと定時実行を自動で無効にします。監視はコミットをしないので、放っておくと対象になります。<strong>自動では有効に戻しません。</strong>この制限を自動で避ける定番の道具が、GitHub に規約違反として止められているためです。知らせが来たら、人が画面で Enable workflow を押します</td></tr>
 </tbody>
 </table>
 
@@ -975,11 +981,13 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <tr><td>実行間隔</td><td><strong>5分</strong></td><td>Cloudflare の cron</td></tr>
 <tr><td>稼働時間帯</td><td>JST 8:00〜21:55</td><td>cron ＋ worker.js ＋ config.json（3か所）</td></tr>
 <tr><td>1日の実行回数</td><td>168回</td><td>14時間 × 12</td></tr>
-<tr><td>1回の所要</td><td>45〜85秒（＋ jitter 最大40秒）</td><td>実測</td></tr>
+<tr><td>1回の所要</td><td>およそ1〜2分半（中央値85秒。起動から終了まで、ゆらぎの待機を含む）</td><td>実測（2026年11月の約500回）。空きが0件のページは描画待ちの上限20秒まで待つので、0件のページが多いほど延びます</td></tr>
 <tr><td>開始前のゆらぎ</td><td>0〜40秒</td><td><code>jitter_max_seconds</code></td></tr>
 <tr><td>URL 間の待機</td><td>3秒</td><td>コード内で固定</td></tr>
 <tr><td>描画待ち</td><td>件数が1秒安定するまで・最長20秒</td><td><code>wait_for_rooms()</code></td></tr>
 <tr><td>取り直しの待機</td><td>5秒・1回だけ</td><td>失敗対策の1段目</td></tr>
+<tr><td>Chrome の起動のやり直し</td><td>3回まで（5秒・10秒あけ、プロファイルを替える）</td><td><code>create_browser()</code></td></tr>
+<tr><td>Slack の送信のやり直し</td><td>3回まで（3秒・6秒あける）</td><td><code>slack_send()</code></td></tr>
 <tr><td>怪しいと判断する減り方</td><td>前回の <strong>0.7 倍</strong>未満</td><td><code>shrink_guard_ratio</code></td></tr>
 <tr><td>粘る回数</td><td><strong>18回</strong>（＝約90分）</td><td><code>zero_streak_limit</code></td></tr>
 <tr><td>「止まっていました」を出す空白</td><td>3時間</td><td><code>stale_warning_hours</code>（監視ジョブ）</td></tr>
@@ -1019,10 +1027,11 @@ UR 側の一時的な不調に耐えられる時間になります。5分に詰�
 <tbody>
 <tr><td>通知が来ない・実行が少ない</td><td>Cloudflare の <strong>Observability</strong></td><td>トークン切れ（401）、権限不足（403）</td></tr>
 <tr><td>「監視が止まっています」が届いた</td><td>Actions タブの実行一覧</td><td>「待ち」のまま固まった実行（20分で自動的に取り消されます）、GitHub の障害</td></tr>
+<tr><td>「監視のワークフローが無効になっています」が届いた</td><td>Actions タブの <strong>UR賃貸監視</strong></td><td>60日間リポジトリに動きが無かった。<strong>Enable workflow</strong> を押すと再開します</td></tr>
 <tr><td>いつ動いたか知りたい</td><td>Actions タブの <strong>実行一覧</strong></td><td>—（コミットはしなくなったので、コミット履歴には残りません）</td></tr>
 <tr><td>全 URL が0件になる</td><td><strong>まず環境</strong>を疑う</td><td>Chrome がそもそも到達できていない</td></tr>
 <tr><td>件数が中途半端</td><td>ログの <code>前回状態を維持</code></td><td>正常動作です。3段構えが効いています</td></tr>
-<tr><td>実行が赤い</td><td>Actions のログ</td><td>依存の更新、<code>config.json</code> の書き間違い、保管庫への書き込み失敗（<code>HTTP 0</code> などの一時的なもの）</td></tr>
+<tr><td>実行が赤い</td><td>Actions のログ</td><td>1回だけなら一時的なもの（Chrome の起動失敗、保管庫との通信失敗 <code>HTTP 0</code>）で、次の回で直ります。続くなら依存の更新や <code>config.json</code> の書き間違い</td></tr>
 </tbody>
 </table>
 
@@ -1048,7 +1057,7 @@ robots.txt の取得は <strong>PHP が直接</strong>行っていて、Chrome �
   </div>
   <div class="author-updated">
     <p class="lbl">Last updated</p>
-    <p class="val"><time datetime="2026-09-14">2026年9月14日</time></p>
+    <p class="val"><time datetime="2026-11-16">2026年11月16日</time></p>
   </div>
 </div>
 <p>
