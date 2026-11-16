@@ -32,7 +32,7 @@ const END_HOUR = 21;
 // 24時間後に打ち切るまで放置される。実際に 2026-09-13 13:10 の回がこうなり、
 // 約24時間・290回ぶん監視が止まった（run 34737267050。ステップ0件、ランナー無し）。
 //
-// 正常な回は数分で終わる（実測45〜85秒、timeout-minutes は10分）。STUCK_MINUTES を
+// 正常な回は数分で終わる（実測でおよそ1〜2分半、timeout-minutes は10分）。STUCK_MINUTES を
 // 過ぎても終わっていない回は詰まっているとみなし、起動のついでにキャンセルする。
 // 普通のキャンセルを受け付けない回があるため、FORCE_CANCEL_MINUTES を過ぎたら
 // 強制キャンセル（force-cancel）に切り替える。
@@ -61,6 +61,16 @@ const KV_STALE_SUSPECT = 'stale_suspect';   // 前回の見回りで「空いて
 // 上の誤報はこの絞り込みの結果が古かったもので、絞り込まない一覧は正しい結果を返していた。
 const RECENT_RUNS = 50;
 
+// ── ワークフローが無効にされていないかの見張り ─────────────
+//
+// GitHub は、公開リポジトリに60日間動きが無いと定時実行を自動で無効にする（ワークフローの state が
+// disabled_inactivity になる）。一覧と state を Cloudflare に移してからは監視がコミットをしないので、
+// 放っておくとこの対象になる。無効になっていたら Slack に知らせ、直し方（Enable workflow を押す）を伝える。
+//
+// 自動で有効に戻したり、動きを装うコミットを定期的に入れたりはしないこと。この制限を自動で避ける
+// 定番の道具（keepalive-workflow）のリポジトリは、GitHub に規約違反として止められている（2026-11 確認）。
+// 規約に触れるおそれのあることは持ち込まず、人が画面で有効に戻す。
+const KV_DISABLED_ALERTED = 'disabled_alerted';   // 同じ状態のあいだ連投しないよう、警告済みの印を置く
 
 // ── 一覧の保管と閲覧 ─────────────────────────
 //
@@ -253,6 +263,46 @@ async function warnIfStale(env, now) {
   console.log(`止まりを警告した（${last ? `最後の成功 run ${last.id}` : mark}・${gap}分）`);
 }
 
+async function warnIfDisabled(env) {
+  if (!env.SLACK_WEBHOOK_URL) return;   // 未設定の知らせは warnIfStale がログに出している
+  const res = await fetch(`${API_BASE}/workflows/${WORKFLOW}`, { headers: githubHeaders(env) });
+  if (!res.ok) {
+    throw new Error(`ワークフローの状態の取得に失敗: ${res.status} ${await res.text()}`);
+  }
+  const { state } = await res.json();
+  if (state === 'active') {
+    if (env.STORE && (await env.STORE.get(KV_DISABLED_ALERTED)) !== null) {
+      await env.STORE.delete(KV_DISABLED_ALERTED);
+      console.log('ワークフローは有効に戻った');
+    }
+    return;
+  }
+
+  // 同じ状態のあいだは1回だけ鳴らす。KV が結び付いていなければ5分おきに届くが、黙るよりは鳴るほうを選ぶ
+  if (env.STORE && (await env.STORE.get(KV_DISABLED_ALERTED)) === state) return;
+
+  const why = state === 'disabled_inactivity'
+    ? 'リポジトリに60日間動きが無かったため、GitHub が自動実行を止めました。'
+    : `状態は ${state} です。手動で止めた覚えが無ければ確認してください。`;
+  const text =
+    `:rotating_light: *監視のワークフローが無効になっています*\n` +
+    `${why}\n` +
+    `次の画面で「Enable workflow」を押すと再開します。\n` +
+    `https://github.com/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}`;
+  const s = await fetch(env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (!s.ok) {
+    throw new Error(`Slack への送信に失敗: ${s.status}`);
+  }
+  if (env.STORE) {
+    await env.STORE.put(KV_DISABLED_ALERTED, state);
+  }
+  console.log(`ワークフローの無効を警告した（${state}）`);
+}
+
 function needAuth() {
   // charset="UTF-8" を付けても、ブラウザが送る文字コードは保証されない。
   // パスワードは英数字にしておくこと（README に書いてある）
@@ -352,6 +402,11 @@ export default {
       await warnIfStale(env, now);
     } catch (e) {
       console.log(`止まりの見張りに失敗: ${e.message}`);
+    }
+    try {
+      await warnIfDisabled(env);
+    } catch (e) {
+      console.log(`無効の見張りに失敗: ${e.message}`);
     }
 
     const res = await fetch(`${API_BASE}/workflows/${WORKFLOW}/dispatches`, {

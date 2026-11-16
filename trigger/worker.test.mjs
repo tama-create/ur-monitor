@@ -26,8 +26,9 @@ function makeStore() {
   };
 }
 
-// GitHub と Slack を模擬する。runs は新しい順の実行一覧、stuck は終わっていない実行
-function setup({ now, runs = [], stuck = [], listFails = false, store = makeStore() }) {
+// GitHub と Slack を模擬する。runs は新しい順の実行一覧、stuck は終わっていない実行、
+// workflowState はワークフローの状態（null なら状態の取得そのものが失敗する）
+function setup({ now, runs = [], stuck = [], listFails = false, workflowState = 'active', store = makeStore() }) {
   const calls = { dispatch: 0, slack: [], cancel: [], urls: [] };
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url);
@@ -52,6 +53,10 @@ function setup({ now, runs = [], stuck = [], listFails = false, store = makeStor
     if (u.includes('/runs?per_page=')) {
       if (listFails) return new Response('boom', { status: 500 });
       return json({ workflow_runs: runs });
+    }
+    if (u.endsWith('/workflows/monitor.yml')) {
+      if (workflowState === null) return new Response('boom', { status: 500 });
+      return json({ state: workflowState });
     }
     throw new Error('想定外の呼び出し: ' + u);
   };
@@ -163,6 +168,37 @@ test('見張りが失敗しても起動は必ず出す', async () => {
   await t.run();
   assert.equal(t.calls.dispatch, 1);
   assert.ok(t.logs.some((l) => l.includes('止まりの見張りに失敗')));
+});
+
+test('ワークフローが無効なら1回だけ知らせ、起動は出す。有効に戻れば印を消す', async () => {
+  const store = makeStore();
+  const now = jst('2026-11-30T10:00:00');
+  const runs = [success(1, now - 3 * MIN)];
+  let t = setup({ now, runs, workflowState: 'disabled_inactivity', store });
+  await t.run();
+  assert.equal(t.calls.slack.length, 1);
+  assert.match(t.calls.slack[0], /監視のワークフローが無効になっています/);
+  assert.match(t.calls.slack[0], /60日間/);
+  assert.match(t.calls.slack[0], /Enable workflow/);
+  assert.equal(t.calls.dispatch, 1, '無効のとき起動を出していない');
+
+  t = setup({ now: now + 5 * MIN, runs, workflowState: 'disabled_inactivity', store });
+  await t.run();
+  assert.equal(t.calls.slack.length, 0, '同じ状態で2回知らせた');
+
+  t = setup({ now: now + 10 * MIN, runs: [success(2, now + 8 * MIN)], store });
+  await t.run();
+  assert.equal(t.calls.slack.length, 0);
+  assert.equal(store.m.has('disabled_alerted'), false, '有効に戻ったのに印が残っている');
+});
+
+test('ワークフローの状態が取れなくても起動は必ず出す', async () => {
+  const now = jst('2026-11-30T10:00:00');
+  const t = setup({ now, runs: [success(1, now - 3 * MIN)], workflowState: null });
+  await t.run();
+  assert.equal(t.calls.dispatch, 1);
+  assert.equal(t.calls.slack.length, 0);
+  assert.ok(t.logs.some((l) => l.includes('無効の見張りに失敗')));
 });
 
 test('稼働時間外（JST 3時）は何もしない', async () => {
