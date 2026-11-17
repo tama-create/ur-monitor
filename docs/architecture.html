@@ -987,6 +987,7 @@ UR は「このサイトについて」で、私的使用と引用を除く転�
 <tr><td>描画待ち</td><td>件数が1秒安定するまで・最長20秒</td><td><code>wait_for_rooms()</code></td></tr>
 <tr><td>取り直しの待機</td><td>5秒・1回だけ</td><td>失敗対策の1段目</td></tr>
 <tr><td>Chrome の起動のやり直し</td><td>3回まで（5秒・10秒あけ、プロファイルを替える）</td><td><code>create_browser()</code></td></tr>
+<tr><td>保管庫との通信のやり直し</td><td>3回まで（2秒・4秒あける）。つながらないときと 5xx だけ</td><td><code>store_request()</code>。404（まだ無い）と 401 はやり直さない</td></tr>
 <tr><td>Slack の送信のやり直し</td><td>3回まで（3秒・6秒あける）</td><td><code>slack_send()</code></td></tr>
 <tr><td>怪しいと判断する減り方</td><td>前回の <strong>0.7 倍</strong>未満</td><td><code>shrink_guard_ratio</code></td></tr>
 <tr><td>粘る回数</td><td><strong>18回</strong>（＝約90分）</td><td><code>zero_streak_limit</code></td></tr>

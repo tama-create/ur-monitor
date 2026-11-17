@@ -94,8 +94,12 @@ function store_conf(): array
 }
 
 /**
- * 保管先へ HTTP リクエストを1回送る。
- * 通信自体が失敗したらステータスは 0 を返す（呼び出し側が「読めなかった」と扱えるように）。
+ * 保管先へ HTTP リクエストを送る。通信の失敗や 5xx は、間をあけて3回まで試す。
+ * それでも通信できなければステータスは 0 を返す（呼び出し側が「読めなかった」と扱えるように）。
+ *
+ * やり直すのは一時的な失敗だけ。404（まだ無い）や 401（合言葉が違う）は何度送っても同じなので、
+ * そのまま返す。GET も PUT も同じ内容を送り直して問題ない（PUT は上書き）。
+ * 一時的な通信の失敗で実行が止まったことが実際にある（2026-09-30 に2回、11-17 に1回）。
  *
  * @param string      $method GET / PUT
  * @param string      $path   /state または /list
@@ -117,17 +121,28 @@ function store_request(string $method, string $path, ?string $body = null): arra
         // 4xx/5xx でも本文を受け取りたい。false のままだと警告だけ出て中身が取れない
         'ignore_errors' => true,
     ]]);
-    $res = @file_get_contents($base . $path, false, $ctx);
-    if ($res === false) {
-        return [0, ''];
-    }
-    $status = 0;
-    foreach ($http_response_header ?? [] as $h) {
-        if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) {
-            $status = (int)$m[1];   // リダイレクトがあれば最後のものが残る
+
+    $attempts = 3;
+    for ($attempt = 1; ; $attempt++) {
+        $http_response_header = null;
+        $res    = @file_get_contents($base . $path, false, $ctx);
+        $status = 0;
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) {
+                $status = (int)$m[1];   // リダイレクトがあれば最後のものが残る
+            }
         }
+        if ($res === false) {
+            $res = '';
+        }
+
+        $transient = ($status === 0 || $status >= 500);
+        if (!$transient || $attempt >= $attempts) {
+            return [$status, $res];
+        }
+        log_msg('WARNING', "保管先との通信に失敗（{$method} {$path}・HTTP {$status}・{$attempt}/{$attempts} 回目）。やり直します");
+        sleep(2 * $attempt);
     }
-    return [$status, $res];
 }
 
 /**
